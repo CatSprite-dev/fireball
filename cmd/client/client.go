@@ -1,4 +1,4 @@
-package api
+package main
 
 import (
 	"fmt"
@@ -32,9 +32,9 @@ func (c *Client) GetBaseURL() *string {
 	return &c.baseURL
 }
 
-func (c *Client) DoRequest(url string, token string) ([]byte, error) {
-	payload := strings.NewReader(`{}`)
-	req, err := http.NewRequest("POST", url, payload)
+func (c *Client) DoRequest(url string, token string, payload string) ([]byte, error) {
+	body := strings.NewReader(payload)
+	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
 		return nil, fmt.Errorf("request error: %s", err)
 	}

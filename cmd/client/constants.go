@@ -1,4 +1,4 @@
-package api
+package main
 
 const (
 	baseUrl        = "https://invest-public-api.tbank.ru/rest/tinkoff.public.invest.api.contract.v1"
