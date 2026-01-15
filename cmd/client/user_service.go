@@ -4,16 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"time"
-
-	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	client    Client
-	accountID string
+	client     Client
+	accountID  string
+	openedDate time.Time
 }
 
 func NewConfig() Config {
@@ -24,8 +22,9 @@ func NewConfig() Config {
 	}
 
 	cfg := Config{
-		client:    *client,
-		accountID: account.Accounts[0].ID,
+		client:     *client,
+		accountID:  account.Accounts[0].ID,
+		openedDate: account.Accounts[0].OpenedDate,
 	}
 
 	cfg.saveAccount()
@@ -34,20 +33,9 @@ func NewConfig() Config {
 
 func (cfg *Config) GetUserInfo() (UserInfo, error) {
 	userUrl := cfg.client.baseURL + ".UsersService/GetInfo"
-	err := godotenv.Load()
+	token, err := cfg.client.getToken()
 	if err != nil {
-		return UserInfo{}, fmt.Errorf("error loading .env file: %s", err)
-	}
-	token := os.Getenv("token")
-
-	value, ok := cfg.client.cache.Get(userUrl)
-	if ok {
-		var user UserInfo
-		err := json.Unmarshal(value, &user)
-		if err != nil {
-			return UserInfo{}, fmt.Errorf("unmarshal error: %s", err)
-		}
-		return user, nil
+		return UserInfo{}, err
 	}
 
 	payload := `{}`
@@ -66,20 +54,9 @@ func (cfg *Config) GetUserInfo() (UserInfo, error) {
 
 func (cfg *Config) GetPortfolio() (UserPortfolio, error) {
 	userUrl := cfg.client.baseURL + ".OperationsService/GetPortfolio"
-	err := godotenv.Load()
+	token, err := cfg.client.getToken()
 	if err != nil {
-		return UserPortfolio{}, fmt.Errorf("error loading .env file: %s", err)
-	}
-	token := os.Getenv("token")
-
-	value, ok := cfg.client.cache.Get(userUrl)
-	if ok {
-		var userPortfolio UserPortfolio
-		err := json.Unmarshal(value, &userPortfolio)
-		if err != nil {
-			return UserPortfolio{}, fmt.Errorf("unmarshal error: %s", err)
-		}
-		return userPortfolio, nil
+		return UserPortfolio{}, err
 	}
 
 	accountID := cfg.accountID
@@ -100,25 +77,32 @@ func (cfg *Config) GetPortfolio() (UserPortfolio, error) {
 
 func (cfg *Config) GetUserOperations(accountId string, from time.Time, to time.Time) ([]UserOperations, error) {
 	userUrl := cfg.client.baseURL + ".OperationsService/GetOperationsByCursor"
-	err := godotenv.Load()
+	token, err := cfg.client.getToken()
 	if err != nil {
-		return []UserOperations{}, fmt.Errorf("error loading .env file: %s", err)
+		return []UserOperations{}, err
 	}
-	token := os.Getenv("token")
 
 	allOperations := []UserOperations{}
 	cursor := ""
 	limit := 1000
 	for {
-		payload := fmt.Sprintf(`{"accountId": "%s", 
-			"from": "%s", 
-			"to": "%s", 
-			"cursor": "%s", 
-			"limit": "%d"}, 
-			"operationTypes": ["OPERATION_TYPE_INPUT", "OPERATION_TYPE_OUTPUT],
-			"state":"OPERATION_STATE_EXECUTED"`,
-			accountId, from.Format(time.RFC3339), to.Format(time.RFC3339), cursor, limit)
-
+		payload := fmt.Sprintf(`{
+			"accountId": "%s",
+			"from": "%s",
+			"to": "%s",
+			"cursor": "%s",
+			"limit": %d,
+			"operationTypes": ["%s", "%s"],
+			"state": "%s"
+		}`,
+			accountId,
+			from.Format(time.RFC3339),
+			to.Format(time.RFC3339),
+			cursor,
+			limit,
+			OperationTypeInput,
+			OperationTypeOutput,
+			OperationStateExecuted)
 		data, err := cfg.client.DoRequest(userUrl, token, payload)
 		if err != nil {
 			return []UserOperations{}, fmt.Errorf("do request error: %s", err)
@@ -140,12 +124,8 @@ func (cfg *Config) GetUserOperations(accountId string, from time.Time, to time.T
 }
 
 func (cfg *Config) GetTotalDeposits() (float64, error) {
-	accounts, err := cfg.client.GetBankAccount()
-	if err != nil {
-		return 0, fmt.Errorf("error fetching bank accounts: %s", err)
-	}
-	accountID := accounts.Accounts[0].ID
-	openDate := accounts.Accounts[0].OpenedDate
+	accountID := cfg.accountID
+	openDate := cfg.openedDate
 
 	userOperations, err := cfg.GetUserOperations(accountID, openDate, time.Now().UTC())
 	if err != nil {
@@ -157,10 +137,10 @@ func (cfg *Config) GetTotalDeposits() (float64, error) {
 	var totalDeposits float64
 	for _, operation := range userOperations {
 		for _, item := range operation.Items {
-			if item.Type == "OPERATION_TYPE_INPUT" || item.Type == "OPERATION_TYPE_OUTPUT" {
+			if item.Type == string(OperationTypeInput) || item.Type == string(OperationTypeOutput) {
 				unit, err := strconv.Atoi(item.Payment.Units)
 				if err != nil {
-					return 0, err
+					return 0, fmt.Errorf("error converting units to int: %s", err)
 				}
 				totalUnits += unit
 				totalNanos += item.Payment.Nano

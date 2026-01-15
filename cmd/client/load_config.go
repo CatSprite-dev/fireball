@@ -9,21 +9,29 @@ import (
 func LoadConfig() (Config, error) {
 	var cfg Config
 
-	// Создаем клиент
 	client := NewClient(5 * time.Second)
 	cfg.client = *client
 
-	// Пытаемся загрузить accountID из файла
 	file, err := os.ReadFile("t-invest-api-account.json")
 	if err != nil {
-		// Если файла нет, создаем новую конфигурацию
 		if os.IsNotExist(err) {
 			return NewConfig(), nil
 		}
 		return cfg, err
 	}
 
-	// Загружаем accountID из файла
-	err = json.Unmarshal(file, &cfg.accountID)
-	return cfg, err
+	var savedData struct {
+		AccountID  string    `json:"accountID"`
+		OpenedDate time.Time `json:"openedDate"`
+	}
+
+	err = json.Unmarshal(file, &savedData)
+	if err != nil {
+		return cfg, err
+	}
+
+	cfg.accountID = savedData.AccountID
+	cfg.openedDate = savedData.OpenedDate
+
+	return cfg, nil
 }

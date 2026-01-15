@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,6 +36,17 @@ func (c *Client) GetBaseURL() *string {
 	return &c.baseURL
 }
 
+func (c *Client) getToken() (string, error) {
+	if err := godotenv.Load(); err != nil {
+		return "", fmt.Errorf("error loading .env file: %s", err)
+	}
+	token := os.Getenv("token")
+	if token == "" {
+		return "", errors.New("token is empty")
+	}
+	return token, nil
+}
+
 func (c *Client) DoRequest(url string, token string, payload string) ([]byte, error) {
 	body := strings.NewReader(payload)
 	req, err := http.NewRequest("POST", url, body)
@@ -56,26 +68,16 @@ func (c *Client) DoRequest(url string, token string, payload string) ([]byte, er
 		return nil, fmt.Errorf("read error: %s", err)
 	}
 
-	c.cache.Add(url, data)
 	return data, nil
 }
 
 func (c *Client) GetBankAccount() (UserAccounts, error) {
 	userUrl := c.baseURL + ".UsersService/GetAccounts"
-	err := godotenv.Load()
+	token, err := c.getToken()
 	if err != nil {
-		return UserAccounts{}, fmt.Errorf("error loading .env file: %s", err)
+		return UserAccounts{}, err
 	}
-	token := os.Getenv("token")
-	value, ok := c.cache.Get(userUrl)
-	if ok {
-		var accounts UserAccounts
-		err := json.Unmarshal(value, &accounts)
-		if err != nil {
-			return UserAccounts{}, fmt.Errorf("unmarshal error: %s", err)
-		}
-		return accounts, nil
-	}
+
 	payload := `{"status": "ACCOUNT_STATUS_OPEN"}`
 	data, err := c.DoRequest(userUrl, token, payload)
 	if err != nil {
