@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"time"
@@ -10,15 +11,36 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func (c *Client) GetUserInfo() (UserInfo, error) {
-	userUrl := c.baseURL + ".UsersService/GetInfo"
+type Config struct {
+	client    Client
+	accountID string
+}
+
+func NewConfig() Config {
+	client := NewClient(5 * time.Second)
+	account, err := client.GetBankAccount()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cfg := Config{
+		client:    *client,
+		accountID: account.Accounts[0].ID,
+	}
+
+	cfg.saveAccount()
+	return cfg
+}
+
+func (cfg *Config) GetUserInfo() (UserInfo, error) {
+	userUrl := cfg.client.baseURL + ".UsersService/GetInfo"
 	err := godotenv.Load()
 	if err != nil {
 		return UserInfo{}, fmt.Errorf("error loading .env file: %s", err)
 	}
 	token := os.Getenv("token")
 
-	value, ok := c.cache.Get(userUrl)
+	value, ok := cfg.client.cache.Get(userUrl)
 	if ok {
 		var user UserInfo
 		err := json.Unmarshal(value, &user)
@@ -28,7 +50,8 @@ func (c *Client) GetUserInfo() (UserInfo, error) {
 		return user, nil
 	}
 
-	data, err := c.DoRequest(userUrl, token, `{}`)
+	payload := `{}`
+	data, err := cfg.client.DoRequest(userUrl, token, payload)
 	if err != nil {
 		return UserInfo{}, fmt.Errorf("do request error: %s", err)
 	}
@@ -41,38 +64,42 @@ func (c *Client) GetUserInfo() (UserInfo, error) {
 	return user, nil
 }
 
-func (c *Client) GetBankAccounts() (UserAccounts, error) {
-	userUrl := c.baseURL + ".UsersService/GetAccounts"
+func (cfg *Config) GetPortfolio() (UserPortfolio, error) {
+	userUrl := cfg.client.baseURL + ".OperationsService/GetPortfolio"
 	err := godotenv.Load()
 	if err != nil {
-		return UserAccounts{}, fmt.Errorf("error loading .env file: %s", err)
+		return UserPortfolio{}, fmt.Errorf("error loading .env file: %s", err)
 	}
 	token := os.Getenv("token")
-	value, ok := c.cache.Get(userUrl)
+
+	value, ok := cfg.client.cache.Get(userUrl)
 	if ok {
-		var accounts UserAccounts
-		err := json.Unmarshal(value, &accounts)
+		var userPortfolio UserPortfolio
+		err := json.Unmarshal(value, &userPortfolio)
 		if err != nil {
-			return UserAccounts{}, fmt.Errorf("unmarshal error: %s", err)
+			return UserPortfolio{}, fmt.Errorf("unmarshal error: %s", err)
 		}
-		return accounts, nil
-	}
-	payload := `{"status": "ACCOUNT_STATUS_OPEN"}`
-	data, err := c.DoRequest(userUrl, token, payload)
-	if err != nil {
-		return UserAccounts{}, fmt.Errorf("do request error: %s", err)
+		return userPortfolio, nil
 	}
 
-	var accounts UserAccounts
-	err = json.Unmarshal(data, &accounts)
+	accountID := cfg.accountID
+	payload := fmt.Sprintf(`{"accountId": "%s"}`, accountID)
+	data, err := cfg.client.DoRequest(userUrl, token, payload)
 	if err != nil {
-		return UserAccounts{}, fmt.Errorf("unmarshal error: %s", err)
+		return UserPortfolio{}, fmt.Errorf("do request error: %s", err)
 	}
-	return accounts, nil
+
+	var userPortfolio UserPortfolio
+	err = json.Unmarshal(data, &userPortfolio)
+	if err != nil {
+		return UserPortfolio{}, fmt.Errorf("unmarshal error: %s", err)
+	}
+	return userPortfolio, nil
+
 }
 
-func (c *Client) GetUserOperations(accountId string, from time.Time, to time.Time) ([]UserOperations, error) {
-	userUrl := c.baseURL + ".OperationsService/GetOperationsByCursor"
+func (cfg *Config) GetUserOperations(accountId string, from time.Time, to time.Time) ([]UserOperations, error) {
+	userUrl := cfg.client.baseURL + ".OperationsService/GetOperationsByCursor"
 	err := godotenv.Load()
 	if err != nil {
 		return []UserOperations{}, fmt.Errorf("error loading .env file: %s", err)
@@ -92,8 +119,7 @@ func (c *Client) GetUserOperations(accountId string, from time.Time, to time.Tim
 			"state":"OPERATION_STATE_EXECUTED"`,
 			accountId, from.Format(time.RFC3339), to.Format(time.RFC3339), cursor, limit)
 
-		fmt.Println(payload)
-		data, err := c.DoRequest(userUrl, token, payload)
+		data, err := cfg.client.DoRequest(userUrl, token, payload)
 		if err != nil {
 			return []UserOperations{}, fmt.Errorf("do request error: %s", err)
 		}
@@ -113,16 +139,15 @@ func (c *Client) GetUserOperations(accountId string, from time.Time, to time.Tim
 	return allOperations, nil
 }
 
-func (c *Client) GetTotalDeposits() (float64, error) {
-	accounts, err := c.GetBankAccounts()
+func (cfg *Config) GetTotalDeposits() (float64, error) {
+	accounts, err := cfg.client.GetBankAccount()
 	if err != nil {
 		return 0, fmt.Errorf("error fetching bank accounts: %s", err)
 	}
 	accountID := accounts.Accounts[0].ID
 	openDate := accounts.Accounts[0].OpenedDate
-	fmt.Println(accountID)
-	fmt.Println(openDate)
-	userOperations, err := c.GetUserOperations(accountID, openDate, time.Now().UTC())
+
+	userOperations, err := cfg.GetUserOperations(accountID, openDate, time.Now().UTC())
 	if err != nil {
 		return 0, fmt.Errorf("error fetching user operations: %s", err)
 	}
@@ -145,4 +170,29 @@ func (c *Client) GetTotalDeposits() (float64, error) {
 
 	totalDeposits = float64(totalUnits) + (float64(totalNanos) / 1000000000)
 	return totalDeposits, nil
+}
+
+func (cfg *Config) GetTotalReturn() (float64, error) {
+	// Функция возвращает общую доходность за всё время существования портфеля
+	// Формула расчета:
+	// сумма всех вложений / акутальная стоимость портфеля
+	// возвращает доходность от 0 до 1 в формате float64
+
+	userPortfolio, err := cfg.GetPortfolio()
+	if err != nil {
+		return 0.0, err
+	}
+	units, err := strconv.Atoi(userPortfolio.TotalAmountPortfolio.Units)
+	if err != nil {
+		return 0.0, err
+	}
+	totalAmount := float64(units) + (float64(userPortfolio.TotalAmountPortfolio.Nano) / 1000000000)
+
+	totalDeposits, err := cfg.GetTotalDeposits()
+	if err != nil {
+		return 0.0, err
+	}
+
+	totalReturn := ((totalAmount / totalDeposits) - 1)
+	return totalReturn, nil
 }

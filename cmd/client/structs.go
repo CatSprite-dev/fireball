@@ -87,3 +87,164 @@ type UserOperations struct {
 		} `json:"childOperations"`
 	} `json:"items"`
 }
+
+type UserPortfolio struct {
+	TotalAmountShares struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountShares"`
+	TotalAmountBonds struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountBonds"`
+	TotalAmountEtf struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountEtf"`
+	TotalAmountCurrencies struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountCurrencies"`
+	TotalAmountFutures struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountFutures"`
+	ExpectedYield struct {
+		Units string `json:"units"`
+		Nano  int    `json:"nano"`
+	} `json:"expectedYield"`
+	Positions []struct {
+		Figi           string `json:"figi"`
+		InstrumentType string `json:"instrumentType"`
+		Quantity       struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"quantity"`
+		AveragePositionPrice struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"averagePositionPrice"`
+		ExpectedYield struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"expectedYield"`
+		AveragePositionPricePt struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"averagePositionPricePt"`
+		CurrentPrice struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"currentPrice"`
+		AveragePositionPriceFifo struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"averagePositionPriceFifo"`
+		QuantityLots struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"quantityLots"`
+		Blocked     bool `json:"blocked"`
+		BlockedLots struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"blockedLots"`
+		PositionUID   string `json:"positionUid"`
+		InstrumentUID string `json:"instrumentUid"`
+		VarMargin     struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"varMargin"`
+		ExpectedYieldFifo struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"expectedYieldFifo"`
+		DailyYield struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"dailyYield"`
+		Ticker     string `json:"ticker"`
+		ClassCode  string `json:"classCode"`
+		CurrentNkd struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"currentNkd,omitempty"`
+	} `json:"positions"`
+	AccountID          string `json:"accountId"`
+	TotalAmountOptions struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountOptions"`
+	TotalAmountSp struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountSp"`
+	TotalAmountPortfolio struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountPortfolio"`
+	VirtualPositions []struct {
+		PositionUID    string `json:"positionUid"`
+		InstrumentUID  string `json:"instrumentUid"`
+		Figi           string `json:"figi"`
+		InstrumentType string `json:"instrumentType"`
+		Quantity       struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"quantity"`
+		AveragePositionPrice struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"averagePositionPrice"`
+		ExpectedYield struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"expectedYield"`
+		ExpectedYieldFifo struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"expectedYieldFifo"`
+		ExpireDate   time.Time `json:"expireDate"`
+		CurrentPrice struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"currentPrice"`
+		AveragePositionPriceFifo struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"averagePositionPriceFifo"`
+		DailyYield struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"dailyYield"`
+		Ticker    string `json:"ticker"`
+		ClassCode string `json:"classCode"`
+	} `json:"virtualPositions"`
+	DailyYield struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"dailyYield"`
+	DailyYieldRelative struct {
+		Units string `json:"units"`
+		Nano  int    `json:"nano"`
+	} `json:"dailyYieldRelative"`
+}

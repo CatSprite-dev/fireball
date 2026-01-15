@@ -1,13 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/cache"
+	"github.com/joho/godotenv"
 )
 
 type Client struct {
@@ -55,4 +58,34 @@ func (c *Client) DoRequest(url string, token string, payload string) ([]byte, er
 
 	c.cache.Add(url, data)
 	return data, nil
+}
+
+func (c *Client) GetBankAccount() (UserAccounts, error) {
+	userUrl := c.baseURL + ".UsersService/GetAccounts"
+	err := godotenv.Load()
+	if err != nil {
+		return UserAccounts{}, fmt.Errorf("error loading .env file: %s", err)
+	}
+	token := os.Getenv("token")
+	value, ok := c.cache.Get(userUrl)
+	if ok {
+		var accounts UserAccounts
+		err := json.Unmarshal(value, &accounts)
+		if err != nil {
+			return UserAccounts{}, fmt.Errorf("unmarshal error: %s", err)
+		}
+		return accounts, nil
+	}
+	payload := `{"status": "ACCOUNT_STATUS_OPEN"}`
+	data, err := c.DoRequest(userUrl, token, payload)
+	if err != nil {
+		return UserAccounts{}, fmt.Errorf("do request error: %s", err)
+	}
+
+	var accounts UserAccounts
+	err = json.Unmarshal(data, &accounts)
+	if err != nil {
+		return UserAccounts{}, fmt.Errorf("unmarshal error: %s", err)
+	}
+	return accounts, nil
 }

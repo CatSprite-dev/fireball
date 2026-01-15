@@ -1,20 +1,17 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"time"
 )
 
-type config struct {
-	url string
-}
-
 func main() {
-	client := NewClient(5 * time.Second)
-	totalDeposits, err := client.GetTotalDeposits()
+	cfg, err := LoadConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(totalDeposits)
+	totalReturn, err := cfg.GetTotalReturn()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println(totalReturn)
 }
