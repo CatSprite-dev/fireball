@@ -71,38 +71,49 @@ func (c *Client) GetBankAccounts() (UserAccounts, error) {
 	return accounts, nil
 }
 
-func (c *Client) GetUserOperations(accountId string, from time.Time, to time.Time) (UserOperation, error) {
-	userUrl := c.baseURL + ".OperationsService/GetOperations"
+func (c *Client) GetUserOperations(accountId string, from time.Time, to time.Time) ([]UserOperations, error) {
+	userUrl := c.baseURL + ".OperationsService/GetOperationsByCursor"
 	err := godotenv.Load()
 	if err != nil {
-		return UserOperation{}, fmt.Errorf("error loading .env file: %s", err)
+		return []UserOperations{}, fmt.Errorf("error loading .env file: %s", err)
 	}
 	token := os.Getenv("token")
-	value, ok := c.cache.Get(userUrl)
-	if ok {
-		var operations UserOperation
-		err := json.Unmarshal(value, &operations)
-		if err != nil {
-			return UserOperation{}, fmt.Errorf("unmarshal error: %s", err)
-		}
-		return operations, nil
-	}
-	payload := fmt.Sprintf(`{"accountId": "%s", "from": "%s", "to": "%s"}`, accountId, from.Format(time.RFC3339), to.Format(time.RFC3339))
-	fmt.Println(payload)
-	data, err := c.DoRequest(userUrl, token, payload)
-	if err != nil {
-		return UserOperation{}, fmt.Errorf("do request error: %s", err)
-	}
 
-	var operations UserOperation
-	err = json.Unmarshal(data, &operations)
-	if err != nil {
-		return UserOperation{}, fmt.Errorf("unmarshal error: %s", err)
+	allOperations := []UserOperations{}
+	cursor := ""
+	limit := 1000
+	for {
+		payload := fmt.Sprintf(`{"accountId": "%s", 
+			"from": "%s", 
+			"to": "%s", 
+			"cursor": "%s", 
+			"limit": "%d"}, 
+			"operationTypes": ["OPERATION_TYPE_INPUT", "OPERATION_TYPE_OUTPUT],
+			"state":"OPERATION_STATE_EXECUTED"`,
+			accountId, from.Format(time.RFC3339), to.Format(time.RFC3339), cursor, limit)
+
+		fmt.Println(payload)
+		data, err := c.DoRequest(userUrl, token, payload)
+		if err != nil {
+			return []UserOperations{}, fmt.Errorf("do request error: %s", err)
+		}
+
+		var blockOfOperations UserOperations
+		err = json.Unmarshal(data, &blockOfOperations)
+		if err != nil {
+			return []UserOperations{}, fmt.Errorf("unmarshal error: %s", err)
+		}
+		allOperations = append(allOperations, blockOfOperations)
+		if blockOfOperations.HasNext {
+			cursor = blockOfOperations.NextCursor
+		} else {
+			break
+		}
 	}
-	return operations, nil
+	return allOperations, nil
 }
 
-func (c *Client) GetTotalDeposits() (int, error) {
+func (c *Client) GetTotalDeposits() (float64, error) {
 	accounts, err := c.GetBankAccounts()
 	if err != nil {
 		return 0, fmt.Errorf("error fetching bank accounts: %s", err)
@@ -115,15 +126,23 @@ func (c *Client) GetTotalDeposits() (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("error fetching user operations: %s", err)
 	}
-	totalDeposits := 0
-	for _, operation := range userOperations.Operations {
-		if operation.Type == "Пополнение брокерского счёта" {
-			deposit, err := strconv.Atoi(operation.Payment.Units)
-			if err != nil {
-				return 0, err
+
+	totalUnits := 0
+	totalNanos := 0
+	var totalDeposits float64
+	for _, operation := range userOperations {
+		for _, item := range operation.Items {
+			if item.Type == "OPERATION_TYPE_INPUT" || item.Type == "OPERATION_TYPE_OUTPUT" {
+				unit, err := strconv.Atoi(item.Payment.Units)
+				if err != nil {
+					return 0, err
+				}
+				totalUnits += unit
+				totalNanos += item.Payment.Nano
 			}
-			totalDeposits += deposit
 		}
 	}
+
+	totalDeposits = float64(totalUnits) + (float64(totalNanos) / 1000000000)
 	return totalDeposits, nil
 }
