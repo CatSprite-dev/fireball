@@ -9,9 +9,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	totalReturn, err := cfg.GetTotalReturn()
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println(totalReturn)
+	GetPositionsInfo(&cfg)
 }
