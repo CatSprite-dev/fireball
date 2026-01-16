@@ -6,11 +6,15 @@ import (
 	"time"
 )
 
-func (cfg *Config) GetUserInfo() (UserInfo, error) {
+func (cfg *Config) GetUserInfo(token string) (UserInfo, error) {
 	userUrl := cfg.client.baseURL + ".UsersService/GetInfo"
-	token, err := cfg.client.getToken()
-	if err != nil {
-		return UserInfo{}, err
+	//temporary
+	if token == "" {
+		cfgToken, err := cfg.client.getToken()
+		if err != nil {
+			return UserInfo{}, err
+		}
+		token = cfgToken
 	}
 
 	payload := `{}`

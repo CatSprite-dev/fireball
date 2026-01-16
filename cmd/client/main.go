@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	_, err := LoadConfig()
+	cfg, err := LoadConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -22,6 +22,8 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.Dir("front")))
+
+	mux.HandleFunc("/auth", cfg.HandlerAuth)
 
 	srv := &http.Server{
 		Addr:    ":" + port,
