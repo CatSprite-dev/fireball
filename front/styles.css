@@ -27,31 +27,23 @@ body {
 .logo-section {
   display: flex;
    text-align: left;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  gap: 20px;
+  gap: 10px;
+  margin-top: 100px;
 }
 
-.logo {
-    margin-bottom: 20px;
-}
 
 .logo-img {
-    width: 80px;
-    height: 80px;
+    width: 55px;
+    height: 120px;
+    margin-bottom: 6px;
 }
 
 .site-title {
     font-size: 5rem;
     color: #333;
-    margin-bottom: 10px;
     font-weight: 600;
-}
-
-.site-subtitle {
-    font-size: 1.2rem;
-    color: #666;
-    margin-bottom: 30px;
 }
 
 .main {
@@ -159,7 +151,7 @@ body {
     }
     
     .logo-img {
-        width: 80px;
-        height: 80px;
+        width: 200px;
+        height: 200px;
     }
 }
