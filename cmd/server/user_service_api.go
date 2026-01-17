@@ -31,12 +31,13 @@ func (cfg *Config) GetUserInfo(token string) (UserInfo, error) {
 	return user, nil
 }
 
-func (cfg *Config) GetPortfolio() (UserPortfolio, error) {
+func (cfg *Config) GetPortfolio(token string) (UserPortfolio, error) {
 	userUrl := cfg.client.baseURL + ".OperationsService/GetPortfolio"
-	token, err := cfg.client.getToken()
-	if err != nil {
-		return UserPortfolio{}, err
-	}
+
+	//token, err := cfg.client.getToken()
+	//if err != nil {
+	//	return UserPortfolio{}, err
+	//}
 
 	accountID := cfg.accountID
 	payload := fmt.Sprintf(`{"accountId": "%s"}`, accountID)

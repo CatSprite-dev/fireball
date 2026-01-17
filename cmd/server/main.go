@@ -24,6 +24,7 @@ func main() {
 	mux.Handle("/", http.FileServer(http.Dir("front")))
 
 	mux.HandleFunc("/auth", cfg.HandlerAuth)
+	mux.HandleFunc("/portfolio", cfg.handlerGetPortfolio)
 
 	srv := &http.Server{
 		Addr:    ":" + port,

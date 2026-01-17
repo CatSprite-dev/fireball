@@ -19,10 +19,17 @@
         </header>
 
         <main class="main">
-            <div class="input-section">
-                <input type="text" class="input-field" placeholder="Введите токен...">
-                <button class="submit-btn" onclick="checkAndSend()">Отправить</button>
+            <div id="start-page" class="page">
+                <div class="site-subtitle">Добро пожаловать в Fireball!<br>Введите ваш токен для авторизации
+                </div>
+                <div class="input-section">
+                    <input type="text" class="input-field" placeholder="Введите токен...">
+                    <button class="submit-btn" onclick="checkAndSend()">Отправить</button>
+                </div>
             </div>
+            <div id="main-page" class="page" style="display: none;">
+                <h2 class="page-title">Ваш портфель</h2>
+                <div id="portfolio-data"></div>
         </main>
 
         <footer class="footer">
