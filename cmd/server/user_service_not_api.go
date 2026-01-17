@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -35,13 +36,13 @@ func GetTotalDeposits(cfg *Config) (float64, error) {
 	return totalDeposits, nil
 }
 
-func GetTotalReturn(cfg *Config) (float64, error) {
+func GetTotalReturn(cfg *Config, token string) (float64, error) {
 	// Функция возвращает общую доходность за всё время существования портфеля
 	// Формула расчета:
 	// сумма всех вложений / акутальная стоимость портфеля
 	// возвращает доходность от 0 до 1 в формате float64
 
-	userPortfolio, err := cfg.GetPortfolio()
+	userPortfolio, err := cfg.GetPortfolio(token)
 	if err != nil {
 		return 0.0, err
 	}
@@ -60,18 +61,22 @@ func GetTotalReturn(cfg *Config) (float64, error) {
 	return totalReturn, nil
 }
 
-func GetPositionsInfo(cfg *Config) error {
-	userPortfolio, err := cfg.GetPortfolio()
+func GetPositionsInfo(cfg *Config, token string) (string, error) {
+	userPortfolio, err := cfg.GetPortfolio(token)
 	if err != nil {
-		return err
+		return "", err
 	}
+	var results strings.Builder
 	for _, position := range userPortfolio.Positions {
-		fmt.Printf("Ticker: %s, Quantity: %s, Average Price: %s %s\n",
-			position.Ticker,
-			position.Quantity.Units,
-			position.AveragePositionPrice.Units,
-			position.AveragePositionPrice.Currency,
+		results.WriteString(
+			fmt.Sprintf("%s, Quantity: %s, Average Price: %s %s\n",
+				position.Ticker,
+				position.Quantity.Units,
+				position.AveragePositionPrice.Units,
+				position.AveragePositionPrice.Currency,
+			),
 		)
 	}
-	return nil
+	portfolioString := results.String()
+	return portfolioString, nil
 }

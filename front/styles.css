@@ -5,6 +5,8 @@
 }
 
 body {
+    display: grid;
+    place-items: center;
     font-family: 'Arial', sans-serif;
     background-color: white;
     width: 100%;
@@ -17,11 +19,9 @@ body {
 }
 
 .header {
-    flex: 1;
     display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 40px 20px;
+    justify-content: flex-start;
+    align-items: flex-start;
 }
 
 .logo-section {
@@ -30,18 +30,17 @@ body {
   align-items: flex-end;
   justify-content: center;
   gap: 10px;
-  margin-top: 100px;
 }
 
 
 .logo-img {
-    width: 55px;
-    height: 120px;
-    margin-bottom: 6px;
+    width: 26px;
+    height: 50px;
+    margin-bottom: 2px;
 }
 
 .site-title {
-    font-size: 5rem;
+    font-size: 2rem;
     color: #333;
     font-weight: 600;
 }
@@ -49,9 +48,27 @@ body {
 .main {
     flex: 1;
     display: flex;
+    flex-direction: column;
     justify-content: center;
-    align-items: flex-start;
-    padding: 0 20px;
+    align-items: center;
+    gap: 20px;
+}
+
+.page-start {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.site-subtitle {
+    display: flex;
+    font-size: 1.2rem;
+    color: #333;
+    justify-content: center;
+    margin-bottom: 0px;
+    text-align: center;
+    line-height: 1.4;
 }
 
 .input-section {
@@ -95,7 +112,7 @@ body {
 
 .footer {
     background-color: #f8f9fa;
-    padding: 20px;
+    padding: 5px;
     text-align: center;
     border-top: 1px solid #eaeaea;
   width: 100%;
@@ -154,4 +171,31 @@ body {
         width: 200px;
         height: 200px;
     }
+}
+
+.page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+#portfolio-data {
+    width: 100%;
+    max-width: 600px;
+    margin-top: 20px;
+    text-align: left;
+}
+
+#portfolio-data ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+#portfolio-data li {
+    background-color: #f8f9fa;
+    margin: 10px 0;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #FF2400;
 }
