@@ -15,15 +15,28 @@ func getTokenFromHeader(headers http.Header) (string, error) {
 }
 
 func (cfg *Config) HandlerAuth(w http.ResponseWriter, req *http.Request) {
+	type returnVals struct {
+		UserInfo      UserInfo      `json:"user_info"`
+		UserPortfolio UserPortfolio `json:"user_portfolio"`
+	}
+
 	token, err := getTokenFromHeader(req.Header)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid token", err)
 	}
 
-	_, err = cfg.GetUserInfo(token)
+	info, err := cfg.GetUserInfo(token)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid token", err)
+		respondWithError(w, http.StatusInternalServerError, err.Error(), err)
 	}
 
-	respondWithJSON(w, 200, struct{}{})
+	portfolio, err := cfg.GetPortfolio(token)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error(), err)
+	}
+
+	respondWithJSON(w, 200, returnVals{
+		UserInfo:      info,
+		UserPortfolio: portfolio,
+	})
 }

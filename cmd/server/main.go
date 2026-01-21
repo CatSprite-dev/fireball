@@ -21,10 +21,10 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.Dir("front")))
 
 	mux.HandleFunc("/auth", cfg.HandlerAuth)
-	mux.HandleFunc("/portfolio", cfg.handlerGetPortfolio)
+
+	mux.Handle("/", http.FileServer(http.Dir("front")))
 
 	srv := &http.Server{
 		Addr:    ":" + port,
