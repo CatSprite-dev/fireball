@@ -179,7 +179,7 @@ async function showMainPage(portfolioData) {
   html += `
     <tr style="background:#f0f8ff; border-top:2px solid #FF2400; font-weight:bold;">
       <td style="padding:8px; text-align:left;">ИТОГО</td>
-      <td style="padding:8px; text-align:right;">${positions.reduce((sum, pos) => sum + parseInt(pos.quantity.units || 0), 0)}</td>
+      <td style="padding:8px; text-align:right;">—</td>
       <td style="padding:8px; text-align:right;">—</td>
       <td style="padding:8px; text-align:right;">—</td>
       <td style="padding:8px; text-align:right; color:${totalYield >= 0 ? 'green' : 'red'}">
