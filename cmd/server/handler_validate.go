@@ -16,8 +16,9 @@ func getTokenFromHeader(headers http.Header) (string, error) {
 
 func (cfg *Config) HandlerAuth(w http.ResponseWriter, req *http.Request) {
 	type returnVals struct {
-		UserInfo      UserInfo      `json:"user_info"`
-		UserPortfolio UserPortfolio `json:"user_portfolio"`
+		UserInfo      UserInfo           `json:"user_info"`
+		UserPortfolio UserPortfolio      `json:"user_portfolio"`
+		UserDividends map[string]float64 `json:"user_dividends"`
 	}
 
 	token, err := getTokenFromHeader(req.Header)
@@ -35,8 +36,14 @@ func (cfg *Config) HandlerAuth(w http.ResponseWriter, req *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, err.Error(), err)
 	}
 
+	dividends, err := cfg.GetDividends(token)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error(), err)
+	}
+
 	respondWithJSON(w, 200, returnVals{
 		UserInfo:      info,
 		UserPortfolio: portfolio,
+		UserDividends: dividends,
 	})
 }

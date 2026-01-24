@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -55,34 +56,45 @@ func (cfg *Config) GetPortfolio(token string) (UserPortfolio, error) {
 
 }
 
-func (cfg *Config) GetUserOperations(accountId string, from time.Time, to time.Time) ([]UserOperations, error) {
+func (cfg *Config) GetUserOperations(
+	token string,
+	accountId string,
+	instrumentId string,
+	from time.Time,
+	to time.Time,
+	operationTypes []OperationType,
+	operationState OperationState) ([]UserOperations, error) {
+
 	userUrl := cfg.client.baseURL + ".OperationsService/GetOperationsByCursor"
-	token, err := cfg.client.getToken()
-	if err != nil {
-		return []UserOperations{}, err
-	}
 
 	allOperations := []UserOperations{}
 	cursor := ""
 	limit := 1000
+
+	operationTypesJSON, err := json.Marshal(operationTypes)
+	if err != nil {
+		return []UserOperations{}, err
+	}
+	operationTypesStr := string(operationTypesJSON)
 	for {
 		payload := fmt.Sprintf(`{
 			"accountId": "%s",
+			"instrumentId": "%s",
 			"from": "%s",
 			"to": "%s",
 			"cursor": "%s",
 			"limit": %d,
-			"operationTypes": ["%s", "%s"],
+			"operationTypes": %s,
 			"state": "%s"
 		}`,
 			accountId,
+			instrumentId,
 			from.Format(time.RFC3339),
 			to.Format(time.RFC3339),
 			cursor,
 			limit,
-			OperationTypeInput,
-			OperationTypeOutput,
-			OperationStateExecuted)
+			operationTypesStr,
+			operationState)
 		data, err := cfg.client.DoRequest(userUrl, token, payload)
 		if err != nil {
 			return []UserOperations{}, fmt.Errorf("do request error: %s", err)
@@ -101,4 +113,36 @@ func (cfg *Config) GetUserOperations(accountId string, from time.Time, to time.T
 		}
 	}
 	return allOperations, nil
+}
+
+func (cfg *Config) GetDividends(token string) (map[string]float64, error) {
+
+	operations, err := cfg.GetUserOperations(
+		token,
+		cfg.accountID,
+		"",
+		cfg.openedDate,
+		time.Now().UTC(),
+		[]OperationType{OperationTypeDividend, OperationTypeCoupon},
+		OperationStateExecuted,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]float64)
+
+	for _, block := range operations {
+		for _, item := range block.Items {
+			key := item.Figi
+			if key == "" {
+				continue
+			}
+			units, _ := strconv.ParseFloat(item.Payment.Units, 64)
+			payment := units + (float64(item.Payment.Nano) / 1000000000)
+			result[item.Ticker] += payment
+		}
+	}
+
+	return result, nil
 }

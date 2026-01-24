@@ -2,11 +2,10 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
-	"time"
 )
 
+/*
 func GetTotalDeposits(cfg *Config) (float64, error) {
 	accountID := cfg.accountID
 	openDate := cfg.openedDate
@@ -36,6 +35,7 @@ func GetTotalDeposits(cfg *Config) (float64, error) {
 	return totalDeposits, nil
 }
 
+
 func GetTotalReturn(cfg *Config, token string) (float64, error) {
 	// Функция возвращает общую доходность за всё время существования портфеля
 	// Формула расчета:
@@ -60,6 +60,7 @@ func GetTotalReturn(cfg *Config, token string) (float64, error) {
 	totalReturn := ((totalAmount / totalDeposits) - 1)
 	return totalReturn, nil
 }
+*/
 
 func GetPositionsInfo(cfg *Config, token string) (string, error) {
 	userPortfolio, err := cfg.GetPortfolio(token)
