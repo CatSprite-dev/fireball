@@ -9,14 +9,6 @@ import (
 
 func (cfg *Config) GetUserInfo(token string) (UserInfo, error) {
 	userUrl := cfg.client.baseURL + ".UsersService/GetInfo"
-	//temporary
-	if token == "" {
-		cfgToken, err := cfg.client.getToken()
-		if err != nil {
-			return UserInfo{}, err
-		}
-		token = cfgToken
-	}
 
 	payload := `{}`
 	data, err := cfg.client.DoRequest(userUrl, token, payload)
@@ -34,11 +26,6 @@ func (cfg *Config) GetUserInfo(token string) (UserInfo, error) {
 
 func (cfg *Config) GetPortfolio(token string) (UserPortfolio, error) {
 	userUrl := cfg.client.baseURL + ".OperationsService/GetPortfolio"
-
-	//token, err := cfg.client.getToken()
-	//if err != nil {
-	//	return UserPortfolio{}, err
-	//}
 
 	accountID := cfg.accountID
 	payload := fmt.Sprintf(`{"accountId": "%s"}`, accountID)
@@ -134,7 +121,7 @@ func (cfg *Config) GetDividends(token string) (map[string]float64, error) {
 
 	for _, block := range operations {
 		for _, item := range block.Items {
-			key := item.Figi
+			key := item.Ticker
 			if key == "" {
 				continue
 			}
