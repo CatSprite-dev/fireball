@@ -68,6 +68,8 @@ async function authorize(inputText) {
       },
     })
 
+    console.log("Статус ответа:", response.status)
+
     if (response.ok) {
       sessionStorage.setItem('T-Token', inputText)
       const data = await response.json()
