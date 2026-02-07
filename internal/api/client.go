@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"fmt"
@@ -6,35 +6,24 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/CatSprite-dev/fireball/internal/cache"
 )
 
 type Client struct {
-	baseURL    string
-	investURL  string
-	sandboxUrl string
 	httpClient http.Client
-	cache      *cache.Cache
+	baseURL    string
+	sandoxUrl  string
 }
 
-func NewClient(timeout time.Duration) *Client {
+func NewClient(baseURL string, timeout time.Duration) *Client {
 	return &Client{
-		baseURL:    baseUrlInvest,
-		investURL:  baseUrlInvest,
-		sandboxUrl: baseUrlSandbox,
 		httpClient: http.Client{
 			Timeout: timeout,
 		},
-		cache: cache.NewCache(5 * time.Second),
+		baseURL: baseURL,
 	}
 }
 
-func (c *Client) GetBaseURL() *string {
-	return &c.baseURL
-}
-
-func (c *Client) DoRequest(url string, token string, payload string) ([]byte, error) {
+func (client *Client) DoRequest(url string, token string, payload string) ([]byte, error) {
 	body := strings.NewReader(payload)
 	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
@@ -44,7 +33,7 @@ func (c *Client) DoRequest(url string, token string, payload string) ([]byte, er
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Authorization", "Bearer "+token)
 
-	res, err := c.httpClient.Do(req)
+	res, err := client.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("response error: %s", err)
 	}

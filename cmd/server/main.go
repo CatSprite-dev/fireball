@@ -3,35 +3,31 @@ package main
 import (
 	"log"
 	"net/http"
-	"os"
 
-	"github.com/joho/godotenv"
+	"github.com/CatSprite-dev/fireball/internal/api"
+	"github.com/CatSprite-dev/fireball/internal/config"
+	"github.com/CatSprite-dev/fireball/internal/handlers"
+	"github.com/CatSprite-dev/fireball/internal/service"
 )
 
 func main() {
-	cfg, err := LoadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
+	cfg := config.NewConfig()
 
-	godotenv.Load(".env")
-	port := os.Getenv("PORT")
-	if port == "" {
-		log.Fatal("PORT environment variable is not set")
-	}
+	apiClient := api.NewClient(cfg.BaseURL, cfg.Timeout)
+	calculator := service.NewCalculator(apiClient)
+	authHandler := handlers.NewAuthHandler(calculator)
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/auth", cfg.HandlerAuth)
+	mux.HandleFunc("/auth", authHandler.HandlerAuth)
 
-	mux.Handle("/", http.FileServer(http.Dir("front")))
+	mux.Handle("/", http.FileServer(http.Dir("web")))
 
 	srv := &http.Server{
-		Addr:    ":" + port,
+		Addr:    ":" + cfg.ServerPort,
 		Handler: mux,
 	}
 
-	log.Printf("Serving on: http://localhost:%s/\n", port)
+	log.Printf("Serving on: http://localhost:%s/\n", cfg.ServerPort)
 	log.Fatal(srv.ListenAndServe())
-
 }
