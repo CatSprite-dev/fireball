@@ -1,23 +1,20 @@
 // pkg/types.go
 package pkg
 
-import "time"
-
 type UserFullPortfolio struct {
-	TotalAmountShares     MoneyValue        `json:"totalAmountShares"`
-	TotalAmountBonds      MoneyValue        `json:"totalAmountBonds"`
-	TotalAmountEtf        MoneyValue        `json:"totalAmountEtf"`
-	TotalAmountCurrencies MoneyValue        `json:"totalAmountCurrencies"`
-	TotalAmountFutures    MoneyValue        `json:"totalAmountFutures"`
-	ExpectedYield         Quotation         `json:"expectedYield"`
-	Positions             []Position        `json:"positions"`
-	AccountID             string            `json:"accountId"`
-	TotalAmountOptions    MoneyValue        `json:"totalAmountOptions"`
-	TotalAmountSp         MoneyValue        `json:"totalAmountSp"`
-	TotalAmountPortfolio  MoneyValue        `json:"totalAmountPortfolio"`
-	VirtualPositions      []VirtualPosition `json:"virtualPositions"`
-	DailyYield            MoneyValue        `json:"dailyYield"`
-	DailyYieldRelative    Quotation         `json:"dailyYieldRelative"`
+	TotalAmountShares     MoneyValue `json:"totalAmountShares"`
+	TotalAmountBonds      MoneyValue `json:"totalAmountBonds"`
+	TotalAmountEtf        MoneyValue `json:"totalAmountEtf"`
+	TotalAmountCurrencies MoneyValue `json:"totalAmountCurrencies"`
+	TotalAmountFutures    MoneyValue `json:"totalAmountFutures"`
+	ExpectedYield         Quotation  `json:"expectedYield"`
+	Positions             []Position `json:"positions"`
+	AccountID             string     `json:"accountId"`
+	TotalAmountOptions    MoneyValue `json:"totalAmountOptions"`
+	TotalAmountSp         MoneyValue `json:"totalAmountSp"`
+	TotalAmountPortfolio  MoneyValue `json:"totalAmountPortfolio"`
+	DailyYield            MoneyValue `json:"dailyYield"`
+	DailyYieldRelative    Quotation  `json:"dailyYieldRelative"`
 }
 
 type Position struct {
@@ -43,23 +40,6 @@ type Position struct {
 	CurrentNkd               MoneyValue `json:"currentNkd,omitempty"`
 	Dividends                Quotation  `json:"dividends"`
 	TotalYield               Quotation  `json:"totalYield"`
-}
-
-type VirtualPosition struct {
-	PositionUID              string     `json:"positionUid"`
-	InstrumentUID            string     `json:"instrumentUid"`
-	Figi                     string     `json:"figi"`
-	InstrumentType           string     `json:"instrumentType"`
-	Quantity                 Quotation  `json:"quantity"`
-	AveragePositionPrice     MoneyValue `json:"averagePositionPrice"`
-	ExpectedYield            Quotation  `json:"expectedYield"`
-	ExpectedYieldFifo        Quotation  `json:"expectedYieldFifo"`
-	ExpireDate               time.Time  `json:"expireDate"`
-	CurrentPrice             MoneyValue `json:"currentPrice"`
-	AveragePositionPriceFifo MoneyValue `json:"averagePositionPriceFifo"`
-	DailyYield               MoneyValue `json:"dailyYield"`
-	Ticker                   string     `json:"ticker"`
-	ClassCode                string     `json:"classCode"`
 }
 
 type MoneyValue struct {

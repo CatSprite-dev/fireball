@@ -10,7 +10,7 @@ import (
 )
 
 func (client *Client) GetBankAccount(token string) (UserAccounts, error) {
-	userUrl := client.baseURL + ".UsersService/GetAccounts"
+	userUrl := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.UsersService/GetAccounts"
 
 	payload := `{"status": "ACCOUNT_STATUS_OPEN"}`
 	data, err := client.DoRequest(userUrl, token, payload)
@@ -27,7 +27,7 @@ func (client *Client) GetBankAccount(token string) (UserAccounts, error) {
 }
 
 func (client *Client) GetUserInfo(token string) (UserInfo, error) {
-	userUrl := client.baseURL + ".UsersService/GetInfo"
+	userUrl := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.UsersService/GetInfo"
 
 	payload := `{}`
 	data, err := client.DoRequest(userUrl, token, payload)
@@ -44,7 +44,7 @@ func (client *Client) GetUserInfo(token string) (UserInfo, error) {
 }
 
 func (client *Client) GetPortfolio(token string, accountID string) (UserPortfolio, error) {
-	userUrl := client.baseURL + ".OperationsService/GetPortfolio"
+	userUrl := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.OperationsService/GetPortfolio"
 
 	payload := fmt.Sprintf(`{"accountId": "%s"}`, accountID)
 	data, err := client.DoRequest(userUrl, token, payload)
@@ -70,9 +70,9 @@ func (client *Client) GetUserOperations(
 	operationTypes []pkg.OperationType,
 	operationState pkg.OperationState) ([]UserOperations, error) {
 
-	userUrl := client.baseURL + ".OperationsService/GetOperationsByCursor"
+	userUrl := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.OperationsService/GetOperationsByCursor"
 	if strings.Contains(client.baseURL, "sandbox") {
-		userUrl = client.baseURL + ".OperationsService/GetSandboxOperationsByCursor"
+		userUrl = client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.OperationsService/GetSandboxOperationsByCursor"
 	}
 
 	allOperations := []UserOperations{}

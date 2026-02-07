@@ -2,8 +2,6 @@ package api
 
 import (
 	"time"
-
-	"github.com/CatSprite-dev/fireball/internal/pkg"
 )
 
 type UserInfo struct {
@@ -31,88 +29,184 @@ type UserOperations struct {
 	HasNext    bool   `json:"hasNext"`
 	NextCursor string `json:"nextCursor"`
 	Items      []struct {
-		Cursor            string         `json:"cursor"`
-		BrokerAccountID   string         `json:"brokerAccountId"`
-		ID                string         `json:"id"`
-		ParentOperationID string         `json:"parentOperationId"`
-		Name              string         `json:"name"`
-		Date              time.Time      `json:"date"`
-		Type              string         `json:"type"`
-		Description       string         `json:"description"`
-		State             string         `json:"state"`
-		InstrumentUID     string         `json:"instrumentUid"`
-		Figi              string         `json:"figi"`
-		InstrumentType    string         `json:"instrumentType"`
-		InstrumentKind    string         `json:"instrumentKind"`
-		PositionUID       string         `json:"positionUid"`
-		Ticker            string         `json:"ticker"`
-		ClassCode         string         `json:"classCode"`
-		Payment           pkg.MoneyValue `json:"payment"`
-		Price             pkg.MoneyValue `json:"price"`
-		Commission        pkg.MoneyValue `json:"commission"`
-		Yield             pkg.MoneyValue `json:"yield"`
-		YieldRelative     pkg.Quotation  `json:"yieldRelative"`
-		AccruedInt        pkg.MoneyValue `json:"accruedInt"`
-		Quantity          string         `json:"quantity"`
-		QuantityRest      string         `json:"quantityRest"`
-		QuantityDone      string         `json:"quantityDone"`
-		CancelReason      string         `json:"cancelReason"`
-		AssetUID          string         `json:"assetUid"`
-		ChildOperations   []struct {
-			InstrumentUID string         `json:"instrumentUid"`
-			Payment       pkg.MoneyValue `json:"payment"`
+		Cursor            string    `json:"cursor"`
+		BrokerAccountID   string    `json:"brokerAccountId"`
+		ID                string    `json:"id"`
+		ParentOperationID string    `json:"parentOperationId"`
+		Name              string    `json:"name"`
+		Date              time.Time `json:"date"`
+		Type              string    `json:"type"`
+		Description       string    `json:"description"`
+		State             string    `json:"state"`
+		InstrumentUID     string    `json:"instrumentUid"`
+		Figi              string    `json:"figi"`
+		InstrumentType    string    `json:"instrumentType"`
+		InstrumentKind    string    `json:"instrumentKind"`
+		PositionUID       string    `json:"positionUid"`
+		Ticker            string    `json:"ticker"`
+		ClassCode         string    `json:"classCode"`
+		Payment           struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"payment"`
+		Price struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"price"`
+		Commission struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"commission"`
+		Yield struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"yield"`
+		YieldRelative struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"yieldRelative"`
+		AccruedInt struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"accruedInt"`
+		Quantity        string `json:"quantity"`
+		QuantityRest    string `json:"quantityRest"`
+		QuantityDone    string `json:"quantityDone"`
+		CancelReason    string `json:"cancelReason"`
+		AssetUID        string `json:"assetUid"`
+		ChildOperations []struct {
+			InstrumentUID string `json:"instrumentUid"`
+			Payment       struct {
+				Currency string `json:"currency"`
+				Units    string `json:"units"`
+				Nano     int    `json:"nano"`
+			} `json:"payment"`
 		} `json:"childOperations"`
 	} `json:"items"`
 }
 
 type UserPortfolio struct {
-	TotalAmountShares     pkg.MoneyValue `json:"totalAmountShares"`
-	TotalAmountBonds      pkg.MoneyValue `json:"totalAmountBonds"`
-	TotalAmountEtf        pkg.MoneyValue `json:"totalAmountEtf"`
-	TotalAmountCurrencies pkg.MoneyValue `json:"totalAmountCurrencies"`
-	TotalAmountFutures    pkg.MoneyValue `json:"totalAmountFutures"`
-	ExpectedYield         pkg.Quotation  `json:"expectedYield"`
-	Positions             []struct {
-		Figi                     string         `json:"figi"`
-		InstrumentType           string         `json:"instrumentType"`
-		Quantity                 pkg.Quotation  `json:"quantity"`
-		AveragePositionPrice     pkg.MoneyValue `json:"averagePositionPrice"`
-		ExpectedYield            pkg.Quotation  `json:"expectedYield"`
-		AveragePositionPricePt   pkg.Quotation  `json:"averagePositionPricePt"`
-		CurrentPrice             pkg.MoneyValue `json:"currentPrice"`
-		AveragePositionPriceFifo pkg.MoneyValue `json:"averagePositionPriceFifo"`
-		QuantityLots             pkg.Quotation  `json:"quantityLots"`
-		Blocked                  bool           `json:"blocked"`
-		BlockedLots              pkg.Quotation  `json:"blockedLots"`
-		PositionUID              string         `json:"positionUid"`
-		InstrumentUID            string         `json:"instrumentUid"`
-		VarMargin                pkg.MoneyValue `json:"varMargin"`
-		ExpectedYieldFifo        pkg.Quotation  `json:"expectedYieldFifo"`
-		DailyYield               pkg.MoneyValue `json:"dailyYield"`
-		Ticker                   string         `json:"ticker"`
-		ClassCode                string         `json:"classCode"`
-		CurrentNkd               pkg.MoneyValue `json:"currentNkd,omitempty"`
+	TotalAmountShares struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountShares"`
+	TotalAmountBonds struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountBonds"`
+	TotalAmountEtf struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountEtf"`
+	TotalAmountCurrencies struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountCurrencies"`
+	TotalAmountFutures struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountFutures"`
+	ExpectedYield struct {
+		Units string `json:"units"`
+		Nano  int    `json:"nano"`
+	} `json:"expectedYield"`
+	Positions []struct {
+		Figi           string `json:"figi"`
+		InstrumentType string `json:"instrumentType"`
+		Quantity       struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"quantity"`
+		AveragePositionPrice struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"averagePositionPrice"`
+		ExpectedYield struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"expectedYield"`
+		AveragePositionPricePt struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"averagePositionPricePt"`
+		CurrentPrice struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"currentPrice"`
+		AveragePositionPriceFifo struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"averagePositionPriceFifo"`
+		QuantityLots struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"quantityLots"`
+		Blocked     bool `json:"blocked"`
+		BlockedLots struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"blockedLots"`
+		PositionUID   string `json:"positionUid"`
+		InstrumentUID string `json:"instrumentUid"`
+		VarMargin     struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"varMargin"`
+		ExpectedYieldFifo struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"expectedYieldFifo"`
+		DailyYield struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"dailyYield"`
+		Ticker     string `json:"ticker"`
+		ClassCode  string `json:"classCode"`
+		CurrentNkd struct {
+			Currency string `json:"currency"`
+			Units    string `json:"units"`
+			Nano     int    `json:"nano"`
+		} `json:"currentNkd,omitempty"`
 	} `json:"positions"`
-	AccountID            string         `json:"accountId"`
-	TotalAmountOptions   pkg.MoneyValue `json:"totalAmountOptions"`
-	TotalAmountSp        pkg.MoneyValue `json:"totalAmountSp"`
-	TotalAmountPortfolio pkg.MoneyValue `json:"totalAmountPortfolio"`
-	VirtualPositions     []struct {
-		PositionUID              string         `json:"positionUid"`
-		InstrumentUID            string         `json:"instrumentUid"`
-		Figi                     string         `json:"figi"`
-		InstrumentType           string         `json:"instrumentType"`
-		Quantity                 pkg.Quotation  `json:"quantity"`
-		AveragePositionPrice     pkg.MoneyValue `json:"averagePositionPrice"`
-		ExpectedYield            pkg.Quotation  `json:"expectedYield"`
-		ExpectedYieldFifo        pkg.Quotation  `json:"expectedYieldFifo"`
-		ExpireDate               time.Time      `json:"expireDate"`
-		CurrentPrice             pkg.MoneyValue `json:"currentPrice"`
-		AveragePositionPriceFifo pkg.MoneyValue `json:"averagePositionPriceFifo"`
-		DailyYield               pkg.MoneyValue `json:"dailyYield"`
-		Ticker                   string         `json:"ticker"`
-		ClassCode                string         `json:"classCode"`
-	} `json:"virtualPositions"`
-	DailyYield         pkg.MoneyValue `json:"dailyYield"`
-	DailyYieldRelative pkg.Quotation  `json:"dailyYieldRelative"`
+	AccountID          string `json:"accountId"`
+	TotalAmountOptions struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountOptions"`
+	TotalAmountSp struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountSp"`
+	TotalAmountPortfolio struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"totalAmountPortfolio"`
+	VirtualPositions []any `json:"virtualPositions"`
+	DailyYield       struct {
+		Currency string `json:"currency"`
+		Units    string `json:"units"`
+		Nano     int    `json:"nano"`
+	} `json:"dailyYield"`
+	DailyYieldRelative struct {
+		Units string `json:"units"`
+		Nano  int    `json:"nano"`
+	} `json:"dailyYieldRelative"`
 }

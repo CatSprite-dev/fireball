@@ -64,25 +64,5 @@ func convertToFullPortfolio(raw api.UserPortfolio) pkg.UserFullPortfolio {
 		}
 	}
 
-	full.VirtualPositions = make([]pkg.VirtualPosition, len(raw.VirtualPositions))
-	for i, vpos := range raw.VirtualPositions {
-		full.VirtualPositions[i] = pkg.VirtualPosition{
-			PositionUID:              vpos.PositionUID,
-			InstrumentUID:            vpos.InstrumentUID,
-			Figi:                     vpos.Figi,
-			InstrumentType:           vpos.InstrumentType,
-			Quantity:                 pkg.Quotation(vpos.Quantity),
-			AveragePositionPrice:     pkg.MoneyValue(vpos.AveragePositionPrice),
-			ExpectedYield:            pkg.Quotation(vpos.ExpectedYield),
-			ExpectedYieldFifo:        pkg.Quotation(vpos.ExpectedYieldFifo),
-			ExpireDate:               vpos.ExpireDate,
-			CurrentPrice:             pkg.MoneyValue(vpos.CurrentPrice),
-			AveragePositionPriceFifo: pkg.MoneyValue(vpos.AveragePositionPriceFifo),
-			DailyYield:               pkg.MoneyValue(vpos.DailyYield),
-			Ticker:                   vpos.Ticker,
-			ClassCode:                vpos.ClassCode,
-		}
-	}
-
 	return full
 }

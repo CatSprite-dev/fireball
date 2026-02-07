@@ -11,7 +11,6 @@ import (
 type Client struct {
 	httpClient http.Client
 	baseURL    string
-	sandoxUrl  string
 }
 
 func NewClient(baseURL string, timeout time.Duration) *Client {
