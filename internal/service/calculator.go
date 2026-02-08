@@ -1,6 +1,8 @@
 package service
 
 import (
+	"log"
+	"sync"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/api"
@@ -16,6 +18,8 @@ func NewCalculator(apiClient *api.Client) *Calculator {
 }
 
 func (calc *Calculator) GetFullPortfolio(token string) (pkg.UserFullPortfolio, error) {
+	t := time.Now()
+
 	userAccounts, err := calc.apiClient.GetBankAccount(token)
 	if err != nil {
 		return pkg.UserFullPortfolio{}, err
@@ -25,16 +29,24 @@ func (calc *Calculator) GetFullPortfolio(token string) (pkg.UserFullPortfolio, e
 	rawPortfolio, err := calc.apiClient.GetPortfolio(token, accountID)
 	fullPortfolio := convertToFullPortfolio(rawPortfolio)
 
+	var wg sync.WaitGroup
 	for i := range fullPortfolio.Positions {
-		pos := &fullPortfolio.Positions[i]
-		divs, err := calc.GetDividends(token, accountID, pos.InstrumentUID, openedDate, time.Now().UTC())
-		if err != nil {
-			return pkg.UserFullPortfolio{}, err
-		}
-		pos.Dividends = divs[pos.Ticker]
-		pos.TotalYield = AddQuotations(pos.ExpectedYield, pos.Dividends)
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			pos := &fullPortfolio.Positions[i]
+			divs, err := calc.GetDividends(token, accountID, pos.InstrumentUID, openedDate, time.Now().UTC())
+			if err != nil {
+				log.Printf("Failed to get dividends for %s: %v", pos.Ticker, err)
+				return
+			}
+			pos.Dividends = divs[pos.Ticker]
+			pos.TotalYield = AddQuotations(pos.ExpectedYield, pos.Dividends)
+		}(i)
 	}
+	wg.Wait()
 
+	log.Printf("Время выполнения GetFullPortfolio: %.2f сек\n", time.Since(t).Seconds())
 	return fullPortfolio, nil
 }
 
