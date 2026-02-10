@@ -210,3 +210,18 @@ type UserPortfolio struct {
 		Nano  int    `json:"nano"`
 	} `json:"dailyYieldRelative"`
 }
+
+type IndicativeInstruments struct {
+	Instruments []struct {
+		Figi              string `json:"figi"`
+		Ticker            string `json:"ticker"`
+		ClassCode         string `json:"classCode"`
+		Currency          string `json:"currency"`
+		InstrumentKind    string `json:"instrumentKind"`
+		Name              string `json:"name"`
+		Exchange          string `json:"exchange"`
+		UID               string `json:"uid"`
+		BuyAvailableFlag  bool   `json:"buyAvailableFlag"`
+		SellAvailableFlag bool   `json:"sellAvailableFlag"`
+	} `json:"instruments"`
+}

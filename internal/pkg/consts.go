@@ -1,5 +1,13 @@
 package pkg
 
+const (
+	HTTPMethodGet    = "GET"
+	HTTPMethodPost   = "POST"
+	HTTPMethodPut    = "PUT"
+	HTTPMethodDelete = "DELETE"
+	HTTPMethodPatch  = "PATCH"
+)
+
 type OperationType string
 
 const (
@@ -79,4 +87,44 @@ const (
 	OperationStateExecuted    OperationState = "OPERATION_STATE_EXECUTED"
 	OperationStateCanceled    OperationState = "OPERATION_STATE_CANCELED"
 	OperationStateProgress    OperationState = "OPERATION_STATE_PROGRESS"
+)
+
+type CandleInterval string
+
+const (
+	CandleIntervalUnspecified CandleInterval = "CANDLE_INTERVAL_UNSPECIFIED"
+	CandleInterval1Min        CandleInterval = "CANDLE_INTERVAL_1_MIN"
+	CandleInterval5Min        CandleInterval = "CANDLE_INTERVAL_5_MIN"
+	CandleInterval15Min       CandleInterval = "CANDLE_INTERVAL_15_MIN"
+	CandleIntervalHour        CandleInterval = "CANDLE_INTERVAL_HOUR"
+	CandleIntervalDay         CandleInterval = "CANDLE_INTERVAL_DAY"
+	CandleInterval2Min        CandleInterval = "CANDLE_INTERVAL_2_MIN"
+	CandleInterval3Min        CandleInterval = "CANDLE_INTERVAL_3_MIN"
+	CandleInterval10Min       CandleInterval = "CANDLE_INTERVAL_10_MIN"
+	CandleInterval30Min       CandleInterval = "CANDLE_INTERVAL_30_MIN"
+	CandleInterval2Hour       CandleInterval = "CANDLE_INTERVAL_2_HOUR"
+	CandleInterval4Hour       CandleInterval = "CANDLE_INTERVAL_4_HOUR"
+	CandleIntervalWeek        CandleInterval = "CANDLE_INTERVAL_WEEK"
+	CandleIntervalMonth       CandleInterval = "CANDLE_INTERVAL_MONTH"
+	CandleInterval5Sec        CandleInterval = "CANDLE_INTERVAL_5_SEC"
+	CandleInterval10Sec       CandleInterval = "CANDLE_INTERVAL_10_SEC"
+	CandleInterval30Sec       CandleInterval = "CANDLE_INTERVAL_30_SEC"
+)
+
+type CandleSource string
+
+const (
+	CandleSourceUnspecified    CandleSource = "CANDLE_SOURCE_UNSPECIFIED"
+	CandleSourceExchange       CandleSource = "CANDLE_SOURCE_EXCHANGE"
+	CandleSourceIncludeWeekend CandleSource = "CANDLE_SOURCE_INCLUDE_WEEKEND"
+)
+
+type AccountStatus string
+
+const (
+	AccountStatusUnspecified AccountStatus = "ACCOUNT_STATUS_UNSPECIFIED"
+	AccountStatusNew         AccountStatus = "ACCOUNT_STATUS_NEW"
+	AccountStatusOpen        AccountStatus = "ACCOUNT_STATUS_OPEN"
+	AccountStatusClosed      AccountStatus = "ACCOUNT_STATUS_CLOSED"
+	AccountStatusAll         AccountStatus = "ACCOUNT_STATUS_ALL"
 )

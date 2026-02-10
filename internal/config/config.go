@@ -10,25 +10,34 @@ import (
 type Config struct {
 	BaseURL    string
 	InvestURL  string
-	SandboxUrl string
+	SandboxURL string
 
-	ServerPort string
-	Timeout    time.Duration
+	ServerPort   string
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+	IdleTimeout  time.Duration
 }
 
 func NewConfig() *Config {
 	godotenv.Load(".env")
-	investUrl := os.Getenv("investURL")
-	sandboxUrl := os.Getenv("sandboxUrl")
-	port := os.Getenv("port")
-	baseUrl := investUrl
-	timeout := 5 * time.Second
+	investURL := os.Getenv("investURL")
+	sandboxURL := os.Getenv("sandboxUrl")
+
+	serverPort := os.Getenv("PORT")
+	readTimeout := 10 * time.Second
+	writeTimeout := 10 * time.Second
+	idleTimeout := 30 * time.Second
+
+	baseURL := investURL
 
 	return &Config{
-		BaseURL:    baseUrl,
-		InvestURL:  investUrl,
-		SandboxUrl: sandboxUrl,
-		ServerPort: port,
-		Timeout:    timeout,
+		BaseURL:    baseURL,
+		InvestURL:  investURL,
+		SandboxURL: sandboxURL,
+
+		ServerPort:   serverPort,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
+		IdleTimeout:  idleTimeout,
 	}
 }

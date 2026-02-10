@@ -1,10 +1,11 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -13,18 +14,22 @@ type Client struct {
 	baseURL    string
 }
 
-func NewClient(baseURL string, timeout time.Duration) *Client {
+func NewClient(baseURL string) *Client {
 	return &Client{
 		httpClient: http.Client{
-			Timeout: timeout,
+			Timeout: 15 * time.Second,
 		},
 		baseURL: baseURL,
 	}
 }
 
-func (client *Client) DoRequest(url string, token string, payload string) ([]byte, error) {
-	body := strings.NewReader(payload)
-	req, err := http.NewRequest("POST", url, body)
+func (client *Client) DoRequest(url string, httpMethod string, token string, payload interface{}) ([]byte, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("payload marshal error:  %v", err)
+	}
+
+	req, err := http.NewRequest(httpMethod, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("request error: %s", err)
 	}

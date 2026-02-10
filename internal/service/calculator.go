@@ -20,10 +20,11 @@ func NewCalculator(apiClient *api.Client) *Calculator {
 func (calc *Calculator) GetFullPortfolio(token string) (pkg.UserFullPortfolio, error) {
 	t := time.Now()
 
-	userAccounts, err := calc.apiClient.GetBankAccount(token)
+	userAccounts, err := calc.apiClient.GetAccounts(token, pkg.AccountStatusOpen)
 	if err != nil {
 		return pkg.UserFullPortfolio{}, err
 	}
+
 	accountID := userAccounts.Accounts[0].ID
 	openedDate := userAccounts.Accounts[0].OpenedDate
 	rawPortfolio, err := calc.apiClient.GetPortfolio(token, accountID)
@@ -57,14 +58,15 @@ func (calc *Calculator) GetDividends(
 	from time.Time,
 	to time.Time) (map[string]pkg.Quotation, error) {
 
-	operations, err := calc.apiClient.GetUserOperations(
+	operations, err := calc.apiClient.GetUserOperationsByCursor(
 		token,
 		accountID,
 		instrumentId,
-		from,
-		to,
+		&from,
+		&to,
 		[]pkg.OperationType{pkg.OperationTypeDividend, pkg.OperationTypeCoupon},
 		pkg.OperationStateExecuted,
+		false,
 	)
 	if err != nil {
 		return nil, err

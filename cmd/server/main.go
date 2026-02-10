@@ -12,8 +12,7 @@ import (
 
 func main() {
 	cfg := config.NewConfig()
-
-	apiClient := api.NewClient(cfg.BaseURL, cfg.Timeout)
+	apiClient := api.NewClient(cfg.BaseURL)
 	calculator := service.NewCalculator(apiClient)
 	authHandler := handlers.NewAuthHandler(calculator)
 
@@ -24,8 +23,11 @@ func main() {
 	mux.Handle("/", http.FileServer(http.Dir("web")))
 
 	srv := &http.Server{
-		Addr:    ":" + cfg.ServerPort,
-		Handler: mux,
+		Addr:         ":" + cfg.ServerPort,
+		Handler:      mux,
+		ReadTimeout:  cfg.ReadTimeout,
+		WriteTimeout: cfg.WriteTimeout,
+		IdleTimeout:  cfg.IdleTimeout,
 	}
 
 	log.Printf("Serving on: http://localhost:%s/\n", cfg.ServerPort)
