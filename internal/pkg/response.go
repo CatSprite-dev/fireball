@@ -1,4 +1,4 @@
-package main
+package pkg
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ type errorJSON struct {
 	Error string `json:"error"`
 }
 
-func respondWithError(w http.ResponseWriter, code int, msg string, err error) {
+func RespondWithError(w http.ResponseWriter, code int, msg string, err error) {
 	if err != nil {
 		log.Println(err)
 	}
@@ -20,10 +20,10 @@ func respondWithError(w http.ResponseWriter, code int, msg string, err error) {
 	errorToSend := errorJSON{
 		Error: msg,
 	}
-	respondWithJSON(w, code, errorToSend)
+	RespondWithJSON(w, code, errorToSend)
 }
 
-func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
+func RespondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	data, err := json.Marshal(payload)
 	if err != nil {

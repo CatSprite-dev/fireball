@@ -1,6 +1,8 @@
-package main
+package api
 
-import "time"
+import (
+	"time"
+)
 
 type UserInfo struct {
 	QualifiedForWorkWith []string `json:"qualifiedForWorkWith"`
@@ -197,48 +199,8 @@ type UserPortfolio struct {
 		Units    string `json:"units"`
 		Nano     int    `json:"nano"`
 	} `json:"totalAmountPortfolio"`
-	VirtualPositions []struct {
-		PositionUID    string `json:"positionUid"`
-		InstrumentUID  string `json:"instrumentUid"`
-		Figi           string `json:"figi"`
-		InstrumentType string `json:"instrumentType"`
-		Quantity       struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		} `json:"quantity"`
-		AveragePositionPrice struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"averagePositionPrice"`
-		ExpectedYield struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		} `json:"expectedYield"`
-		ExpectedYieldFifo struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		} `json:"expectedYieldFifo"`
-		ExpireDate   time.Time `json:"expireDate"`
-		CurrentPrice struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"currentPrice"`
-		AveragePositionPriceFifo struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"averagePositionPriceFifo"`
-		DailyYield struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"dailyYield"`
-		Ticker    string `json:"ticker"`
-		ClassCode string `json:"classCode"`
-	} `json:"virtualPositions"`
-	DailyYield struct {
+	VirtualPositions []any `json:"virtualPositions"`
+	DailyYield       struct {
 		Currency string `json:"currency"`
 		Units    string `json:"units"`
 		Nano     int    `json:"nano"`
@@ -247,4 +209,19 @@ type UserPortfolio struct {
 		Units string `json:"units"`
 		Nano  int    `json:"nano"`
 	} `json:"dailyYieldRelative"`
+}
+
+type IndicativeInstruments struct {
+	Instruments []struct {
+		Figi              string `json:"figi"`
+		Ticker            string `json:"ticker"`
+		ClassCode         string `json:"classCode"`
+		Currency          string `json:"currency"`
+		InstrumentKind    string `json:"instrumentKind"`
+		Name              string `json:"name"`
+		Exchange          string `json:"exchange"`
+		UID               string `json:"uid"`
+		BuyAvailableFlag  bool   `json:"buyAvailableFlag"`
+		SellAvailableFlag bool   `json:"sellAvailableFlag"`
+	} `json:"instruments"`
 }
