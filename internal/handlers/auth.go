@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/CatSprite-dev/fireball/internal/domain"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 	"github.com/CatSprite-dev/fireball/internal/service"
 )
@@ -17,7 +18,7 @@ func NewAuthHandler(calc *service.Calculator) *AuthHandler {
 
 func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 	type returnVals struct {
-		UserPortfolio pkg.UserFullPortfolio `json:"user_portfolio"`
+		UserPortfolio domain.UserFullPortfolio `json:"user_portfolio"`
 	}
 
 	token, err := getTokenFromHeader(r.Header)

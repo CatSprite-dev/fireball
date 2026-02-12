@@ -1,5 +1,4 @@
-// pkg/types.go
-package pkg
+package domain
 
 type UserFullPortfolio struct {
 	TotalAmountShares     MoneyValue `json:"totalAmountShares"`
@@ -7,7 +6,8 @@ type UserFullPortfolio struct {
 	TotalAmountEtf        MoneyValue `json:"totalAmountEtf"`
 	TotalAmountCurrencies MoneyValue `json:"totalAmountCurrencies"`
 	TotalAmountFutures    MoneyValue `json:"totalAmountFutures"`
-	ExpectedYield         Quotation  `json:"expectedYield"`
+	ExpectedYield         MoneyValue `json:"expectedYield"`
+	ExpectedYieldRelative Quotation  `json:"expectedYieldRelative"`
 	Positions             []Position `json:"positions"`
 	AccountID             string     `json:"accountId"`
 	TotalAmountOptions    MoneyValue `json:"totalAmountOptions"`
@@ -23,7 +23,8 @@ type Position struct {
 	InstrumentType           string     `json:"instrumentType"`
 	Quantity                 Quotation  `json:"quantity"`
 	AveragePositionPrice     MoneyValue `json:"averagePositionPrice"`
-	ExpectedYield            Quotation  `json:"expectedYield"`
+	ExpectedYield            MoneyValue `json:"expectedYield"`
+	ExpectedYieldRelative    Quotation  `json:"expectedYieldRelative"`
 	AveragePositionPricePt   Quotation  `json:"averagePositionPricePt"`
 	CurrentPrice             MoneyValue `json:"currentPrice"`
 	AveragePositionPriceFifo MoneyValue `json:"averagePositionPriceFifo"`
@@ -35,20 +36,11 @@ type Position struct {
 	VarMargin                MoneyValue `json:"varMargin"`
 	ExpectedYieldFifo        Quotation  `json:"expectedYieldFifo"`
 	DailyYield               MoneyValue `json:"dailyYield"`
+	DailyYieldRelative       Quotation  `json:"dailyYieldRelative"`
 	Ticker                   string     `json:"ticker"`
 	ClassCode                string     `json:"classCode"`
 	CurrentNkd               MoneyValue `json:"currentNkd,omitempty"`
-	Dividends                Quotation  `json:"dividends"`
-	TotalYield               Quotation  `json:"totalYield"`
-}
-
-type MoneyValue struct {
-	Currency string `json:"currency"`
-	Units    string `json:"units"`
-	Nano     int    `json:"nano"`
-}
-
-type Quotation struct {
-	Units string `json:"units"`
-	Nano  int    `json:"nano"`
+	Dividends                MoneyValue `json:"dividends"`
+	TotalYield               MoneyValue `json:"totalYield"`
+	TotalYieldRelative       Quotation  `json:"totalYieldRelative"`
 }
