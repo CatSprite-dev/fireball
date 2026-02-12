@@ -28,14 +28,26 @@ func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio
 
 	accountID := userAccounts.Accounts[0].ID
 	openedDate := userAccounts.Accounts[0].OpenedDate
+
 	rawPortfolio, err := calc.apiClient.GetPortfolio(token, accountID)
 	fullPortfolio := convertToFullPortfolio(rawPortfolio)
 
-	fullPortfolio.ExpectedYield = MultiplyMoneyValue(fullPortfolio.TotalAmountPortfolio,
+	// Заполняем ExpectedYield всего портфеля
+	coeff, err := DivideMoneyValue(
 		domain.MoneyValue{
 			Units: fullPortfolio.ExpectedYieldRelative.Units,
 			Nano:  fullPortfolio.ExpectedYieldRelative.Nano,
-		})
+		},
+		domain.MoneyValue{Units: "100", Nano: 0},
+	)
+	if err != nil {
+		return domain.UserFullPortfolio{}, err
+	}
+	fullPortfolio.ExpectedYield = MultiplyMoneyValue(fullPortfolio.TotalAmountPortfolio, coeff)
+
+	// Получаем дивиденды для всего портфеля
+	fullPortfolio.AllDividends, err = calc.GetDividends(token, accountID, "", openedDate, time.Now().UTC())
+	log.Printf("AllDividends length: %d", len(fullPortfolio.AllDividends))
 
 	var wg sync.WaitGroup
 	for i := range fullPortfolio.Positions {
@@ -43,20 +55,34 @@ func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio
 		go func(i int) {
 			defer wg.Done()
 			pos := &fullPortfolio.Positions[i]
+
+			// Заполняем ExpectedYieldRelative для каждой позиции
 			posAmount := MultiplyMoneyValue(pos.AveragePositionPrice,
 				domain.MoneyValue{
 					Units: pos.Quantity.Units,
 					Nano:  pos.Quantity.Nano,
-				})
+				},
+			)
+			pos.ExpectedYieldRelative, err = DivideQuotation(
+				domain.Quotation{
+					Units: pos.ExpectedYield.Units,
+					Nano:  pos.ExpectedYield.Nano,
+				},
+				domain.Quotation{
+					Units: posAmount.Units,
+					Nano:  posAmount.Nano,
+				},
+			)
+			if err != nil {
+				log.Printf("Failed to calculate ExpectedYieldRelative for %s: %v", pos.Ticker, err)
+				return
+			}
+			pos.ExpectedYieldRelative = MultiplyQuotation(pos.ExpectedYieldRelative, domain.Quotation{Units: "100", Nano: 0})
 
-			pos.ExpectedYield = MultiplyMoneyValue(posAmount,
-				domain.MoneyValue{
-					Units: pos.ExpectedYieldRelative.Units,
-					Nano:  pos.ExpectedYieldRelative.Nano,
-				})
-
+			// Заполняем DailyYieldRelative
 			// pos.DailyYieldRelative =
 
+			// Получаем дивиденды и заполняем TotalYield и TotalYieldRelative для каждой позиции
 			divs, err := calc.GetDividends(token, accountID, pos.InstrumentUID, openedDate, time.Now().UTC())
 			if err != nil {
 				log.Printf("Failed to get dividends for %s: %v", pos.Ticker, err)
@@ -64,7 +90,22 @@ func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio
 			}
 			pos.Dividends = divs[pos.Ticker]
 			pos.TotalYield = AddMoneyValue(pos.ExpectedYield, pos.Dividends)
-			// pos.TotalYieldRelative =
+
+			pos.TotalYieldRelative, err = DivideQuotation(
+				domain.Quotation{
+					Units: pos.TotalYield.Units,
+					Nano:  pos.TotalYield.Nano,
+				},
+				domain.Quotation{
+					Units: posAmount.Units,
+					Nano:  posAmount.Nano,
+				},
+			)
+			if err != nil {
+				log.Printf("Failed to calculate TotalYieldRelative for %s: %v", pos.Ticker, err)
+				return
+			}
+			pos.TotalYieldRelative = MultiplyQuotation(pos.TotalYieldRelative, domain.Quotation{Units: "100", Nano: 0})
 		}(i)
 	}
 	wg.Wait()

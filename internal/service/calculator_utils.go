@@ -20,6 +20,7 @@ func convertToFullPortfolio(raw api.UserPortfolio) domain.UserFullPortfolio {
 		TotalAmountPortfolio:  domain.MoneyValue(raw.TotalAmountPortfolio),
 		DailyYield:            domain.MoneyValue(raw.DailyYield),
 		DailyYieldRelative:    domain.Quotation(raw.DailyYieldRelative),
+		AllDividends:          map[string]domain.MoneyValue{},
 	}
 
 	full.Positions = make([]domain.Position, len(raw.Positions))
@@ -30,8 +31,8 @@ func convertToFullPortfolio(raw api.UserPortfolio) domain.UserFullPortfolio {
 			InstrumentType:           pos.InstrumentType,
 			Quantity:                 domain.Quotation(pos.Quantity),
 			AveragePositionPrice:     domain.MoneyValue(pos.AveragePositionPrice),
-			ExpectedYield:            domain.MoneyValue{},
-			ExpectedYieldRelative:    domain.Quotation(pos.ExpectedYield),
+			ExpectedYield:            domain.MoneyValue{Units: pos.ExpectedYield.Units, Nano: pos.ExpectedYield.Nano},
+			ExpectedYieldRelative:    domain.Quotation{},
 			AveragePositionPricePt:   domain.Quotation(pos.AveragePositionPricePt),
 			CurrentPrice:             domain.MoneyValue(pos.CurrentPrice),
 			AveragePositionPriceFifo: domain.MoneyValue(pos.AveragePositionPriceFifo),
