@@ -27,7 +27,7 @@ export const renderPortfolioHeader = (summary) => {
 export const renderPositionRow = (position, index) => {
   return `
     <tr style="border-bottom:1px solid #eee; ${index % 2 === 0 ? 'background:#fafafa;' : ''}">
-      <td style="padding:6px; font-weight:600;">${position.ticker}</td>
+      <td style="padding:6px; font-weight:600;">${position.name}</td>
       <td style="padding:6px; text-align:right;">${position.quantity}</td>
       <td style="padding:6px; text-align:right;">${position.averagePrice}</td>
       <td style="padding:6px; text-align:right; font-weight:500;">${position.currentPrice}</td>

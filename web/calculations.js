@@ -27,7 +27,7 @@ export const calculatePositionMetrics = (pos, dividends) => {
   const dividendPercent = positionCost > 0 ? (dividendValue / positionCost) * 100 : 0
 
   return {
-    ticker: pos.ticker,
+    name: pos.name,
     quantity: pos.quantity.units,
     averagePrice: formatCurrency(pos.averagePositionPrice),
     currentPrice: formatCurrency(pos.currentPrice),
@@ -62,10 +62,8 @@ export const calculatePortfolioSummary = (positions, dividends, portfolio, allDi
                     (parseInt(portfolio.totalAmountPortfolio?.nano || 0) / 1_000_000_000)
   
   // Суммарная доходность от изменения цены (из позиций)
-  const totalYieldValue = positions.reduce((sum, pos) => {
-    const val = parseInt(pos.expectedYield?.units || 0) + (parseInt(pos.expectedYield?.nano || 0) / 1_000_000_000)
-    return sum + val
-  }, 0)
+  const totalYieldValue = parseInt(portfolio.expectedYield?.units || 0) + 
+                       (parseInt(portfolio.expectedYield?.nano || 0) / 1_000_000_000)
   
   // Средний процент доходности от цены
   const totalYieldPercent = totalValue > 0 ? (totalYieldValue / totalValue) * 100 : 0

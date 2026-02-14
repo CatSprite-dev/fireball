@@ -27,7 +27,6 @@ func (client *Client) GetAccounts(token string, accountStatus pkg.AccountStatus)
 	if err != nil {
 		return UserAccounts{}, fmt.Errorf("unmarshal error (api.GetAccounts): %s", err)
 	}
-	fmt.Println(len(accounts.Accounts))
 	return accounts, nil
 }
 
@@ -128,4 +127,37 @@ func (client *Client) GetUserOperationsByCursor(
 		}
 	}
 	return allOperations, nil
+}
+
+func (client *Client) GetInstrumentBy(token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (Instrument, error) {
+	type InstrumentRequest struct {
+		IDType    pkg.InstrumentIdType `json:"idType"`
+		ClassCode pkg.ClassCode        `json:"classCode,omitempty"`
+		ID        string               `json:"id"`
+	}
+
+	if idType == pkg.InstrumentIdTypeTicker && classCode == pkg.ClassCodeUnspecified {
+		return Instrument{}, fmt.Errorf("classCode is required when idType is TICKER")
+	}
+
+	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/GetInstrumentBy"
+
+	payload := InstrumentRequest{
+		IDType:    idType,
+		ClassCode: classCode,
+		ID:        id,
+	}
+
+	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+	if err != nil {
+		return Instrument{}, fmt.Errorf("do request error (GetInstrumentBy): %s", err)
+	}
+
+	var instrument Instrument
+	err = json.Unmarshal(data, &instrument)
+	if err != nil {
+		return Instrument{}, fmt.Errorf("unmarshal error (GetInstrumentBy): %s", err)
+	}
+
+	return instrument, nil
 }
