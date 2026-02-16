@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Fireball - Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-background min-h-screen flex items-center justify-center">
+    <div class="container max-w-md mx-auto p-6">
+        <!-- Карточка входа -->
+        <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+            <div class="flex flex-col space-y-1.5 p-6">
+                <h3 class="text-2xl font-semibold leading-none tracking-tight">Welcome to Investment Fireball</h3>
+                <p class="text-sm text-muted-foreground">Enter your API token to access your portfolio</p>
+            </div>
+            <div class="p-6 pt-0">
+                <form id="tokenForm" class="space-y-4">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium leading-none">Tinkoff API Token</label>
+                        <input type="password" 
+                               name="token" 
+                               required 
+                               class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                               placeholder="Enter your token">
+                        <p class="text-xs text-muted-foreground">
+                            Get your token from <a href="https://www.tinkoff.ru/invest/settings/" target="_blank" class="text-primary hover:underline">Tinkoff Invest</a>
+                        </p>
+                    </div>
+                    
+                    <button type="submit" 
+                            class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full">
+                        Access Portfolio
+                    </button>
+                </form>
+                
+                <!-- Сообщение об ошибке -->
+                <div id="errorMessage" class="mt-4 text-sm text-red-600 hidden"></div>
+            </div>
+        </div>
+        
+        <!-- Информация для теста -->
+        <div class="mt-6 text-center text-xs text-muted-foreground">
+            <p>Demo token for testing: <span class="font-mono">t.1234567890_example</span></p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('tokenForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const token = e.target.token.value.trim();
+        const errorDiv = document.getElementById('errorMessage');
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Checking...';
+        submitBtn.disabled = true;
+        errorDiv.classList.add('hidden');
+        
+        try {
+            const response = await fetch("http://localhost:8080/auth", {
+                method: 'POST',  // или GET? смотрите какой метод ожидает сервер
+                headers: {
+                    "T-Token": token,  // заголовок как в вашем примере
+                    "Content-Type": "application/json"
+                },
+                // если нужен body, добавьте, если нет - уберите
+                // body: JSON.stringify({})
+            });
+
+            console.log("Статус ответа:", response.status);
+
+            if (response.ok) {
+                localStorage.setItem('token', token);  // сохраняем токен
+                // Если сервер возвращает данные
+                const data = await response.json();
+                console.log("Данные получены:", data);
+                
+                // Перенаправляем на главную
+                window.location.href = '/';
+            } else {
+                console.error(response.status, response.statusText);
+                errorDiv.textContent = 'Invalid token. Please check and try again.';
+                errorDiv.classList.remove('hidden');
+            }
+        } catch(error) {
+            console.error("Не удалось выполнить запрос", error);
+            errorDiv.textContent = 'Network error. Please try again.';
+            errorDiv.classList.remove('hidden');
+        } finally {
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+    </script>
+</body>
+</html>

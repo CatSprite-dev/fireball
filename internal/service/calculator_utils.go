@@ -1,7 +1,7 @@
 package service
 
 import (
-	"log"
+	"fmt"
 	"sync"
 	"time"
 
@@ -10,154 +10,146 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 )
 
-func convertToFullPortfolio(raw api.UserPortfolio) domain.UserFullPortfolio {
-	full := domain.UserFullPortfolio{
-		TotalAmountShares:     domain.MoneyValue(raw.TotalAmountShares),
-		TotalAmountBonds:      domain.MoneyValue(raw.TotalAmountBonds),
-		TotalAmountEtf:        domain.MoneyValue(raw.TotalAmountEtf),
-		TotalAmountCurrencies: domain.MoneyValue(raw.TotalAmountCurrencies),
-		TotalAmountFutures:    domain.MoneyValue(raw.TotalAmountFutures),
-		ExpectedYield:         domain.MoneyValue{},
-		ExpectedYieldRelative: domain.Quotation(raw.ExpectedYield),
-		AccountID:             raw.AccountID,
-		TotalAmountOptions:    domain.MoneyValue(raw.TotalAmountOptions),
-		TotalAmountSp:         domain.MoneyValue(raw.TotalAmountSp),
-		TotalAmountPortfolio:  domain.MoneyValue(raw.TotalAmountPortfolio),
-		DailyYield:            domain.MoneyValue(raw.DailyYield),
-		DailyYieldRelative:    domain.Quotation(raw.DailyYieldRelative),
-		AllDividends:          map[string]domain.MoneyValue{},
+func enrichFullPortfolio(calc *Calculator, portfolio domain.UserFullPortfolio, token string, accountID string, openedDate time.Time) (domain.UserFullPortfolio, error) {
+	// 1. Общие метрики портфеля
+	portfolio, err := enrichPortfolioMetrics(portfolio)
+	if err != nil {
+		return domain.UserFullPortfolio{}, err
 	}
 
-	full.Positions = make([]domain.Position, len(raw.Positions))
-	for i, pos := range raw.Positions {
-		full.Positions[i] = domain.Position{
-			Name:                     "", // из апи мосбиржи
-			Figi:                     pos.Figi,
-			InstrumentType:           pos.InstrumentType,
-			Quantity:                 domain.Quotation(pos.Quantity),
-			AveragePositionPrice:     domain.MoneyValue(pos.AveragePositionPrice),
-			ExpectedYield:            domain.MoneyValue{Units: pos.ExpectedYield.Units, Nano: pos.ExpectedYield.Nano},
-			ExpectedYieldRelative:    domain.Quotation{},
-			AveragePositionPricePt:   domain.Quotation(pos.AveragePositionPricePt),
-			CurrentPrice:             domain.MoneyValue(pos.CurrentPrice),
-			AveragePositionPriceFifo: domain.MoneyValue(pos.AveragePositionPriceFifo),
-			QuantityLots:             domain.Quotation(pos.QuantityLots),
-			Blocked:                  pos.Blocked,
-			BlockedLots:              domain.Quotation(pos.BlockedLots),
-			PositionUID:              pos.PositionUID,
-			InstrumentUID:            pos.InstrumentUID,
-			VarMargin:                domain.MoneyValue(pos.VarMargin),
-			ExpectedYieldFifo:        domain.Quotation(pos.ExpectedYieldFifo),
-			DailyYield:               domain.MoneyValue(pos.DailyYield),
-			DailyYieldRelative:       domain.Quotation{},
-			Ticker:                   pos.Ticker,
-			ClassCode:                pos.ClassCode,
-			CurrentNkd:               domain.MoneyValue(pos.CurrentNkd),
-			Dividends:                domain.MoneyValue{},
-			TotalYield:               domain.MoneyValue{},
-			TotalYieldRelative:       domain.Quotation{},
-		}
+	// 2. Дивиденды для всего портфеля
+	portfolio.AllDividends, err = calc.GetDividends(token, accountID, "", openedDate, time.Now().UTC())
+	if err != nil {
+		return domain.UserFullPortfolio{}, err
 	}
 
-	return full
+	// 3. Метрики каждой позиции
+	portfolio, err = enrichPositions(portfolio, calc, token, accountID, openedDate)
+	return portfolio, nil
 }
 
-func enrichFullPortfolio(calc *Calculator, fullEmptyPortfolio domain.UserFullPortfolio, token string, accountID string, openedDate time.Time) (domain.UserFullPortfolio, error) {
+func enrichPortfolioMetrics(portfolio domain.UserFullPortfolio) (domain.UserFullPortfolio, error) {
 	// Заполняем ExpectedYield всего портфеля
 	coeff, err := DivideMoneyValue(
 		domain.MoneyValue{
-			Units: fullEmptyPortfolio.ExpectedYieldRelative.Units,
-			Nano:  fullEmptyPortfolio.ExpectedYieldRelative.Nano,
+			Units: portfolio.ExpectedYieldRelative.Units,
+			Nano:  portfolio.ExpectedYieldRelative.Nano,
 		},
 		domain.MoneyValue{Units: "100", Nano: 0},
 	)
 	if err != nil {
 		return domain.UserFullPortfolio{}, err
 	}
-	fullEmptyPortfolio.ExpectedYield = MultiplyMoneyValue(fullEmptyPortfolio.TotalAmountPortfolio, coeff)
-
-	// Получаем дивиденды для всего портфеля
-	fullEmptyPortfolio.AllDividends, err = calc.GetDividends(token, accountID, "", openedDate, time.Now().UTC())
-	if err != nil {
-		return domain.UserFullPortfolio{}, err
-	}
-
-	var wg sync.WaitGroup
-	for i := range fullEmptyPortfolio.Positions {
-		wg.Add(2)
-		pos := &fullEmptyPortfolio.Positions[i]
-
-		// Получаем названия инструментов для каждой позиции
-		go func(i int, p *domain.Position) {
-			defer wg.Done()
-			name, err := getInstrumentName(calc.apiClient, token, p.PositionUID)
-			if err != nil {
-				log.Printf("Failed to get instrument name for %s: %v", p.Ticker, err)
-				return
-			}
-			p.Name = name
-		}(i, pos)
-
-		// Заполняем ExpectedYieldRelative, DailyYieldRelative, TotalYield, TotalYieldRelative и дивиденды для каждой позиции
-		go func(i int, p *domain.Position) {
-			defer wg.Done()
-			posAmount := MultiplyMoneyValue(p.AveragePositionPrice,
-				domain.MoneyValue{
-					Units: p.Quantity.Units,
-					Nano:  p.Quantity.Nano,
-				},
-			)
-			p.ExpectedYieldRelative, err = DivideQuotation(
-				domain.Quotation{
-					Units: p.ExpectedYield.Units,
-					Nano:  p.ExpectedYield.Nano,
-				},
-				domain.Quotation{
-					Units: posAmount.Units,
-					Nano:  posAmount.Nano,
-				},
-			)
-			if err != nil {
-				log.Printf("Failed to calculate ExpectedYieldRelative for %s: %v", p.Ticker, err)
-				return
-			}
-			p.ExpectedYieldRelative = MultiplyQuotation(p.ExpectedYieldRelative, domain.Quotation{Units: "100", Nano: 0})
-
-			// p.DailyYieldRelative =
-
-			divs, err := calc.GetDividends(token, accountID, p.InstrumentUID, openedDate, time.Now().UTC())
-			if err != nil {
-				log.Printf("Failed to get dividends for %s: %v", p.Ticker, err)
-				return
-			}
-			p.Dividends = divs[p.Ticker]
-			p.TotalYield = AddMoneyValue(p.ExpectedYield, p.Dividends)
-
-			p.TotalYieldRelative, err = DivideQuotation(
-				domain.Quotation{
-					Units: p.TotalYield.Units,
-					Nano:  p.TotalYield.Nano,
-				},
-				domain.Quotation{
-					Units: posAmount.Units,
-					Nano:  posAmount.Nano,
-				},
-			)
-			if err != nil {
-				log.Printf("Failed to calculate TotalYieldRelative for %s: %v", p.Ticker, err)
-				return
-			}
-			p.TotalYieldRelative = MultiplyQuotation(p.TotalYieldRelative, domain.Quotation{Units: "100", Nano: 0})
-		}(i, pos)
-	}
-	wg.Wait()
-	return fullEmptyPortfolio, nil
+	portfolio.ExpectedYield = MultiplyMoneyValue(portfolio.TotalAmountPortfolio, coeff)
+	return portfolio, nil
 }
 
-func getInstrumentName(apiClient *api.Client, token string, instrumentId string) (string, error) {
-	instrument, err := apiClient.GetInstrumentBy(token, pkg.InstrumentIdTypePositionUid, pkg.ClassCodeUnspecified, instrumentId)
-	if err != nil {
-		return "", err
+func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token string, accountID string, openedDate time.Time) (domain.UserFullPortfolio, error) {
+	var wg sync.WaitGroup
+
+	errChan := make(chan error)
+	for i := range portfolio.Positions {
+		wg.Add(2)
+		pos := &portfolio.Positions[i]
+
+		// Заполняем имя и тип
+		go getPositionInfo(&wg, pos, calc, token, errChan)
+
+		// Заполняем ExpectedYieldRelative, DailyYieldRelative, TotalYield, TotalYieldRelative и дивиденды для каждой позиции
+		go getPositionMetrics(&wg, pos, calc, token, accountID, openedDate, errChan)
 	}
-	return instrument.Instrument.Name, nil
+
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	errorList := []error{}
+	for err := range errChan {
+		if err != nil {
+			errorList = append(errorList, err)
+		}
+	}
+	if len(errorList) > 0 {
+		return domain.UserFullPortfolio{}, fmt.Errorf("%d errors occurred", len(errorList))
+	}
+	return portfolio, nil
+}
+
+func getPositionInfo(wg *sync.WaitGroup, p *domain.Position, calc *Calculator, token string, errChan chan<- error) {
+	defer wg.Done()
+	instrument, err := getInstrumentInfo(calc.apiClient, token, pkg.InstrumentIdTypePositionUid, p.PositionUID)
+	if err != nil {
+		errChan <- fmt.Errorf("failed to get instrument info for position %s: %v", p.PositionUID, err)
+		return
+	}
+	p.Name = instrument.Name
+	p.Type = instrument.InstrumentType
+}
+
+func getPositionMetrics(wg *sync.WaitGroup, p *domain.Position, calc *Calculator, token string, accountID string, openedDate time.Time, errChan chan<- error) {
+	defer wg.Done()
+	// ExpectedYieldRelative
+	posAmount := MultiplyMoneyValue(p.AveragePositionPrice,
+		domain.MoneyValue{
+			Units: p.Quantity.Units,
+			Nano:  p.Quantity.Nano,
+		},
+	)
+	var err error
+	p.ExpectedYieldRelative, err = DivideQuotation(
+		domain.Quotation{
+			Units: p.ExpectedYield.Units,
+			Nano:  p.ExpectedYield.Nano,
+		},
+		domain.Quotation{
+			Units: posAmount.Units,
+			Nano:  posAmount.Nano,
+		},
+	)
+	if err != nil {
+		errChan <- fmt.Errorf("failed to calculate ExpectedYieldRelative for position %s: %v", p.PositionUID, err)
+		return
+	}
+	p.ExpectedYieldRelative = MultiplyQuotation(p.ExpectedYieldRelative, domain.Quotation{Units: "100", Nano: 0})
+
+	//DailyYieldRelative
+	// p.DailyYieldRelative =
+
+	// Dividends
+	divs, err := calc.GetDividends(token, accountID, p.InstrumentUID, openedDate, time.Now().UTC())
+	if err != nil {
+		errChan <- fmt.Errorf("failed to get dividends for position %s: %v", p.PositionUID, err)
+		return
+	}
+	p.Dividends = divs[p.Ticker]
+
+	// TotalYield
+	p.TotalYield = AddMoneyValue(p.ExpectedYield, p.Dividends)
+
+	// TotalYieldRelative
+	p.TotalYieldRelative, err = DivideQuotation(
+		domain.Quotation{
+			Units: p.TotalYield.Units,
+			Nano:  p.TotalYield.Nano,
+		},
+		domain.Quotation{
+			Units: posAmount.Units,
+			Nano:  posAmount.Nano,
+		},
+	)
+	if err != nil {
+		errChan <- fmt.Errorf("failed to calculate TotalYieldRelative for position %s: %v", p.PositionUID, err)
+		return
+	}
+	p.TotalYieldRelative = MultiplyQuotation(p.TotalYieldRelative, domain.Quotation{Units: "100", Nano: 0})
+}
+
+func getInstrumentInfo(apiClient *api.Client, token string, instrumentIdType pkg.InstrumentIdType, instrumentId string) (domain.Instrument, error) {
+	rawInstrument, err := apiClient.GetInstrumentBy(token, instrumentIdType, pkg.ClassCodeUnspecified, instrumentId)
+	if err != nil {
+		return domain.Instrument{}, err
+	}
+	instrument := convertToDomainInstrument(rawInstrument)
+	return instrument, nil
 }
