@@ -86,24 +86,21 @@ async function authorize(inputText) {
   }
 }
 
-async function showMainPage(portfolioData) {  
-
-
-  const positions = portfolioData.user_portfolio.positions
-  const dividends = portfolioData.user_dividends || {}
-  const portfolio = portfolioData.user_portfolio
+async function showMainPage(portfolioData) {
+  const fullPortfolio = portfolioData.user_portfolio
+  const positions = fullPortfolio.positions
+  const allDividends = portfolioData.user_portfolio.allDividends || {}
   
-  // Расчет метрик для каждой позиции
+  // Дивиденды по открытым позициям
+  const dividends = {}
+  positions.forEach(pos => {
+    dividends[pos.ticker] = pos.dividends
+  })
+  
   const positionsMetrics = positions.map(pos => calculatePositionMetrics(pos, dividends))
   
-  // Расчет суммарных показателей
-  const summary = calculatePortfolioSummary(
-    positions, 
-    dividends, 
-    portfolio.totalAmountPortfolio || {units: "0", currency: "rub"}
-  )
+  const summary = calculatePortfolioSummary(positions, dividends, fullPortfolio, allDividends)  // ✅ передаём
   
-  // Рендер
   const html = `
     ${renderPortfolioHeader(summary)}
     ${renderPortfolioTable(positionsMetrics, summary)}

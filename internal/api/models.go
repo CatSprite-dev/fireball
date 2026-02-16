@@ -225,3 +225,75 @@ type IndicativeInstruments struct {
 		SellAvailableFlag bool   `json:"sellAvailableFlag"`
 	} `json:"instruments"`
 }
+
+type Instrument struct {
+	Instrument struct {
+		AssetUID  string `json:"assetUid"`
+		Figi      string `json:"figi"`
+		DshortMin struct {
+			Nano  int    `json:"nano"`
+			Units string `json:"units"`
+		} `json:"dshortMin"`
+		CountryOfRisk  string   `json:"countryOfRisk"`
+		Lot            int      `json:"lot"`
+		UID            string   `json:"uid"`
+		RequiredTests  []string `json:"requiredTests"`
+		BlockedTcaFlag bool     `json:"blockedTcaFlag"`
+		Dlong          struct {
+			Nano  int    `json:"nano"`
+			Units string `json:"units"`
+		} `json:"dlong"`
+		DlongClient struct {
+			Nano  int    `json:"nano"`
+			Units string `json:"units"`
+		} `json:"dlongClient"`
+		SellAvailableFlag   bool      `json:"sellAvailableFlag"`
+		Currency            string    `json:"currency"`
+		First1DayCandleDate time.Time `json:"first1dayCandleDate"`
+		Brand               struct {
+			LogoName      string `json:"logoName"`
+			LogoBaseColor string `json:"logoBaseColor"`
+			TextColor     string `json:"textColor"`
+		} `json:"brand"`
+		BuyAvailableFlag      bool   `json:"buyAvailableFlag"`
+		WeekendFlag           bool   `json:"weekendFlag"`
+		ClassCode             string `json:"classCode"`
+		Ticker                string `json:"ticker"`
+		InstrumentType        string `json:"instrumentType"`
+		ForQualInvestorFlag   bool   `json:"forQualInvestorFlag"`
+		ForIisFlag            bool   `json:"forIisFlag"`
+		PositionUID           string `json:"positionUid"`
+		APITradeAvailableFlag bool   `json:"apiTradeAvailableFlag"`
+		DlongMin              struct {
+			Nano  int    `json:"nano"`
+			Units string `json:"units"`
+		} `json:"dlongMin"`
+		ShortEnabledFlag bool `json:"shortEnabledFlag"`
+		Kshort           struct {
+			Nano  int    `json:"nano"`
+			Units string `json:"units"`
+		} `json:"kshort"`
+		First1MinCandleDate time.Time `json:"first1minCandleDate"`
+		MinPriceIncrement   struct {
+			Nano  int    `json:"nano"`
+			Units string `json:"units"`
+		} `json:"minPriceIncrement"`
+		OtcFlag      bool `json:"otcFlag"`
+		DshortClient struct {
+			Nano  int    `json:"nano"`
+			Units string `json:"units"`
+		} `json:"dshortClient"`
+		Klong struct {
+			Nano  int    `json:"nano"`
+			Units string `json:"units"`
+		} `json:"klong"`
+		Dshort struct {
+			Nano  int    `json:"nano"`
+			Units string `json:"units"`
+		} `json:"dshort"`
+		Name              string `json:"name"`
+		Exchange          string `json:"exchange"`
+		CountryOfRiskName string `json:"countryOfRiskName"`
+		Isin              string `json:"isin"`
+	} `json:"instrument"`
+}

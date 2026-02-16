@@ -1,20 +1,21 @@
 package domain
 
 type UserFullPortfolio struct {
-	TotalAmountShares     MoneyValue `json:"totalAmountShares"`
-	TotalAmountBonds      MoneyValue `json:"totalAmountBonds"`
-	TotalAmountEtf        MoneyValue `json:"totalAmountEtf"`
-	TotalAmountCurrencies MoneyValue `json:"totalAmountCurrencies"`
-	TotalAmountFutures    MoneyValue `json:"totalAmountFutures"`
-	ExpectedYield         MoneyValue `json:"expectedYield"`
-	ExpectedYieldRelative Quotation  `json:"expectedYieldRelative"`
-	Positions             []Position `json:"positions"`
-	AccountID             string     `json:"accountId"`
-	TotalAmountOptions    MoneyValue `json:"totalAmountOptions"`
-	TotalAmountSp         MoneyValue `json:"totalAmountSp"`
-	TotalAmountPortfolio  MoneyValue `json:"totalAmountPortfolio"`
-	DailyYield            MoneyValue `json:"dailyYield"`
-	DailyYieldRelative    Quotation  `json:"dailyYieldRelative"`
+	TotalAmountShares     MoneyValue            `json:"totalAmountShares"`
+	TotalAmountBonds      MoneyValue            `json:"totalAmountBonds"`
+	TotalAmountEtf        MoneyValue            `json:"totalAmountEtf"`
+	TotalAmountCurrencies MoneyValue            `json:"totalAmountCurrencies"`
+	TotalAmountFutures    MoneyValue            `json:"totalAmountFutures"`
+	ExpectedYield         MoneyValue            `json:"expectedYield"`
+	ExpectedYieldRelative Quotation             `json:"expectedYieldRelative"`
+	Positions             []Position            `json:"positions"`
+	AccountID             string                `json:"accountId"`
+	TotalAmountOptions    MoneyValue            `json:"totalAmountOptions"`
+	TotalAmountSp         MoneyValue            `json:"totalAmountSp"`
+	TotalAmountPortfolio  MoneyValue            `json:"totalAmountPortfolio"`
+	DailyYield            MoneyValue            `json:"dailyYield"`
+	DailyYieldRelative    Quotation             `json:"dailyYieldRelative"`
+	AllDividends          map[string]MoneyValue `json:"allDividends"`
 }
 
 type Position struct {

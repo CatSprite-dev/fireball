@@ -1,25 +1,33 @@
 import { formatCurrency, formatNumberAsCurrency, formatNumberAsPercent } from './formatters.js'
 
-// Расчеты для позиции
 export const calculatePositionMetrics = (pos, dividends) => {
+  // Дивиденды по тикеру (уже MoneyValue от сервера)
+  const dividendAmount = dividends[pos.ticker] || { units: 0, nano: 0, currency: 'rub' }
+  
+  // Используем готовые значения от сервера
   const yieldValue = parseInt(pos.expectedYield?.units || 0) + (parseInt(pos.expectedYield?.nano || 0) / 1_000_000_000)
   const dailyValue = parseInt(pos.dailyYield?.units || 0) + (parseInt(pos.dailyYield?.nano || 0) / 1_000_000_000)
-  
-  const currentPriceValue = parseFloat(pos.currentPrice?.units || 0) + (parseFloat(pos.currentPrice?.nano || 0) / 1_000_000_000)
-  const averagePriceValue = parseFloat(pos.averagePositionPrice?.units || 0) + (parseFloat(pos.averagePositionPrice?.nano || 0) / 1_000_000_000)
-  const quantityValue = parseFloat(pos.quantity?.units || 0)
-  
-  const totalInvestment = averagePriceValue * quantityValue
-  const yieldPercent = totalInvestment > 0 ? ((currentPriceValue - averagePriceValue) * quantityValue / totalInvestment) * 100 : 0
+  const dividendValue = parseInt(dividendAmount.units || 0) + (parseInt(dividendAmount.nano || 0) / 1_000_000_000)
+  const totalValue = parseInt(pos.totalYield?.units || 0) + (parseInt(pos.totalYield?.nano || 0) / 1_000_000_000)
 
-  const dividendAmount = dividends[pos.ticker] || 0
-  const dividendPercent = totalInvestment > 0 ? (dividendAmount / totalInvestment) * 100 : 0
+  // Проценты уже посчитаны сервером
+  const yieldPercent = parseFloat(pos.expectedYieldRelative?.units || 0) + 
+                     (parseFloat(pos.expectedYieldRelative?.nano || 0) / 1_000_000_000)
+
+  const totalPercent = parseFloat(pos.totalYieldRelative?.units || 0) + 
+                    (parseFloat(pos.totalYieldRelative?.nano || 0) / 1_000_000_000)
+
+  // Стоимость позиции для расчёта процента дивидендов
+  const avgPrice = parseFloat(pos.averagePositionPrice?.units || 0) + 
+                  (parseFloat(pos.averagePositionPrice?.nano || 0) / 1_000_000_000)
+  const quantity = parseFloat(pos.quantity?.units || 0)
+  const positionCost = avgPrice * quantity
   
-  const totalWithDividends = yieldValue + dividendAmount
-  const totalPercent = totalInvestment > 0 ? ((yieldValue + dividendAmount) / totalInvestment) * 100 : 0
+  // Процент дивидендов от стоимости позиции
+  const dividendPercent = positionCost > 0 ? (dividendValue / positionCost) * 100 : 0
 
   return {
-    ticker: pos.ticker,
+    name: pos.name,
     quantity: pos.quantity.units,
     averagePrice: formatCurrency(pos.averagePositionPrice),
     currentPrice: formatCurrency(pos.currentPrice),
@@ -35,71 +43,96 @@ export const calculatePositionMetrics = (pos, dividends) => {
       color: dailyValue >= 0 ? 'green' : 'red'
     },
     dividend: {
-      amount: dividendAmount,
-      formatted: dividendAmount > 0 ? formatNumberAsCurrency(dividendAmount) : '—',
+      amount: dividendValue,
+      formatted: dividendValue > 0 ? formatNumberAsCurrency(dividendValue) : '—',
       percent: dividendPercent,
-      color: dividendAmount > 0 ? 'green' : '#666'
+      color: dividendValue > 0 ? 'green' : '#666'
     },
     total: {
-      value: totalWithDividends,
-      formatted: formatNumberAsCurrency(totalWithDividends),
+      value: totalValue,
+      formatted: formatCurrency(pos.totalYield),
       percent: totalPercent,
-      color: totalWithDividends >= 0 ? 'green' : 'red'
+      color: totalValue >= 0 ? 'green' : 'red'
     }
   }
 }
 
-// Расчеты для всего портфеля
-export const calculatePortfolioSummary = (positions, dividends, portfolioTotal) => {
-  const totalValue = parseFloat(portfolioTotal?.units || 0) + (parseFloat(portfolioTotal?.nano || 0) / 1_000_000_000)
+export const calculatePortfolioSummary = (positions, dividends, portfolio, allDividends) => {
+  const totalValue = parseInt(portfolio.totalAmountPortfolio?.units || 0) + 
+                    (parseInt(portfolio.totalAmountPortfolio?.nano || 0) / 1_000_000_000)
   
-  const totalYield = positions.reduce((sum, pos) => {
-    const units = parseInt(pos.expectedYield?.units || 0)
-    const nano = parseInt(pos.expectedYield?.nano || 0)
-    return sum + units + (nano / 1_000_000_000)
+  // Суммарная доходность от изменения цены (из позиций)
+  const totalYieldValue = parseInt(portfolio.expectedYield?.units || 0) + 
+                       (parseInt(portfolio.expectedYield?.nano || 0) / 1_000_000_000)
+  
+  // Средний процент доходности от цены
+  const totalYieldPercent = totalValue > 0 ? (totalYieldValue / totalValue) * 100 : 0
+  
+  // Дневная доходность
+  const totalDailyYieldValue = positions.reduce((sum, pos) => {
+    const val = parseInt(pos.dailyYield?.units || 0) + (parseInt(pos.dailyYield?.nano || 0) / 1_000_000_000)
+    return sum + val
   }, 0)
   
-  const totalDividends = Object.values(dividends).reduce((sum, val) => sum + val, 0)
-  const totalYieldWithDividends = totalYield + totalDividends
-  const totalDailyYield = positions.reduce((sum, pos) => {
-    const units = parseInt(pos.dailyYield?.units || 0)
-    const nano = parseInt(pos.dailyYield?.nano || 0)
-    return sum + units + (nano / 1_000_000_000)
+  // Дивиденды только по открытым позициям (для итоговой строки)
+  const openDividendsValue = positions.reduce((sum, pos) => {
+    const val = parseInt(pos.dividends?.units || 0) + (parseInt(pos.dividends?.nano || 0) / 1_000_000_000)
+    return sum + val
   }, 0)
+  
+  // Все дивиденды за всё время (с учетом закрытых позиций)
+  const allDividendsValue = Object.values(allDividends || {}).reduce((sum, div) => {
+    const val = parseInt(div?.units || 0) + (parseInt(div?.nano || 0) / 1_000_000_000)
+    return sum + val
+  }, 0)
+  
+  // Общая доходность с учетом дивидендов от закрытых позиций (для хедера)
+  const totalYieldWithDividendsValue = totalYieldValue + allDividendsValue
+  const totalYieldWithDividendsPercent = totalValue > 0 ? 
+    ((totalYieldValue + allDividendsValue) / totalValue) * 100 : 0
+
+  // Общая доходность только по открытым позициям (для итоговой колонки)
+  const totalOpenYieldValue = totalYieldValue + openDividendsValue
+  const totalOpenYieldPercent = totalValue > 0 ? 
+    ((totalYieldValue + openDividendsValue) / totalValue) * 100 : 0
 
   return {
-    totalValue: formatCurrency(portfolioTotal),
+    totalValue: formatCurrency(portfolio.totalAmountPortfolio),
     totalYield: {
-      value: totalYield,
-      formatted: formatCurrency({
-        units: Math.floor(totalYield).toString(),
-        nano: Math.round((totalYield - Math.floor(totalYield)) * 1_000_000_000),
-        currency: 'rub'
-      }),
-      percent: totalValue > 0 ? (totalYield / totalValue) * 100 : 0,
-      color: totalYield >= 0 ? 'green' : 'red'
+      value: totalYieldValue,
+      formatted: formatNumberAsCurrency(totalYieldValue),
+      percent: totalYieldPercent,
+      color: totalYieldValue >= 0 ? 'green' : 'red'
     },
-    totalDividends: {
-      value: totalDividends,
-      formatted: formatNumberAsCurrency(totalDividends),
-      percent: totalValue > 0 ? (totalDividends / totalValue) * 100 : 0,
-      color: totalDividends >= 0 ? 'green' : 'red'
+    allDividends: {
+      value: allDividendsValue,
+      formatted: formatNumberAsCurrency(allDividendsValue),
+      percent: totalValue > 0 ? (allDividendsValue / totalValue) * 100 : 0,
+      color: allDividendsValue >= 0 ? 'green' : 'red'
+    },
+    openDividends: {
+      value: openDividendsValue,
+      formatted: formatNumberAsCurrency(openDividendsValue),
+      percent: totalValue > 0 ? (openDividendsValue / totalValue) * 100 : 0,
+      color: openDividendsValue >= 0 ? 'green' : 'red'
     },
     totalYieldWithDividends: {
-      value: totalYieldWithDividends,
-      formatted: formatCurrency({
-        units: Math.floor(totalYieldWithDividends).toString(),
-        nano: Math.round((totalYieldWithDividends - Math.floor(totalYieldWithDividends)) * 1_000_000_000),
-        currency: 'rub'
-      }),
-      percent: totalValue > 0 ? (totalYieldWithDividends / totalValue) * 100 : 0,
-      color: totalYieldWithDividends >= 0 ? 'green' : 'red'
+      value: totalYieldWithDividendsValue,
+      formatted: formatNumberAsCurrency(totalYieldWithDividendsValue),
+      percent: totalYieldWithDividendsPercent,
+      color: totalYieldWithDividendsValue >= 0 ? 'green' : 'red'
+    },
+    totalOpenYield: {  // ✅ новая колонка для итоговой строки
+      value: totalOpenYieldValue,
+      formatted: formatNumberAsCurrency(totalOpenYieldValue),
+      percent: totalOpenYieldPercent,
+      color: totalOpenYieldValue >= 0 ? 'green' : 'red'
     },
     totalDailyYield: {
-      value: totalDailyYield,
-      formatted: formatNumberAsCurrency(totalDailyYield),
-      percent: totalValue > 0 ? (totalDailyYield / totalValue) * 100 : 0,
-      color: totalDailyYield >= 0 ? 'green' : 'red'
+      value: totalDailyYieldValue,
+      formatted: formatNumberAsCurrency(totalDailyYieldValue),
+      percent: totalValue > 0 ? (totalDailyYieldValue / totalValue) * 100 : 0,
+      color: totalDailyYieldValue >= 0 ? 'green' : 'red'
     },
     positionsCount: positions.length
   }

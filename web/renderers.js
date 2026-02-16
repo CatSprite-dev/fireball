@@ -7,16 +7,16 @@ export const renderPortfolioHeader = (summary) => {
       <h3 style="margin:0;">Общая стоимость: ${summary.totalValue}</h3>
       <div style="display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap;">
         <p style="margin:0; color:${summary.totalYieldWithDividends.color}">
-          <strong>Общая доходность:</strong><br>
+          <strong>Общая доходность (с дивидендами):</strong><br>
           ${summary.totalYieldWithDividends.formatted} (${formatNumberAsPercent(summary.totalYieldWithDividends.percent)})
         </p>
         <p style="margin:0; color:${summary.totalYield.color}">
-          <strong>От цены:</strong><br>
+          <strong>От изменения цены:</strong><br>
           ${summary.totalYield.formatted} (${formatNumberAsPercent(summary.totalYield.percent)})
         </p>
-        <p style="margin:0; color:${summary.totalDividends.color}">
-          <strong>От дивидендов:</strong><br>
-          ${summary.totalDividends.formatted} (${formatNumberAsPercent(summary.totalDividends.percent)})
+        <p style="margin:0; color:${summary.allDividends.color}">
+          <strong>Дивиденды (с учетома закрытых позиций):</strong><br>
+          ${summary.allDividends.formatted} (${formatNumberAsPercent(summary.allDividends.percent)})
         </p>
       </div>
     </div>
@@ -27,7 +27,7 @@ export const renderPortfolioHeader = (summary) => {
 export const renderPositionRow = (position, index) => {
   return `
     <tr style="border-bottom:1px solid #eee; ${index % 2 === 0 ? 'background:#fafafa;' : ''}">
-      <td style="padding:6px; font-weight:600;">${position.ticker}</td>
+      <td style="padding:6px; font-weight:600;">${position.name}</td>
       <td style="padding:6px; text-align:right;">${position.quantity}</td>
       <td style="padding:6px; text-align:right;">${position.averagePrice}</td>
       <td style="padding:6px; text-align:right; font-weight:500;">${position.currentPrice}</td>
@@ -61,11 +61,11 @@ export const renderTotalRow = (summary) => {
       <td style="padding:8px; text-align:right; color:${summary.totalDailyYield.color}">
         ${summary.totalDailyYield.formatted} <span style="font-size:0.9em; opacity:0.8;">(${formatNumberAsPercent(summary.totalDailyYield.percent)})</span>
       </td>
-      <td style="padding:8px; text-align:right; color:${summary.totalDividends.color}">
-        ${summary.totalDividends.formatted} <span style="font-size:0.9em; opacity:0.8;">(${formatNumberAsPercent(summary.totalDividends.percent)})</span>
+      <td style="padding:8px; text-align:right; color:${summary.openDividends.color}">
+        ${summary.openDividends.formatted} <span style="font-size:0.9em; opacity:0.8;">(${formatNumberAsPercent(summary.openDividends.percent)})</span>
       </td>
-      <td style="padding:8px; text-align:right; color:${summary.totalYieldWithDividends.color}; font-weight:bold;">
-        ${summary.totalYieldWithDividends.formatted} <span style="font-size:0.9em; opacity:0.8;">(${formatNumberAsPercent(summary.totalYieldWithDividends.percent)})</span>
+      <td style="padding:8px; text-align:right; color:${summary.totalOpenYield.color}; font-weight:bold;">
+        ${summary.totalOpenYield.formatted} <span style="font-size:0.9em; opacity:0.8;">(${formatNumberAsPercent(summary.totalOpenYield.percent)})</span>
       </td>
     </tr>
   `
