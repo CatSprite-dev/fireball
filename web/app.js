@@ -1,3 +1,8 @@
+const token = localStorage.getItem('token');
+if (!token) {
+    window.location.href = '/login.html';
+}
+
 document.getElementById('themeFloatingBtn')?.addEventListener('click', toggleTheme);
 document.getElementById('logoutBtn')?.addEventListener('click', () => {
     localStorage.removeItem('token');
@@ -166,11 +171,7 @@ let investments = [];
 // Загружаем данные с бекенда
 async function loadInvestments() {
     const token = localStorage.getItem('token');
-    if (!token) {
-        window.location.href = '/login.html';
-        return;
-    }
-    
+        
     try {
         console.log("Запрашиваем портфель с токеном:", token);
         
@@ -187,7 +188,7 @@ async function loadInvestments() {
         if (response.status === 401) {
             console.log('Token invalid or expired');
             localStorage.removeItem('token');
-            window.location.href = '/login.html?error=invalid';
+            window.location.href = '/login.html';
             return;
         }
         

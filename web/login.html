@@ -47,52 +47,17 @@
     </div>
 
     <script>
-        document.getElementById('tokenForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const token = e.target.token.value.trim();
-        const errorDiv = document.getElementById('errorMessage');
-        
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        const originalText = submitBtn.textContent;
-        submitBtn.textContent = 'Checking...';
-        submitBtn.disabled = true;
-        errorDiv.classList.add('hidden');
-        
-        try {
-            const response = await fetch("http://localhost:8080/auth", {
-                method: 'POST',  // или GET? смотрите какой метод ожидает сервер
-                headers: {
-                    "T-Token": token,  // заголовок как в вашем примере
-                    "Content-Type": "application/json"
-                },
-                // если нужен body, добавьте, если нет - уберите
-                // body: JSON.stringify({})
-            });
-
-            console.log("Статус ответа:", response.status);
-
-            if (response.ok) {
-                localStorage.setItem('token', token);  // сохраняем токен
-                // Если сервер возвращает данные
-                const data = await response.json();
-                console.log("Данные получены:", data);
-                
-                // Перенаправляем на главную
-                window.location.href = '/';
-            } else {
-                console.error(response.status, response.statusText);
-                errorDiv.textContent = 'Invalid token. Please check and try again.';
-                errorDiv.classList.remove('hidden');
-            }
-        } catch(error) {
-            console.error("Не удалось выполнить запрос", error);
-            errorDiv.textContent = 'Network error. Please try again.';
-            errorDiv.classList.remove('hidden');
-        } finally {
-            submitBtn.textContent = originalText;
-            submitBtn.disabled = false;
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('error') === 'invalid') {
+            document.getElementById('errorMessage').textContent = 'Token is invalid or expired. Please enter a valid token.';
+            document.getElementById('errorMessage').classList.remove('hidden');
         }
+        
+        document.getElementById('tokenForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const token = e.target.token.value.trim();
+        localStorage.setItem('token', token);
+        window.location.href = '/';
     });
     </script>
 </body>
