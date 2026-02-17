@@ -1,0 +1,1 @@
+.PHONY: dev build test clean

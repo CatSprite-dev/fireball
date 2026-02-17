@@ -1,3 +1,6 @@
+@import "tailwindcss";
+
+@layer base {
 :root {
     --background: #ffffff;
     --foreground: #020817;
@@ -56,4 +59,5 @@ body {
 
 #themeToggle:hover {
     background-color: var(--muted);
+}
 }
