@@ -17,10 +17,11 @@ func main() {
 	authHandler := handlers.NewAuthHandler(calculator)
 
 	mux := http.NewServeMux()
+	fileServer := http.FileServer(http.Dir("web"))
 
 	mux.HandleFunc("/auth", authHandler.HandlerAuth)
 
-	mux.Handle("/", http.FileServer(http.Dir("web")))
+	mux.Handle("/", fileServer)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.ServerPort,

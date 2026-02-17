@@ -20,6 +20,7 @@ type UserFullPortfolio struct {
 
 type Position struct {
 	Name                     string     `json:"name"`
+	Type                     string     `json:"type"`
 	Figi                     string     `json:"figi"`
 	InstrumentType           string     `json:"instrumentType"`
 	Quantity                 Quotation  `json:"quantity"`
