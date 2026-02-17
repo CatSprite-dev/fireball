@@ -34,3 +34,5 @@ go.work.sum
 **/.DS_Store
 *.json
 web_old
+
+node_modules/
