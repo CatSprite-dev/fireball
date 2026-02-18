@@ -17,7 +17,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(calculator)
 
 	mux := http.NewServeMux()
-	fileServer := http.FileServer(http.Dir("web/dist"))
+	fileServer := http.FileServer(http.Dir("frontend/dist"))
 
 	mux.HandleFunc("/auth", authHandler.HandlerAuth)
 

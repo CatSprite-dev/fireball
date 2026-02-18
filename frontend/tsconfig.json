@@ -6,11 +6,11 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "outDir": "./web/dist",
+    "outDir": "./dist",
     "rootDir": "./web",
     "allowJs": true,
     "checkJs": false
   },
-  "include": ["web/**/*"],
-  "exclude": ["node_modules", "web/dist"]
+  "include": ["web/*"],
+  "exclude": ["node_modules", "./dist"]
 }
