@@ -32,105 +32,105 @@ logoutBtn?.addEventListener('click', () => {
 });
 
 // Mock data (MAYBE DELETE LATER)
-const mockInvestments: Investment[] = [
+const mockInvestments = [
     {
         id: '1',
-        name: 'Apple Inc.',
-        ticker: 'AAPL',
-        quantity: 50,
-        purchasePrice: 150.25,
-        currentPrice: 178.50,
-        purchaseDate: '2024-01-15',
+        name: 'Сбербанк',
+        ticker: 'SBER',
+        quantity: 100,
+        purchasePrice: 250.50,
+        currentPrice: 280.30,
+        dividends: 500.00,
         type: 'stock',
     },
     {
         id: '2',
-        name: 'Vanguard S&P 500 ETF',
-        ticker: 'VOO',
-        quantity: 25,
-        purchasePrice: 380.00,
-        currentPrice: 425.75,
-        purchaseDate: '2024-02-10',
-        type: 'etf',
+        name: 'ЛУКОЙЛ',
+        ticker: 'LKOH',
+        quantity: 20,
+        purchasePrice: 6800.00,
+        currentPrice: 7200.50,
+        dividends: 2000.00,
+        type: 'stock',
     },
     {
         id: '3',
-        name: 'Bitcoin',
-        ticker: 'BTC',
-        quantity: 0.5,
-        purchasePrice: 45000.00,
-        currentPrice: 52000.00,
-        purchaseDate: '2024-03-05',
-        type: 'crypto',
+        name: 'Газпром',
+        ticker: 'GAZP',
+        quantity: 200,
+        purchasePrice: 160.20,
+        currentPrice: 155.80,
+        dividends: 1020.00,
+        type: 'stock',
     },
     {
         id: '4',
-        name: 'Microsoft Corporation',
-        ticker: 'MSFT',
-        quantity: 30,
-        purchasePrice: 320.50,
-        currentPrice: 385.20,
-        purchaseDate: '2024-01-20',
+        name: 'Яндекс',
+        ticker: 'YNDX',
+        quantity: 50,
+        purchasePrice: 3800.00,
+        currentPrice: 4100.00,
+        dividends: 0.00,
         type: 'stock',
     },
     {
         id: '5',
-        name: 'Tesla Inc.',
-        ticker: 'TSLA',
+        name: 'Норникель',
+        ticker: 'GMKN',
         quantity: 15,
-        purchasePrice: 245.00,
-        currentPrice: 218.50,
-        purchaseDate: '2024-04-01',
+        purchasePrice: 16500.00,
+        currentPrice: 17200.00,
+        dividends: 3000.00,
         type: 'stock',
     },
     {
         id: '6',
-        name: 'NVIDIA Corporation',
-        ticker: 'NVDA',
-        quantity: 20,
-        purchasePrice: 480.00,
-        currentPrice: 725.30,
-        purchaseDate: '2024-01-25',
+        name: 'Роснефть',
+        ticker: 'ROSN',
+        quantity: 30,
+        purchasePrice: 520.00,
+        currentPrice: 560.50,
+        dividends: 1500.00,
         type: 'stock',
     },
     {
         id: '7',
-        name: 'Ethereum',
-        ticker: 'ETH',
-        quantity: 5,
-        purchasePrice: 2200.00,
-        currentPrice: 2850.00,
-        purchaseDate: '2024-03-15',
-        type: 'crypto',
+        name: 'Тинькофф',
+        ticker: 'TCSG',
+        quantity: 25,
+        purchasePrice: 3100.00,
+        currentPrice: 3400.00,
+        dividends: 0.00,
+        type: 'stock',
     },
     {
         id: '8',
-        name: 'iShares Core MSCI Emerging Markets ETF',
-        ticker: 'IEMG',
+        name: 'Фонд Тинькофф Вечный портфель',
+        ticker: 'TPAY',
         quantity: 100,
-        purchasePrice: 48.50,
-        currentPrice: 52.20,
-        purchaseDate: '2024-02-20',
+        purchasePrice: 1250.00,
+        currentPrice: 1320.00,
+        dividends: 0.00,
         type: 'etf',
     },
     {
         id: '9',
-        name: 'Amazon.com Inc.',
-        ticker: 'AMZN',
+        name: 'VK Company',
+        ticker: 'VKCO',
         quantity: 40,
-        purchasePrice: 142.00,
-        currentPrice: 165.80,
-        purchaseDate: '2024-02-05',
+        purchasePrice: 550.00,
+        currentPrice: 520.00,
+        dividends: 0.00,
         type: 'stock',
     },
     {
         id: '10',
-        name: 'US Treasury Bond',
-        ticker: 'TLT',
-        quantity: 50,
-        purchasePrice: 95.00,
-        currentPrice: 97.50,
-        purchaseDate: '2024-01-10',
+        name: 'ОФЗ 26238',
+        ticker: 'SU26238RMFS5',
+        quantity: 500,
+        purchasePrice: 980.00,
+        currentPrice: 995.00,
+        dividends: 35000.00,
         type: 'bond',
     },
 ];
@@ -211,6 +211,13 @@ async function loadInvestments(): Promise<void> {
         window.location.href = '/login.html';
         return;
     }
+    if (token === "t.1234567890_example") {
+        console.log("Используем моковые данные");
+        investments = [...mockInvestments];
+        saveInvestments();
+        renderAll();
+        return
+    }
     
     try {
         console.log("Запрашиваем портфель с токеном:", token);
@@ -266,7 +273,7 @@ async function loadInvestments(): Promise<void> {
                 quantity: parseQuantity(pos.quantity),
                 purchasePrice: parsePrice(pos.averagePositionPrice),
                 currentPrice: parsePrice(pos.currentPrice),
-                purchaseDate: new Date().toISOString().split('T')[0]
+                dividends: parsePrice(pos.dividends)
             };
         });
         
@@ -409,10 +416,10 @@ function renderChart(): void {
     // Set canvas dimensions
     performanceChart.width = performanceChart.offsetWidth;
     performanceChart.height = 300;
-    
-    // Sort by date
+
+    // Sort by dividends
     const sorted = [...investments].sort((a, b) => 
-        new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime()
+        new Date(a.dividends).getTime() - new Date(b.dividends).getTime()
     );
     
     // Calculate cumulative values
@@ -421,7 +428,7 @@ function renderChart(): void {
     const dataPoints: DataPoint[] = sorted.map(inv => {
         cumulativeInvested += inv.quantity * inv.purchasePrice;
         cumulativeValue += inv.quantity * inv.currentPrice;
-        return { date: inv.purchaseDate, invested: cumulativeInvested, value: cumulativeValue };
+        return { invested: cumulativeInvested, value: cumulativeValue };
     });
 
     if (dataPoints.length === 0) {
@@ -607,6 +614,7 @@ function renderHoldings(): void {
         const current = inv.quantity * inv.currentPrice;
         const gain = current - invested;
         const gainPercent = invested > 0 ? (gain / invested) * 100 : 0;
+        const dividendsPercent = invested > 0 ? (inv.dividends / invested) * 100 : 0;
         
         const gainIcon = gain >= 0 ? 
             '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline mr-1"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>' :
@@ -625,8 +633,10 @@ function renderHoldings(): void {
                     ${gain >= 0 ? '+' : ''}${formatCurrency(gain)} (${gainPercent >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%)
                     ${gainIcon}
                 </td>
-                <td class="p-4 align-middle text-center">
-                    <button onclick="deleteInvestment('${inv.id}')" class="text-red-600 hover:text-red-800">Delete</button>
+                <td class="p-4 align-middle text-right ${inv.dividends == 0 ? 'text-foreground' : inv.dividends >= 0 ? 'text-green-600' : 'text-red-600'}">
+                    ${inv.dividends == 0 
+                        ? '—' 
+                        : `${formatCurrency(inv.dividends)} (${dividendsPercent >= 0 ? '+' : ''}${dividendsPercent.toFixed(2)}%)`}
                 </td>
             </tr>
         `;
@@ -668,43 +678,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     });
 });
 
-// Add investment form
-addInvestmentForm?.addEventListener('submit', (e: Event) => {
-    e.preventDefault();
-    const form = e.target as HTMLFormElement;
-    const formData = new FormData(form);
-    
-    const newInvestment: Investment = {
-        id: Date.now().toString(),
-        name: formData.get('name') as string || '',
-        ticker: formData.get('ticker') as string || '',
-        type: formData.get('type') as string || 'other',
-        quantity: parseFloat(formData.get('quantity') as string) || 0,
-        purchasePrice: parseFloat(formData.get('purchasePrice') as string) || 0,
-        currentPrice: parseFloat(formData.get('currentPrice') as string) || 0,
-        purchaseDate: formData.get('purchaseDate') as string || new Date().toISOString().split('T')[0],
-    };
-    
-    investments.push(newInvestment);
-    saveInvestments();
-    renderAll();
-    form.reset();
-    
-    // Switch to holdings tab
-    const holdingsTab = document.querySelector('[data-tab="holdings"]') as HTMLElement;
-    if (holdingsTab) {
-        holdingsTab.click();
-    }
-});
-
-// Delete investment
-window.deleteInvestment = (id: string): void => {
-    if (confirm('Are you sure you want to delete this investment?')) {
-        investments = investments.filter(inv => inv.id !== id);
-        saveInvestments();
-        renderAll();
-    }
-};
 
 // Initialize
 loadInvestments();

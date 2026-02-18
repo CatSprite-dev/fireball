@@ -6,6 +6,8 @@ export interface Quantity {
 }
 
 export interface Price {
+    currency?: string;
+    Currency?: string;
     units?: string;
     Units?: string;
     nano?: number;
@@ -24,6 +26,8 @@ export interface Position {
     quantity?: Quantity;
     averagePositionPrice?: Price;
     currentPrice?: Price;
+    dividends?: Price;
+    Dividends?: Price;
 }
 
 export interface Portfolio {
@@ -39,7 +43,7 @@ export interface Investment {
     quantity: number;
     purchasePrice: number;
     currentPrice: number;
-    purchaseDate: string;
+    dividends: number;
     type: 'stock' | 'etf' | 'crypto' | 'bond' | 'other' | string;
 }
 
@@ -57,7 +61,6 @@ export interface Metrics {
 }
 
 export interface DataPoint {
-    date: string;
     invested: number;
     value: number;
 }
