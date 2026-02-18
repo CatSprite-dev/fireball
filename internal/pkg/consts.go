@@ -1,8 +1,11 @@
-package main
+package pkg
 
 const (
-	baseUrlInvest  = "https://invest-public-api.tbank.ru/rest/tinkoff.public.invest.api.contract.v1"
-	baseUrlSandbox = "https://sandbox-invest-public-api.tbank.ru/rest/tinkoff.public.invest.api.contract.v1"
+	HTTPMethodGet    = "GET"
+	HTTPMethodPost   = "POST"
+	HTTPMethodPut    = "PUT"
+	HTTPMethodDelete = "DELETE"
+	HTTPMethodPatch  = "PATCH"
 )
 
 type OperationType string
@@ -84,4 +87,83 @@ const (
 	OperationStateExecuted    OperationState = "OPERATION_STATE_EXECUTED"
 	OperationStateCanceled    OperationState = "OPERATION_STATE_CANCELED"
 	OperationStateProgress    OperationState = "OPERATION_STATE_PROGRESS"
+)
+
+type CandleInterval string
+
+const (
+	CandleIntervalUnspecified CandleInterval = "CANDLE_INTERVAL_UNSPECIFIED"
+	CandleInterval1Min        CandleInterval = "CANDLE_INTERVAL_1_MIN"
+	CandleInterval5Min        CandleInterval = "CANDLE_INTERVAL_5_MIN"
+	CandleInterval15Min       CandleInterval = "CANDLE_INTERVAL_15_MIN"
+	CandleIntervalHour        CandleInterval = "CANDLE_INTERVAL_HOUR"
+	CandleIntervalDay         CandleInterval = "CANDLE_INTERVAL_DAY"
+	CandleInterval2Min        CandleInterval = "CANDLE_INTERVAL_2_MIN"
+	CandleInterval3Min        CandleInterval = "CANDLE_INTERVAL_3_MIN"
+	CandleInterval10Min       CandleInterval = "CANDLE_INTERVAL_10_MIN"
+	CandleInterval30Min       CandleInterval = "CANDLE_INTERVAL_30_MIN"
+	CandleInterval2Hour       CandleInterval = "CANDLE_INTERVAL_2_HOUR"
+	CandleInterval4Hour       CandleInterval = "CANDLE_INTERVAL_4_HOUR"
+	CandleIntervalWeek        CandleInterval = "CANDLE_INTERVAL_WEEK"
+	CandleIntervalMonth       CandleInterval = "CANDLE_INTERVAL_MONTH"
+	CandleInterval5Sec        CandleInterval = "CANDLE_INTERVAL_5_SEC"
+	CandleInterval10Sec       CandleInterval = "CANDLE_INTERVAL_10_SEC"
+	CandleInterval30Sec       CandleInterval = "CANDLE_INTERVAL_30_SEC"
+)
+
+type CandleSource string
+
+const (
+	CandleSourceUnspecified    CandleSource = "CANDLE_SOURCE_UNSPECIFIED"
+	CandleSourceExchange       CandleSource = "CANDLE_SOURCE_EXCHANGE"
+	CandleSourceIncludeWeekend CandleSource = "CANDLE_SOURCE_INCLUDE_WEEKEND"
+)
+
+type AccountStatus string
+
+const (
+	AccountStatusUnspecified AccountStatus = "ACCOUNT_STATUS_UNSPECIFIED"
+	AccountStatusNew         AccountStatus = "ACCOUNT_STATUS_NEW"
+	AccountStatusOpen        AccountStatus = "ACCOUNT_STATUS_OPEN"
+	AccountStatusClosed      AccountStatus = "ACCOUNT_STATUS_CLOSED"
+	AccountStatusAll         AccountStatus = "ACCOUNT_STATUS_ALL"
+)
+
+type InstrumentIdType string
+
+const (
+	InstrumentIdUnspecified     InstrumentIdType = "INSTRUMENT_ID_UNSPECIFIED"
+	InstrumentIdTypeFigi        InstrumentIdType = "INSTRUMENT_ID_TYPE_FIGI"
+	InstrumentIdTypeTicker      InstrumentIdType = "INSTRUMENT_ID_TYPE_TICKER"
+	InstrumentIdTypeUid         InstrumentIdType = "INSTRUMENT_ID_TYPE_UID"
+	InstrumentIdTypePositionUid InstrumentIdType = "INSTRUMENT_ID_TYPE_POSITION_UID"
+)
+
+type ClassCode string
+
+const (
+	ClassCodeUnspecified ClassCode = ""
+	ClassCodeTQBR        ClassCode = "TQBR"   // Основной режим торгов акциями на Московской бирже
+	ClassCodeTQOB        ClassCode = "TQOB"   // Основной режим торгов облигациями на Московской бирже
+	ClassCodeSPBRU       ClassCode = "SPBRU"  // Основной режим торгов акциями и фондами на Санкт-Петербургской бирже
+	ClassCodeSPBFUT      ClassCode = "SPBFUT" // Торговля фьючерсами на Московской бирже
+	ClassCodeSPBOPT      ClassCode = "SPBOPT" // Торговля опционами на Московской бирже
+	ClassCodeTQTF        ClassCode = "TQTF"   // Основной режим торгов фондами на Московской бирже
+	ClassCodeCETS        ClassCode = "CETS"   // Основной режим торгов валютой на Московской бирже
+)
+
+type InstrumentType string
+
+const (
+	InstrumentTypeUnspecified         InstrumentType = "INSTRUMENT_TYPE_UNSPECIFIED"
+	InstrumentTypeBond                InstrumentType = "INSTRUMENT_TYPE_BOND"
+	InstrumentTypeShare               InstrumentType = "INSTRUMENT_TYPE_SHARE"
+	InstrumentTypeCurrency            InstrumentType = "INSTRUMENT_TYPE_CURRENCY"
+	InstrumentTypeETF                 InstrumentType = "INSTRUMENT_TYPE_ETF"
+	InstrumentTypeFutures             InstrumentType = "INSTRUMENT_TYPE_FUTURES"
+	InstrumentTypeSP                  InstrumentType = "INSTRUMENT_TYPE_SP"
+	InstrumentTypeOption              InstrumentType = "INSTRUMENT_TYPE_OPTION"
+	InstrumentTypeClearingCertificate InstrumentType = "INSTRUMENT_TYPE_CLEARING_CERTIFICATE"
+	InstrumentTypeIndex               InstrumentType = "INSTRUMENT_TYPE_INDEX"
+	InstrumentTypeCommodity           InstrumentType = "INSTRUMENT_TYPE_COMMODITY"
 )

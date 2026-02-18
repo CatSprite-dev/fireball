@@ -1,0 +1,16 @@
+module.exports = {
+  collapseWhitespace: true,
+  removeComments: true,
+  minifyJS: true,
+  minifyCSS: true,
+  removeAttributeQuotes: true,
+  removeRedundantAttributes: true,
+  useShortDoctype: true,
+  removeEmptyAttributes: true,
+  removeScriptTypeAttributes: true,
+  removeStyleLinkTypeAttributes: true,
+  sortAttributes: true,
+  sortClassName: true,
+  decodeEntities: true,
+  customAttrCollapse: /class/,
+};
