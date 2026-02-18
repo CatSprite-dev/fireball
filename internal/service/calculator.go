@@ -29,7 +29,7 @@ func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio
 	openedDate := userAccounts.Accounts[0].OpenedDate
 
 	rawPortfolio, err := calc.apiClient.GetPortfolio(token, accountID)
-	fullEmptyPortfolio := convertToFullPortfolio(rawPortfolio)
+	fullEmptyPortfolio := convertFullPortfolio(rawPortfolio)
 	enrichedFullPortfolio, err := enrichFullPortfolio(calc, fullEmptyPortfolio, token, accountID, openedDate)
 	if err != nil {
 		return domain.UserFullPortfolio{}, err
@@ -69,6 +69,31 @@ func (calc *Calculator) GetDividends(
 			}
 			current := result[item.Ticker]
 			result[item.Ticker] = AddMoneyValue(current, item.Payment)
+		}
+	}
+	return result, nil
+}
+
+func (calc *Calculator) GetInstrumentInfo(token string, instrumentIdType pkg.InstrumentIdType, instrumentId string) (domain.Instrument, error) {
+	rawInstrument, err := calc.apiClient.GetInstrumentBy(token, instrumentIdType, pkg.ClassCodeUnspecified, instrumentId)
+	if err != nil {
+		return domain.Instrument{}, err
+	}
+	instrument := convertInstrument(rawInstrument)
+	return instrument, nil
+}
+
+func (calc *Calculator) GetIndexByTicker(token string, ticker string) (domain.IndicativeInstruments, error) {
+	result := domain.IndicativeInstruments{}
+
+	rawInstruments, err := calc.apiClient.Indicatives(token)
+	if err != nil {
+		return domain.IndicativeInstruments{}, err
+	}
+	indicativeInstruments := convertIndicativeInstrument(rawInstruments)
+	for _, instr := range indicativeInstruments.Instruments {
+		if instr.Ticker == ticker {
+			result.Instruments = append(result.Instruments, instr)
 		}
 	}
 	return result, nil

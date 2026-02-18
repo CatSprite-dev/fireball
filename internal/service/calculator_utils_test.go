@@ -276,7 +276,7 @@ func TestConvertToFullPortfolio(t *testing.T) {
 		},
 	}
 
-	result := convertToFullPortfolio(rawPortfolio)
+	result := convertFullPortfolio(rawPortfolio)
 
 	if result.TotalAmountShares.Units != "100" {
 		t.Errorf("Expected TotalAmountShares 100, got %s", result.TotalAmountShares.Units)

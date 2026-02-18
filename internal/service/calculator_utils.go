@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CatSprite-dev/fireball/internal/api"
 	"github.com/CatSprite-dev/fireball/internal/domain"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 )
@@ -78,7 +77,7 @@ func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token
 
 func getPositionInfo(wg *sync.WaitGroup, p *domain.Position, calc *Calculator, token string, errChan chan<- error) {
 	defer wg.Done()
-	instrument, err := getInstrumentInfo(calc.apiClient, token, pkg.InstrumentIdTypePositionUid, p.PositionUID)
+	instrument, err := calc.GetInstrumentInfo(token, pkg.InstrumentIdTypePositionUid, p.PositionUID)
 	if err != nil {
 		errChan <- fmt.Errorf("failed to get instrument info for position %s: %v", p.PositionUID, err)
 		return
@@ -143,13 +142,4 @@ func getPositionMetrics(wg *sync.WaitGroup, p *domain.Position, calc *Calculator
 		return
 	}
 	p.TotalYieldRelative = MultiplyQuotation(p.TotalYieldRelative, domain.Quotation{Units: "100", Nano: 0})
-}
-
-func getInstrumentInfo(apiClient *api.Client, token string, instrumentIdType pkg.InstrumentIdType, instrumentId string) (domain.Instrument, error) {
-	rawInstrument, err := apiClient.GetInstrumentBy(token, instrumentIdType, pkg.ClassCodeUnspecified, instrumentId)
-	if err != nil {
-		return domain.Instrument{}, err
-	}
-	instrument := convertToDomainInstrument(rawInstrument)
-	return instrument, nil
 }

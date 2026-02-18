@@ -5,7 +5,7 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/domain"
 )
 
-func convertToFullPortfolio(raw api.UserPortfolio) domain.UserFullPortfolio {
+func convertFullPortfolio(raw api.UserPortfolio) domain.UserFullPortfolio {
 	full := domain.UserFullPortfolio{
 		TotalAmountShares:     domain.MoneyValue(raw.TotalAmountShares),
 		TotalAmountBonds:      domain.MoneyValue(raw.TotalAmountBonds),
@@ -58,9 +58,24 @@ func convertToFullPortfolio(raw api.UserPortfolio) domain.UserFullPortfolio {
 	return full
 }
 
-func convertToDomainInstrument(raw api.Instrument) domain.Instrument {
+func convertInstrument(raw api.Instrument) domain.Instrument {
 	return domain.Instrument{
 		Name:           raw.Instrument.Name,
 		InstrumentType: raw.Instrument.InstrumentType,
 	}
+}
+
+func convertIndicativeInstrument(raw api.IndicativeInstruments) domain.IndicativeInstruments {
+	indicatineInstruments := domain.IndicativeInstruments{}
+	for _, rawInstr := range raw.Instruments {
+		instr := domain.Instrument{
+			Figi:           rawInstr.Figi,
+			Ticker:         rawInstr.Ticker,
+			UID:            rawInstr.UID,
+			InstrumentType: rawInstr.InstrumentKind,
+			Name:           rawInstr.Name,
+		}
+		indicatineInstruments.Instruments = append(indicatineInstruments.Instruments, instr)
+	}
+	return indicatineInstruments
 }

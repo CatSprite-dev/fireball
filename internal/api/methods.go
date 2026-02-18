@@ -161,3 +161,20 @@ func (client *Client) GetInstrumentBy(token string, idType pkg.InstrumentIdType,
 
 	return instrument, nil
 }
+
+func (client *Client) Indicatives(token string) (IndicativeInstruments, error) {
+	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Indicatives"
+
+	payload := `{}`
+	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+	if err != nil {
+		return IndicativeInstruments{}, err
+	}
+
+	var indicativeInstruments IndicativeInstruments
+	err = json.Unmarshal(data, &indicativeInstruments)
+	if err != nil {
+		return IndicativeInstruments{}, fmt.Errorf("unmarshal error (api.Indicatives): %s", err)
+	}
+	return indicativeInstruments, nil
+}
