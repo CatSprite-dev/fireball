@@ -1,0 +1,35 @@
+{
+  "name": "fireball-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Fireball",
+  "main": "app.js",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "dev": "concurrently \"npm run dev:js\" \"npm run dev:css\"",
+    "dev:js": "esbuild web/app.ts --bundle --outfile=dist/app.js --sourcemap --watch ",
+    "dev:css": "npx @tailwindcss/cli -i web/styles.css -o dist/styles.css --watch",
+    "dev:ts": "tsc --project ./configs/tsconfig.json --watch",
+
+    "build": "npm run clean && npm run build:tailwind && npm run build:js && npm run build:html && npm run build:final-css",
+    "build:js": "esbuild web/app.ts --bundle --outfile=dist/app.js --minify --legal-comments=none",
+    "build:tailwind": "npx @tailwindcss/cli -i web/styles.css -o dist/tailwind.full.css --minify",
+    "build:html": "html-minifier-terser --collapse-whitespace --remove-comments --minify-js true --minify-css true -o dist/index.html web/index.html && html-minifier-terser --collapse-whitespace --remove-comments --minify-js true --minify-css true -o dist/login.html web/login.html",
+    "build:final-css": "purgecss --css dist/tailwind.full.css --content dist/*.html dist/*.js --output dist/styles.css && rm dist/tailwind.full.css",
+
+    "build:html:all": "for file in web/*.html; do html-minifier-terser --config ./configs/html-minifier.config.js -o web/dist/$(basename $file) $file; done",
+
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "esbuild": "^0.27.3",
+    "html-minifier-terser": "^7.2.0",
+    "postcss-class-name-shortener": "^2.0.0",
+    "purgecss": "^8.0.0",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.9.3"
+  }
+}
