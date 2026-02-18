@@ -28,6 +28,11 @@ export interface Position {
     currentPrice?: Price;
     dividends?: Price;
     Dividends?: Price;
+    totalYield?: Price;
+    TotalYield?: Price;
+    totalYieldRelative?: Quantity;
+    TotalYieldRelative?: Quantity;
+
 }
 
 export interface Portfolio {
@@ -44,6 +49,8 @@ export interface Investment {
     purchasePrice: number;
     currentPrice: number;
     dividends: number;
+    totalYield: number;
+    totalYieldRelative: number;
     type: 'stock' | 'etf' | 'crypto' | 'bond' | 'other' | string;
 }
 

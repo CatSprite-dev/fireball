@@ -41,6 +41,8 @@ const mockInvestments = [
         purchasePrice: 250.50,
         currentPrice: 280.30,
         dividends: 500.00,
+        totalYield: 3000.00,
+        totalYieldRelative: 0.3,
         type: 'stock',
     },
     {
@@ -51,6 +53,8 @@ const mockInvestments = [
         purchasePrice: 6800.00,
         currentPrice: 7200.50,
         dividends: 2000.00,
+        totalYield: 8000.00,
+        totalYieldRelative: 0.4,
         type: 'stock',
     },
     {
@@ -61,6 +65,8 @@ const mockInvestments = [
         purchasePrice: 160.20,
         currentPrice: 155.80,
         dividends: 1020.00,
+        totalYield: -840.00,
+        totalYieldRelative: -0.042,
         type: 'stock',
     },
     {
@@ -71,6 +77,8 @@ const mockInvestments = [
         purchasePrice: 3800.00,
         currentPrice: 4100.00,
         dividends: 0.00,
+        totalYield: 15000.00,
+        totalYieldRelative: 0.3,
         type: 'stock',
     },
     {
@@ -81,6 +89,8 @@ const mockInvestments = [
         purchasePrice: 16500.00,
         currentPrice: 17200.00,
         dividends: 3000.00,
+        totalYield: 10500.00,
+        totalYieldRelative: 0.2,
         type: 'stock',
     },
     {
@@ -91,6 +101,8 @@ const mockInvestments = [
         purchasePrice: 520.00,
         currentPrice: 560.50,
         dividends: 1500.00,
+        totalYield: 1350.00,
+        totalYieldRelative: 0.09,
         type: 'stock',
     },
     {
@@ -101,6 +113,8 @@ const mockInvestments = [
         purchasePrice: 3100.00,
         currentPrice: 3400.00,
         dividends: 0.00,
+        totalYield: 7500.00,
+        totalYieldRelative: 0.3,
         type: 'stock',
     },
     {
@@ -111,6 +125,8 @@ const mockInvestments = [
         purchasePrice: 1250.00,
         currentPrice: 1320.00,
         dividends: 0.00,
+        totalYield: 7000.00,
+        totalYieldRelative: 0.56,
         type: 'etf',
     },
     {
@@ -121,6 +137,8 @@ const mockInvestments = [
         purchasePrice: 550.00,
         currentPrice: 520.00,
         dividends: 0.00,
+        totalYield: -1200.00,
+        totalYieldRelative: -0.0545,
         type: 'stock',
     },
     {
@@ -131,6 +149,8 @@ const mockInvestments = [
         purchasePrice: 980.00,
         currentPrice: 995.00,
         dividends: 35000.00,
+        totalYield: 7500.00,
+        totalYieldRelative: 0.15,
         type: 'bond',
     },
 ];
@@ -273,7 +293,9 @@ async function loadInvestments(): Promise<void> {
                 quantity: parseQuantity(pos.quantity),
                 purchasePrice: parsePrice(pos.averagePositionPrice),
                 currentPrice: parsePrice(pos.currentPrice),
-                dividends: parsePrice(pos.dividends)
+                dividends: parsePrice(pos.dividends),
+                totalYield: parsePrice(pos.totalYield),
+                totalYieldRelative: parseQuantity(pos.totalYieldRelative),
             };
         });
         
@@ -615,6 +637,7 @@ function renderHoldings(): void {
         const gain = current - invested;
         const gainPercent = invested > 0 ? (gain / invested) * 100 : 0;
         const dividendsPercent = invested > 0 ? (inv.dividends / invested) * 100 : 0;
+        const totalYieldPercent = inv.totalYieldRelative
         
         const gainIcon = gain >= 0 ? 
             '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline mr-1"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>' :
@@ -637,6 +660,10 @@ function renderHoldings(): void {
                     ${inv.dividends == 0 
                         ? '—' 
                         : `${formatCurrency(inv.dividends)} (${dividendsPercent >= 0 ? '+' : ''}${dividendsPercent.toFixed(2)}%)`}
+                </td>
+                <td class="p-4 align-middle text-right ${gain >= 0 ? 'text-green-600' : 'text-red-600'}">
+                    ${gain >= 0 ? '+' : ''}${formatCurrency(inv.totalYield)} (${totalYieldPercent >= 0 ? '+' : ''}${totalYieldPercent.toFixed(2)}%)
+                    ${gainIcon}
                 </td>
             </tr>
         `;
