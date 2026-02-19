@@ -55,7 +55,7 @@ func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token
 		go getPositionInfo(&wg, pos, calc, token, errChan)
 
 		// Заполняем ExpectedYieldRelative, DailyYieldRelative, TotalYield, TotalYieldRelative и дивиденды для каждой позиции
-		go getPositionMetrics(&wg, pos, calc, token, accountID, openedDate, errChan)
+		go getPositionMetrics(&wg, &portfolio, pos, errChan)
 	}
 
 	go func() {
@@ -86,7 +86,7 @@ func getPositionInfo(wg *sync.WaitGroup, p *domain.Position, calc *Calculator, t
 	p.Type = instrument.InstrumentType
 }
 
-func getPositionMetrics(wg *sync.WaitGroup, p *domain.Position, calc *Calculator, token string, accountID string, openedDate time.Time, errChan chan<- error) {
+func getPositionMetrics(wg *sync.WaitGroup, portfolio *domain.UserFullPortfolio, p *domain.Position, errChan chan<- error) {
 	defer wg.Done()
 	// ExpectedYieldRelative
 	posAmount := MultiplyMoneyValue(p.AveragePositionPrice,
@@ -116,12 +116,7 @@ func getPositionMetrics(wg *sync.WaitGroup, p *domain.Position, calc *Calculator
 	// p.DailyYieldRelative =
 
 	// Dividends
-	divs, err := calc.GetDividends(token, accountID, p.InstrumentUID, openedDate, time.Now().UTC())
-	if err != nil {
-		errChan <- fmt.Errorf("failed to get dividends for position %s: %v", p.PositionUID, err)
-		return
-	}
-	p.Dividends = divs[p.Ticker]
+	p.Dividends = portfolio.AllDividends[p.Ticker]
 
 	// TotalYield
 	p.TotalYield = AddMoneyValue(p.ExpectedYield, p.Dividends)

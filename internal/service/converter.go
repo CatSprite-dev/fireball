@@ -26,7 +26,7 @@ func convertFullPortfolio(raw api.UserPortfolio) domain.UserFullPortfolio {
 	full.Positions = make([]domain.Position, len(raw.Positions))
 	for i, pos := range raw.Positions {
 		full.Positions[i] = domain.Position{
-			Name:                     "", // из апи мосбиржи
+			Name:                     "",
 			Type:                     "",
 			Figi:                     pos.Figi,
 			InstrumentType:           pos.InstrumentType,
