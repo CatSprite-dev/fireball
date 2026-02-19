@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"log"
 	"time"
 
@@ -23,6 +24,9 @@ func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio
 	userAccounts, err := calc.apiClient.GetAccounts(token, pkg.AccountStatusOpen)
 	if err != nil {
 		return domain.UserFullPortfolio{}, err
+	}
+	if len(userAccounts.Accounts) == 0 {
+		return domain.UserFullPortfolio{}, errors.New("found no accounts")
 	}
 
 	accountID := userAccounts.Accounts[0].ID
@@ -67,8 +71,8 @@ func (calc *Calculator) GetDividends(
 			if key == "" {
 				continue
 			}
-			current := result[item.Ticker]
-			result[item.Ticker] = AddMoneyValue(current, item.Payment)
+			current := result[key]
+			result[key] = AddMoneyValue(current, item.Payment)
 		}
 	}
 	return result, nil
