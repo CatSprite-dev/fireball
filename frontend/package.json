@@ -4,30 +4,19 @@
   "description": "Frontend for Fireball",
   "main": "app.js",
   "scripts": {
-    "clean": "rm -rf dist",
-    "dev": "concurrently \"npm run dev:js\" \"npm run dev:css\" \"npm run dev:html\"",
-    "dev:js": "esbuild web/app.ts --bundle --outfile=dist/app.js --sourcemap --watch ",
-    "dev:css": "npx @tailwindcss/cli -i web/styles.css -o dist/styles.css --watch",
-    "dev:html": "nodemon --watch web --ext html --exec 'cp web/*.html dist/'",
-    "build": "npm run clean && npm run build:tailwind && npm run build:js && npm run build:html && npm run build:final-css",
-    "build:js": "esbuild web/app.ts --bundle --outfile=dist/app.js --minify --legal-comments=none",
-    "build:tailwind": "npx @tailwindcss/cli -i web/styles.css -o dist/tailwind.full.css --minify",
-    "build:html": "html-minifier-terser --collapse-whitespace --remove-comments --minify-js true --minify-css true -o dist/index.html web/index.html && html-minifier-terser --collapse-whitespace --remove-comments --minify-js true --minify-css true -o dist/login.html web/login.html",
-    "build:final-css": "purgecss --css dist/tailwind.full.css --content dist/*.html dist/*.js --output dist/styles.css && rm dist/tailwind.full.css",
-    "build:html:all": "for file in web/*.html; do html-minifier-terser --config ./configs/html-minifier.config.js -o web/dist/$(basename $file) $file; done"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "concurrently": "^9.2.1",
-    "esbuild": "^0.27.3",
-    "html-minifier-terser": "^7.2.0",
-    "purgecss": "^8.0.0",
+    "@tailwindcss/vite": "^4.2.0",
+    "@vitejs/plugin-basic-ssl": "^2.1.4",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "nodemon": "^3.1.11"
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-html-minifier": "^1.0.5"
   }
 }
