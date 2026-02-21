@@ -79,3 +79,31 @@ func convertIndicativeInstrument(raw api.IndicativeInstruments) domain.Indicativ
 	}
 	return indicatineInstruments
 }
+
+func convertCandles(raw api.Candles) domain.Candles {
+	candles := domain.Candles{}
+	for _, rawCandle := range raw.Candles {
+		candle := domain.Candle{
+			Time: rawCandle.Time,
+			Close: domain.Quotation{
+				Units: rawCandle.Close.Units,
+				Nano:  rawCandle.Close.Nano,
+			},
+			Open: domain.Quotation{
+				Units: rawCandle.Open.Units,
+				Nano:  rawCandle.Open.Nano,
+			},
+			High: domain.Quotation{
+				Units: rawCandle.High.Units,
+				Nano:  rawCandle.High.Nano,
+			},
+			Low: domain.Quotation{
+				Units: rawCandle.Low.Units,
+				Nano:  rawCandle.Low.Nano,
+			},
+			IsComplete: rawCandle.IsComplete,
+		}
+		candles.Candles = append(candles.Candles, candle)
+	}
+	return candles
+}

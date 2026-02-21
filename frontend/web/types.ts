@@ -72,6 +72,22 @@ export interface DataPoint {
     value: number;
 }
 
+export interface Candle {
+    time: string; // или Date, зависит от того, как приходит
+    open: Quantity;
+    close: Quantity;
+    high?: Quantity; // если добавите позже
+    low?: Quantity;  // если добавите позже
+    isComplete?: boolean;
+}
+
+export interface ChartData {
+    index_candles: {
+        candles: Candle[];
+    };
+    // возможно, другие поля
+}
+
 declare global {
     interface Window {
         fullPortfolio?: Portfolio;

@@ -87,18 +87,54 @@ func (calc *Calculator) GetInstrumentInfo(token string, instrumentIdType pkg.Ins
 	return instrument, nil
 }
 
-func (calc *Calculator) GetIndexByTicker(token string, ticker string) (domain.IndicativeInstruments, error) {
-	result := domain.IndicativeInstruments{}
+func (calc *Calculator) GetIndexByTicker(token string, ticker string) (domain.Instrument, error) {
+	result := domain.Instrument{}
 
 	rawInstruments, err := calc.apiClient.Indicatives(token)
 	if err != nil {
-		return domain.IndicativeInstruments{}, err
+		return domain.Instrument{}, err
 	}
 	indicativeInstruments := convertIndicativeInstrument(rawInstruments)
 	for _, instr := range indicativeInstruments.Instruments {
 		if instr.Ticker == ticker {
-			result.Instruments = append(result.Instruments, instr)
+			result = instr
+			break
 		}
 	}
 	return result, nil
+}
+
+func (calc *Calculator) GetCandles(token string,
+	instrumentId string,
+	from time.Time,
+	to time.Time,
+	interval pkg.CandleInterval,
+	candleSourceType pkg.CandleSource) (domain.Candles, error) {
+
+	rawCandles, err := calc.apiClient.GetCandles(token, &from, &to, interval, instrumentId, candleSourceType, 0)
+	if err != nil {
+		return domain.Candles{}, err
+	}
+
+	candles := convertCandles(rawCandles)
+	return candles, nil
+}
+
+func (calc *Calculator) GetChartData(token string, indexTicker string, from time.Time, to time.Time, candleInterval pkg.CandleInterval) (domain.ChartData, error) {
+	index, err := calc.GetIndexByTicker(token, indexTicker)
+	if err != nil {
+		return domain.ChartData{}, err
+	}
+
+	indexCandles, err := calc.GetCandles(token, index.UID, from, to, candleInterval, pkg.CandleSourceExchange)
+	if err != nil {
+		return domain.ChartData{}, err
+	}
+	if len(indexCandles.Candles) == 0 {
+		return domain.ChartData{}, errors.New("no candles data available")
+	}
+
+	return domain.ChartData{
+		IndexCandles: indexCandles,
+	}, nil
 }

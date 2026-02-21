@@ -33,7 +33,7 @@ func (client *Client) GetAccounts(token string, accountStatus pkg.AccountStatus)
 func (client *Client) GetInfo(token string) (UserInfo, error) {
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.UsersService/GetInfo"
 
-	payload := `{}`
+	payload := struct{}{}
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
 		return UserInfo{}, err
@@ -165,16 +165,57 @@ func (client *Client) GetInstrumentBy(token string, idType pkg.InstrumentIdType,
 func (client *Client) Indicatives(token string) (IndicativeInstruments, error) {
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Indicatives"
 
-	payload := `{}`
+	payload := struct{}{}
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
 		return IndicativeInstruments{}, err
 	}
-
 	var indicativeInstruments IndicativeInstruments
 	err = json.Unmarshal(data, &indicativeInstruments)
 	if err != nil {
 		return IndicativeInstruments{}, fmt.Errorf("unmarshal error (api.Indicatives): %s", err)
 	}
 	return indicativeInstruments, nil
+}
+
+func (client *Client) GetCandles(token string,
+	from *time.Time,
+	to *time.Time,
+	interval pkg.CandleInterval,
+	instrumentId string,
+	candleSourceType pkg.CandleSource,
+	limit int) (Candles, error) {
+
+	type GetCandlesRequest struct {
+		From             *time.Time         `json:"from"`
+		To               *time.Time         `json:"to"`
+		Interval         pkg.CandleInterval `json:"interval"`
+		InstrumentID     string             `json:"instrumentId"`
+		CandleSourceType pkg.CandleSource   `json:"candleSourceType,omitempty"`
+		Limit            int                `json:"limit,omitempty"`
+	}
+
+	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles"
+
+	payload := GetCandlesRequest{
+		From:             from,
+		To:               to,
+		Interval:         interval,
+		InstrumentID:     instrumentId,
+		CandleSourceType: candleSourceType,
+		Limit:            limit,
+	}
+
+	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+	if err != nil {
+		return Candles{}, fmt.Errorf("do request error (GetCandles): %s", err)
+	}
+
+	var candles Candles
+	err = json.Unmarshal(data, &candles)
+	if err != nil {
+		return Candles{}, fmt.Errorf("unmarshal error (GetCandles): %s", err)
+	}
+
+	return candles, nil
 }

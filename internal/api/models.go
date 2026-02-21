@@ -297,3 +297,29 @@ type Instrument struct {
 		Isin              string `json:"isin"`
 	} `json:"instrument"`
 }
+
+type Candles struct {
+	Candles []struct {
+		Volume string `json:"volume"`
+		High   struct {
+			Nano  int    `json:"nano"`
+			Units string `json:"units"`
+		} `json:"high"`
+		Low struct {
+			Nano  int    `json:"nano"`
+			Units string `json:"units"`
+		} `json:"low"`
+		VolumeBuy  string    `json:"volumeBuy"`
+		VolumeSell string    `json:"volumeSell"`
+		Time       time.Time `json:"time"`
+		Close      struct {
+			Nano  int    `json:"nano"`
+			Units string `json:"units"`
+		} `json:"close"`
+		Open struct {
+			Nano  int    `json:"nano"`
+			Units string `json:"units"`
+		} `json:"open"`
+		IsComplete bool `json:"isComplete"`
+	} `json:"candles"`
+}

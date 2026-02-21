@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/domain"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
@@ -19,6 +20,7 @@ func NewAuthHandler(calc *service.Calculator) *AuthHandler {
 func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 	type returnVals struct {
 		UserPortfolio domain.UserFullPortfolio `json:"user_portfolio"`
+		ChartData     domain.ChartData         `json:"chart_data"`
 	}
 
 	token, err := getTokenFromHeader(r.Header)
@@ -32,7 +34,14 @@ func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	chartData, err := h.portfolioService.GetChartData(token, "MCFTR", time.Now().AddDate(-1, 0, 0), time.Now(), pkg.CandleIntervalDay)
+	if err != nil {
+		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
+		return
+	}
+
 	pkg.RespondWithJSON(w, http.StatusOK, returnVals{
 		UserPortfolio: userPortfolio,
+		ChartData:     chartData,
 	})
 }

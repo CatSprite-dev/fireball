@@ -6,7 +6,9 @@ import type {
     Price,
     InvestmentWithGain,
     Metrics,
-    DataPoint 
+    DataPoint,
+    ChartData,
+    Candle
 } from './types.ts';
 
 const token = localStorage.getItem('token');
@@ -263,9 +265,15 @@ async function loadInvestments(): Promise<void> {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-        const data = await response.json() as { user_portfolio?: Portfolio } | Portfolio;
+        const data = await response.json() as { user_portfolio?: Portfolio; chart_data?: ChartData } | Portfolio;
         console.log("✅ Сервер ответил:", data);
-        
+
+        if ('chart_data' in data && data.chart_data) {
+            // Сохраняем как есть, но в renderChart будем обращаться правильно
+            (window as any).chartData = data.chart_data;
+            console.log("Сохраненные chartData:", data.chart_data);
+        }
+                
         // Извлекаем портфель
         let portfolio: Portfolio;
         if ('user_portfolio' in data && data.user_portfolio) {
@@ -430,91 +438,144 @@ function renderMetrics(): void {
 }
 
 function renderChart(): void {
-    if (!performanceChart) return;
-    
-    const ctx = performanceChart.getContext('2d');
-    if (!ctx) return;
-    
-    // Set canvas dimensions
-    performanceChart.width = performanceChart.offsetWidth;
-    performanceChart.height = 300;
-
-    // Sort by dividends
-    const sorted = [...investments].sort((a, b) => 
-        new Date(a.dividends).getTime() - new Date(b.dividends).getTime()
-    );
-    
-    // Calculate cumulative values
-    let cumulativeInvested = 0;
-    let cumulativeValue = 0;
-    const dataPoints: DataPoint[] = sorted.map(inv => {
-        cumulativeInvested += inv.quantity * inv.purchasePrice;
-        cumulativeValue += inv.quantity * inv.currentPrice;
-        return { invested: cumulativeInvested, value: cumulativeValue };
-    });
-
-    if (dataPoints.length === 0) {
-        ctx.fillStyle = '#888';
-        ctx.font = '16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('No data to display', performanceChart.width / 2, performanceChart.height / 2);
+    const canvas = performanceChart;
+    if (!canvas) {
+        console.warn("Canvas element not found");
         return;
     }
 
-    const padding = 40;
-    const chartWidth = performanceChart.width - padding * 2;
-    const chartHeight = performanceChart.height - padding * 2;
+    const chartData = (window as any).chartData;
     
-    const maxValue = Math.max(...dataPoints.map(d => Math.max(d.invested, d.value)));
-    const minValue = 0;
+    if (!chartData?.IndexCandles?.candles?.length) {
+        console.warn("No chart data available", chartData);
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = '14px sans-serif';
+            ctx.fillStyle = '#6b7280';
+            ctx.textAlign = 'center';
+            ctx.fillText('No chart data', canvas.width/2, canvas.height/2);
+        }
+        return;
+    }
+
+    const candles = chartData.IndexCandles.candles;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Получаем реальные размеры контейнера
+    const containerWidth = canvas.parentElement?.clientWidth || window.innerWidth;
+    const containerHeight = 180;
     
-    // Clear canvas
-    ctx.clearRect(0, 0, performanceChart.width, performanceChart.height);
+    // Устанавливаем физические размеры canvas
+    const dpr = window.devicePixelRatio || 1;
+    canvas.style.width = `${containerWidth}px`;
+    canvas.style.height = `${containerHeight}px`;
+    canvas.width = containerWidth * dpr;
+    canvas.height = containerHeight * dpr;
+    ctx.scale(dpr, dpr);
+
+    const width = containerWidth;
+    const height = containerHeight;
+    const padding = { top: 25, right: 30, bottom: 45, left: 55 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+
+    // Находим мин/макс цены закрытия
+    let minPrice = Infinity;
+    let maxPrice = -Infinity;
     
-    // Draw axes
+    candles.forEach((candle: Candle) => {
+        const close = parseQuantity(candle.close);
+        minPrice = Math.min(minPrice, close);
+        maxPrice = Math.max(maxPrice, close);
+    });
+
+    const priceRange = maxPrice - minPrice;
+    minPrice = Math.max(0, minPrice - priceRange * 0.05);
+    maxPrice = maxPrice + priceRange * 0.05;
+
+    // Очищаем canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // 1. СНАЧАЛА рисуем сетку (она будет на заднем плане)
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    for (let i = 0; i <= 4; i++) {
+        const y = padding.top + (i / 4) * chartHeight;
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(width - padding.right, y);
+    }
+    ctx.stroke();
+
+    // 2. ПОТОМ рисуем график (он будет поверх сетки)
+    ctx.beginPath();
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    candles.forEach((candle: Candle, index: number) => {
+        const close = parseQuantity(candle.close);
+        const x = padding.left + (index / (candles.length - 1)) * chartWidth;
+        const y = padding.top + ((maxPrice - close) / (maxPrice - minPrice)) * chartHeight;
+
+        if (index === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    });
+    ctx.stroke();
+
+    // 3. Подписи цен (поверх всего)
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    
+    for (let i = 0; i <= 4; i++) {
+        const price = minPrice + (maxPrice - minPrice) * (1 - i / 4);
+        const y = padding.top + (i / 4) * chartHeight;
+        ctx.fillText(price.toFixed(0), padding.left - 8, y);
+    }
+
+    // 4. Подписи дат
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.font = '11px sans-serif';
+    
+    const dateIndices = [
+        0, 
+        Math.floor(candles.length/4), 
+        Math.floor(candles.length/2), 
+        Math.floor(3*candles.length/4), 
+        candles.length-1
+    ];
+    
+    dateIndices.forEach((i, idx) => {
+        const x = padding.left + (i / (candles.length - 1)) * chartWidth;
+        
+        let adjustedX = x;
+        if (idx === dateIndices.length - 1) {
+            const textWidth = ctx.measureText('99.99').width;
+            if (x + textWidth/2 > width - padding.right) {
+                adjustedX = width - padding.right - textWidth/2;
+            }
+        }
+        
+        const date = new Date(candles[i].time).toLocaleDateString('ru-RU', { 
+            day: '2-digit', 
+            month: '2-digit' 
+        });
+        ctx.fillText(date, adjustedX, height - padding.bottom + 8);
+    });
+
+    // 5. Рамка графика (опционально, поверх всего)
     ctx.strokeStyle = '#e5e7eb';
     ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(padding, padding);
-    ctx.lineTo(padding, performanceChart.height - padding);
-    ctx.lineTo(performanceChart.width - padding, performanceChart.height - padding);
-    ctx.stroke();
-    
-    // Draw invested line
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    dataPoints.forEach((point, i) => {
-        const x = padding + (i / (dataPoints.length - 1)) * chartWidth;
-        const y = performanceChart.height - padding - ((point.invested - minValue) / (maxValue - minValue)) * chartHeight;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    
-    // Draw current value line
-    ctx.strokeStyle = '#10b981';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    dataPoints.forEach((point, i) => {
-        const x = padding + (i / (dataPoints.length - 1)) * chartWidth;
-        const y = performanceChart.height - padding - ((point.value - minValue) / (maxValue - minValue)) * chartHeight;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    
-    // Legend
-    ctx.font = '12px sans-serif';
-    ctx.fillStyle = '#3b82f6';
-    ctx.fillRect(padding, 10, 15, 15);
-    ctx.fillStyle = '#000';
-    ctx.fillText('Invested', padding + 20, 22);
-    
-    ctx.fillStyle = '#10b981';
-    ctx.fillRect(padding + 120, 10, 15, 15);
-    ctx.fillStyle = '#000';
-    ctx.fillText('Current Value', padding + 140, 22);
+    ctx.strokeRect(padding.left, padding.top, chartWidth, chartHeight);
 }
 
 function renderAssetAllocation(): void {

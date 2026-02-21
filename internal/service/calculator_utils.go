@@ -23,7 +23,7 @@ func enrichFullPortfolio(calc *Calculator, portfolio domain.UserFullPortfolio, t
 	}
 
 	// 3. Метрики каждой позиции
-	portfolio, err = enrichPositions(portfolio, calc, token, accountID, openedDate)
+	portfolio, err = enrichPositions(portfolio, calc, token)
 	return portfolio, nil
 }
 
@@ -43,7 +43,7 @@ func enrichPortfolioMetrics(portfolio domain.UserFullPortfolio) (domain.UserFull
 	return portfolio, nil
 }
 
-func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token string, accountID string, openedDate time.Time) (domain.UserFullPortfolio, error) {
+func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token string) (domain.UserFullPortfolio, error) {
 	var wg sync.WaitGroup
 
 	errChan := make(chan error)
