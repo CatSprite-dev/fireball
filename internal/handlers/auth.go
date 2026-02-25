@@ -34,7 +34,7 @@ func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chartData, err := h.portfolioService.GetChartData(token, "MCFTR", time.Now().AddDate(-1, 0, 0), time.Now(), pkg.CandleIntervalDay)
+	chartData, err := h.portfolioService.GetChartData(token, "IMOEX", time.Now().AddDate(-1, 0, 0), time.Now(), pkg.CandleIntervalDay)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
 		return
