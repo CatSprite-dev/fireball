@@ -203,7 +203,7 @@ function parsePrice(price?: Price): number {
     return units + nano;
 }
 
-// Загружаем данные с бекенда
+// Fetch backend data
 async function loadInvestments(): Promise<void> {
     const token = localStorage.getItem('token');
     
@@ -234,7 +234,7 @@ async function loadInvestments(): Promise<void> {
         
         if (response.status === 401) {
             console.log('Token invalid or expired');
-            localStorage.removeItem('token');
+            localStorage.removeItem('token'); // WHYYYYYYY
             window.location.href = '/login.html';
             return;
         }
