@@ -33,6 +33,10 @@ func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio
 	openedDate := userAccounts.Accounts[0].OpenedDate
 
 	rawPortfolio, err := calc.apiClient.GetPortfolio(token, accountID)
+	if err != nil {
+		return domain.UserFullPortfolio{}, err
+	}
+
 	fullEmptyPortfolio := convertFullPortfolio(rawPortfolio)
 	enrichedFullPortfolio, err := enrichFullPortfolio(calc, fullEmptyPortfolio, token, accountID, openedDate)
 	if err != nil {
@@ -40,6 +44,7 @@ func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio
 	}
 
 	log.Printf("Время выполнения GetFullPortfolio: %.2f сек\n", time.Since(t).Seconds())
+	_, err = calc.GetTotalReturn(token, enrichedFullPortfolio, accountID, openedDate)
 	return enrichedFullPortfolio, nil
 }
 
@@ -137,4 +142,35 @@ func (calc *Calculator) GetChartData(token string, indexTicker string, from time
 	return domain.ChartData{
 		IndexCandles: indexCandles,
 	}, nil
+}
+
+func (calc *Calculator) GetTotalReturn(token string, portfolio domain.UserFullPortfolio, accountID string, openedDate time.Time) (domain.MoneyValue, error) {
+	now := time.Now()
+	operations, err := calc.apiClient.GetUserOperationsByCursor(
+		token,
+		accountID,
+		"",
+		&openedDate,
+		&now,
+		[]pkg.OperationType{
+			pkg.OperationTypeInput,
+			pkg.OperationTypeOutput,
+		},
+		pkg.OperationStateExecuted,
+		true,
+	)
+	if err != nil {
+		return domain.MoneyValue{}, err
+	}
+
+	netCashFlow := domain.MoneyValue{}
+	for _, block := range operations {
+		for _, item := range block.Items {
+			netCashFlow = AddMoneyValue(netCashFlow, item.Payment)
+		}
+	}
+
+	totalReturn := SubtractMoneyValue(portfolio.TotalAmountPortfolio, netCashFlow)
+
+	return totalReturn, nil
 }

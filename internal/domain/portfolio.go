@@ -16,6 +16,8 @@ type UserFullPortfolio struct {
 	DailyYield            MoneyValue            `json:"dailyYield"`
 	DailyYieldRelative    Quotation             `json:"dailyYieldRelative"`
 	AllDividends          map[string]MoneyValue `json:"allDividends"`
+	TotalReturn           MoneyValue            `json:"totalReturn"`
+	// TotalReturnRelative   Quotation             `json:"totalReturnRelative"`
 }
 
 type Position struct {

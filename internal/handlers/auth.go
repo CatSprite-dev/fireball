@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -44,4 +45,6 @@ func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 		UserPortfolio: userPortfolio,
 		ChartData:     chartData,
 	})
+
+	log.Printf("Общая доходность: %v", userPortfolio.TotalReturn)
 }

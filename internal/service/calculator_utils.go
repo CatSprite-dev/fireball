@@ -22,7 +22,13 @@ func enrichFullPortfolio(calc *Calculator, portfolio domain.UserFullPortfolio, t
 		return domain.UserFullPortfolio{}, err
 	}
 
-	// 3. Метрики каждой позиции
+	// 3. Total return для портфеля
+	portfolio.TotalReturn, err = calc.GetTotalReturn(token, portfolio, accountID, openedDate)
+	if err != nil {
+		return domain.UserFullPortfolio{}, err
+	}
+
+	// 4. Метрики каждой позиции
 	portfolio, err = enrichPositions(portfolio, calc, token)
 	return portfolio, nil
 }
