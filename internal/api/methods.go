@@ -19,13 +19,13 @@ func (client *Client) GetAccounts(token string, accountStatus pkg.AccountStatus)
 
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
-		return UserAccounts{}, fmt.Errorf("do request error (api.GetAccounts): %s", err)
+		return UserAccounts{}, fmt.Errorf("do request error (api.GetAccounts): %w", err)
 	}
 
 	var accounts UserAccounts
 	err = json.Unmarshal(data, &accounts)
 	if err != nil {
-		return UserAccounts{}, fmt.Errorf("unmarshal error (api.GetAccounts): %s", err)
+		return UserAccounts{}, fmt.Errorf("unmarshal error (api.GetAccounts): %w", err)
 	}
 	return accounts, nil
 }
@@ -42,7 +42,7 @@ func (client *Client) GetInfo(token string) (UserInfo, error) {
 	var user UserInfo
 	err = json.Unmarshal(data, &user)
 	if err != nil {
-		return UserInfo{}, fmt.Errorf("unmarshal error (api.GetInfo): %s", err)
+		return UserInfo{}, fmt.Errorf("unmarshal error (api.GetInfo): %w", err)
 	}
 	return user, nil
 }
@@ -57,13 +57,13 @@ func (client *Client) GetPortfolio(token string, accountID string) (UserPortfoli
 	payload := PortfolioRequest{AccountID: accountID}
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
-		return UserPortfolio{}, fmt.Errorf("do request error (GetPortfolio): %s", err)
+		return UserPortfolio{}, fmt.Errorf("do request error (GetPortfolio): %w", err)
 	}
 
 	var userPortfolio UserPortfolio
 	err = json.Unmarshal(data, &userPortfolio)
 	if err != nil {
-		return UserPortfolio{}, fmt.Errorf("unmarshal error (GetPortfolio): %s", err)
+		return UserPortfolio{}, fmt.Errorf("unmarshal error (GetPortfolio): %w", err)
 	}
 
 	return userPortfolio, nil
@@ -111,13 +111,13 @@ func (client *Client) GetUserOperationsByCursor(
 
 		data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 		if err != nil {
-			return []UserOperations{}, fmt.Errorf("do request error (GetOperationsByCursor): %s", err)
+			return []UserOperations{}, fmt.Errorf("do request error (GetOperationsByCursor): %w", err)
 		}
 
 		var blockOfOperations UserOperations
 		err = json.Unmarshal(data, &blockOfOperations)
 		if err != nil {
-			return []UserOperations{}, fmt.Errorf("unmarshal error (GetOperationsByCursor): %s", err)
+			return []UserOperations{}, fmt.Errorf("unmarshal error (GetOperationsByCursor): %w", err)
 		}
 		allOperations = append(allOperations, blockOfOperations)
 		if blockOfOperations.HasNext {
@@ -150,13 +150,13 @@ func (client *Client) GetInstrumentBy(token string, idType pkg.InstrumentIdType,
 
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
-		return Instrument{}, fmt.Errorf("do request error (GetInstrumentBy): %s", err)
+		return Instrument{}, fmt.Errorf("do request error (GetInstrumentBy): %w", err)
 	}
 
 	var instrument Instrument
 	err = json.Unmarshal(data, &instrument)
 	if err != nil {
-		return Instrument{}, fmt.Errorf("unmarshal error (GetInstrumentBy): %s", err)
+		return Instrument{}, fmt.Errorf("unmarshal error (GetInstrumentBy): %w", err)
 	}
 
 	return instrument, nil
@@ -174,7 +174,7 @@ func (client *Client) Indicatives(token string) (IndicativeInstruments, error) {
 	var indicativeInstruments IndicativeInstruments
 	err = json.Unmarshal(data, &indicativeInstruments)
 	if err != nil {
-		return IndicativeInstruments{}, fmt.Errorf("unmarshal error (api.Indicatives): %s", err)
+		return IndicativeInstruments{}, fmt.Errorf("unmarshal error (api.Indicatives): %w", err)
 	}
 	return indicativeInstruments, nil
 }
