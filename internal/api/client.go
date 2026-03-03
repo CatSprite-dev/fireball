@@ -7,11 +7,16 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 type Client struct {
-	httpClient http.Client
-	baseURL    string
+	httpClient         http.Client
+	baseURL            string
+	usersLimiter       *rate.Limiter
+	operationsLimiter  *rate.Limiter
+	instrumentsLimiter *rate.Limiter
 }
 
 func NewClient(baseURL string) *Client {
@@ -19,7 +24,10 @@ func NewClient(baseURL string) *Client {
 		httpClient: http.Client{
 			Timeout: 15 * time.Second,
 		},
-		baseURL: baseURL,
+		baseURL:            baseURL,
+		usersLimiter:       rate.NewLimiter(rate.Every(time.Minute), 100),
+		operationsLimiter:  rate.NewLimiter(rate.Every(time.Minute), 200),
+		instrumentsLimiter: rate.NewLimiter(rate.Every(time.Minute), 200),
 	}
 }
 

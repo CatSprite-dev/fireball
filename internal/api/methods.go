@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -16,6 +17,8 @@ func (client *Client) GetAccounts(token string, accountStatus pkg.AccountStatus)
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.UsersService/GetAccounts"
 
 	payload := AccountsRequest{Status: accountStatus}
+
+	client.usersLimiter.Wait(context.Background())
 
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
@@ -34,6 +37,9 @@ func (client *Client) GetInfo(token string) (UserInfo, error) {
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.UsersService/GetInfo"
 
 	payload := `{}`
+
+	client.usersLimiter.Wait(context.Background())
+
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
 		return UserInfo{}, err
@@ -55,6 +61,9 @@ func (client *Client) GetPortfolio(token string, accountID string) (UserPortfoli
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.OperationsService/GetPortfolio"
 
 	payload := PortfolioRequest{AccountID: accountID}
+
+	client.operationsLimiter.Wait(context.Background())
+
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
 		return UserPortfolio{}, fmt.Errorf("do request error (GetPortfolio): %w", err)
@@ -109,6 +118,8 @@ func (client *Client) GetUserOperationsByCursor(
 			State:          operationState,
 		}
 
+		client.operationsLimiter.Wait(context.Background())
+
 		data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 		if err != nil {
 			return []UserOperations{}, fmt.Errorf("do request error (GetOperationsByCursor): %w", err)
@@ -148,6 +159,8 @@ func (client *Client) GetInstrumentBy(token string, idType pkg.InstrumentIdType,
 		ID:        id,
 	}
 
+	client.instrumentsLimiter.Wait(context.Background())
+
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
 		return Instrument{}, fmt.Errorf("do request error (GetInstrumentBy): %w", err)
@@ -166,6 +179,9 @@ func (client *Client) Indicatives(token string) (IndicativeInstruments, error) {
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Indicatives"
 
 	payload := `{}`
+
+	client.instrumentsLimiter.Wait(context.Background())
+
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
 		return IndicativeInstruments{}, err
