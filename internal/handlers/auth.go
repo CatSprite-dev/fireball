@@ -19,6 +19,7 @@ func NewAuthHandler(calc *service.Calculator) *AuthHandler {
 }
 
 func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
+	t := time.Now()
 	type returnVals struct {
 		UserPortfolio domain.UserFullPortfolio `json:"user_portfolio"`
 		ChartData     domain.ChartData         `json:"chart_data"`
@@ -46,5 +47,8 @@ func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 		ChartData:     chartData,
 	})
 
+	// _, err = h.portfolioService.GetCandlesForPortfolio(token, userPortfolio, time.Now().AddDate(-1, 0, 0), time.Now(), pkg.CandleIntervalDay)
+
 	log.Printf("Общая доходность: %v", userPortfolio.TotalReturn)
+	log.Printf("Время выполнения HandlerAuth: %.2f сек\n", time.Since(t).Seconds())
 }

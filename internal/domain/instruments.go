@@ -15,6 +15,7 @@ type IndicativeInstruments struct {
 }
 
 type Candles struct {
+	// Time Close Open High Low IsComplete
 	Candles []Candle `json:"candles"`
 }
 
