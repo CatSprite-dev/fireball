@@ -9,9 +9,8 @@ import (
 )
 
 type Config struct {
-	BaseURL    string
-	InvestURL  string
-	SandboxURL string
+	BaseURL   string
+	InvestURL string
 
 	ServerPort   string
 	ReadTimeout  time.Duration
@@ -21,15 +20,20 @@ type Config struct {
 
 func NewConfig() *Config {
 	err := godotenv.Load(".env")
-	//mmmmmmmmmmmmm for now
 	if err != nil {
 		log.Println("failed loading .env file")
 		os.Exit(1)
 	}
-	investURL := os.Getenv("investURL")
-	sandboxURL := os.Getenv("sandboxUrl")
-
+	investURL := os.Getenv("T_INVEST_URL")
+	if investURL == "" {
+		log.Println("failed loading investURL")
+		os.Exit(1)
+	}
 	serverPort := os.Getenv("PORT")
+	if serverPort == "" {
+		log.Println("PORT variable is not found in environment")
+		os.Exit(1)
+	}
 	readTimeout := 10 * time.Second
 	writeTimeout := 10 * time.Second
 	idleTimeout := 30 * time.Second
@@ -37,9 +41,8 @@ func NewConfig() *Config {
 	baseURL := investURL
 
 	return &Config{
-		BaseURL:    baseURL,
-		InvestURL:  investURL,
-		SandboxURL: sandboxURL,
+		BaseURL:   baseURL,
+		InvestURL: investURL,
 
 		ServerPort:   serverPort,
 		ReadTimeout:  readTimeout,
