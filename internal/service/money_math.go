@@ -8,208 +8,101 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func AddMoneyValue(a, b domain.MoneyValue) domain.MoneyValue {
-	unitsA, _ := strconv.ParseInt(a.Units, 10, 64)
-	unitsB, _ := strconv.ParseInt(b.Units, 10, 64)
+const nanoScale = int64(1_000_000_000)
 
-	decA := decimal.NewFromInt(unitsA*1_000_000_000 + int64(a.Nano))
-	decB := decimal.NewFromInt(unitsB*1_000_000_000 + int64(b.Nano))
+var decNano = decimal.NewFromInt(nanoScale)
 
-	result := decA.Add(decB)
+func parseNano(units string, nano int) decimal.Decimal {
+	u, _ := strconv.ParseInt(units, 10, 64)
+	return decimal.NewFromInt(u*nanoScale + int64(nano))
+}
 
-	units := result.Div(decimal.NewFromInt(1_000_000_000)).IntPart()
-	nano := result.Mod(decimal.NewFromInt(1_000_000_000)).IntPart()
+func parseDecimal(units string, nano int) decimal.Decimal {
+	u, _ := strconv.ParseInt(units, 10, 64)
+	return decimal.NewFromInt(u).Add(decimal.NewFromInt(int64(nano)).Div(decNano))
+}
 
-	unitsStr := strconv.FormatInt(units, 10)
+func unitsStr(units, nano int64) string {
 	if units == 0 && nano < 0 {
-		unitsStr = "-0" // Tinkoff API требует "-0" для отрицательных чисел меньше 1
+		return "-0"
 	}
+	return strconv.FormatInt(units, 10)
+}
 
-	return domain.MoneyValue{
-		Currency: a.Currency,
-		Units:    unitsStr,
-		Nano:     int(nano),
-	}
+func AddMoneyValue(a, b domain.MoneyValue) domain.MoneyValue {
+	result := parseNano(a.Units, a.Nano).Add(parseNano(b.Units, b.Nano))
+	units := result.Div(decNano).IntPart()
+	nano := result.Mod(decNano).IntPart()
+	return domain.MoneyValue{Currency: a.Currency, Units: unitsStr(units, nano), Nano: int(nano)}
 }
 
 func SubtractMoneyValue(a, b domain.MoneyValue) domain.MoneyValue {
-	unitsA, _ := strconv.ParseInt(a.Units, 10, 64)
-	unitsB, _ := strconv.ParseInt(b.Units, 10, 64)
-
-	decA := decimal.NewFromInt(unitsA*1_000_000_000 + int64(a.Nano))
-	decB := decimal.NewFromInt(unitsB*1_000_000_000 + int64(b.Nano))
-
-	result := decA.Sub(decB)
-
-	units := result.Div(decimal.NewFromInt(1_000_000_000)).IntPart()
-	nano := result.Mod(decimal.NewFromInt(1_000_000_000)).IntPart()
-
-	unitsStr := strconv.FormatInt(units, 10)
-	if units == 0 && nano < 0 {
-		unitsStr = "-0" // Tinkoff API требует "-0" для отрицательных чисел меньше 1
-	}
-
-	return domain.MoneyValue{
-		Currency: a.Currency,
-		Units:    unitsStr,
-		Nano:     int(nano),
-	}
+	result := parseNano(a.Units, a.Nano).Sub(parseNano(b.Units, b.Nano))
+	units := result.Div(decNano).IntPart()
+	nano := result.Mod(decNano).IntPart()
+	return domain.MoneyValue{Currency: a.Currency, Units: unitsStr(units, nano), Nano: int(nano)}
 }
 
 func MultiplyMoneyValue(a, b domain.MoneyValue) domain.MoneyValue {
-	unitsA, _ := strconv.ParseInt(a.Units, 10, 64)
-	unitsB, _ := strconv.ParseInt(b.Units, 10, 64)
-
-	aRub := decimal.NewFromInt(unitsA).Add(decimal.NewFromInt(int64(a.Nano)).Div(decimal.NewFromInt(1e9)))
-	bRub := decimal.NewFromInt(unitsB).Add(decimal.NewFromInt(int64(b.Nano)).Div(decimal.NewFromInt(1e9)))
-
-	result := aRub.Mul(bRub)
-
+	result := parseDecimal(a.Units, a.Nano).Mul(parseDecimal(b.Units, b.Nano))
 	units := result.IntPart()
-	nano := result.Sub(result.Floor()).Mul(decimal.NewFromInt(1e9)).IntPart()
-
-	return domain.MoneyValue{
-		Currency: a.Currency,
-		Units:    strconv.FormatInt(units, 10),
-		Nano:     int(nano),
-	}
+	nano := result.Sub(result.Floor()).Mul(decNano).IntPart()
+	return domain.MoneyValue{Currency: a.Currency, Units: strconv.FormatInt(units, 10), Nano: int(nano)}
 }
 
 func DivideMoneyValue(a, b domain.MoneyValue) (domain.MoneyValue, error) {
-	unitsA, _ := strconv.ParseInt(a.Units, 10, 64)
-	unitsB, _ := strconv.ParseInt(b.Units, 10, 64)
-
-	aRub := decimal.NewFromInt(unitsA).Add(decimal.NewFromInt(int64(a.Nano)).Div(decimal.NewFromInt(1e9)))
-	bRub := decimal.NewFromInt(unitsB).Add(decimal.NewFromInt(int64(b.Nano)).Div(decimal.NewFromInt(1e9)))
-
-	if bRub.IsZero() {
+	divisor := parseDecimal(b.Units, b.Nano)
+	if divisor.IsZero() {
 		return domain.MoneyValue{}, fmt.Errorf("division by zero")
 	}
+	result := parseDecimal(a.Units, a.Nano).Div(divisor)
 
-	result := aRub.Div(bRub)
-
-	var units int64
-	var nano int64
-
+	var units, nano int64
 	if result.IsNegative() {
-		// Округляем вверх для отрицательных
 		units = result.Ceil().IntPart()
-		nano = result.Sub(decimal.NewFromInt(units)).Mul(decimal.NewFromInt(1e9)).IntPart()
+		nano = result.Sub(decimal.NewFromInt(units)).Mul(decNano).IntPart()
 	} else {
-		// Округляем вниз для положительных
 		units = result.Floor().IntPart()
-		nano = result.Sub(result.Floor()).Mul(decimal.NewFromInt(1e9)).IntPart()
+		nano = result.Sub(result.Floor()).Mul(decNano).IntPart()
 	}
-
-	unitsStr := strconv.FormatInt(units, 10)
-	if units == 0 && nano < 0 {
-		unitsStr = "-0"
-	}
-
-	return domain.MoneyValue{
-		Currency: a.Currency,
-		Units:    unitsStr,
-		Nano:     int(nano),
-	}, nil
+	return domain.MoneyValue{Currency: a.Currency, Units: unitsStr(units, nano), Nano: int(nano)}, nil
 }
 
 func AddQuotations(a, b domain.Quotation) domain.Quotation {
-	unitsA, _ := strconv.ParseInt(a.Units, 10, 64)
-	unitsB, _ := strconv.ParseInt(b.Units, 10, 64)
-
-	decA := decimal.NewFromInt(unitsA*1_000_000_000 + int64(a.Nano))
-	decB := decimal.NewFromInt(unitsB*1_000_000_000 + int64(b.Nano))
-
-	result := decA.Add(decB)
-
-	units := result.Div(decimal.NewFromInt(1_000_000_000)).IntPart()
-	nano := result.Mod(decimal.NewFromInt(1_000_000_000)).IntPart()
-
-	unitsStr := strconv.FormatInt(units, 10)
-	if units == 0 && nano < 0 {
-		unitsStr = "-0" // Tinkoff API требует "-0" для отрицательных чисел меньше 1
-	}
-
-	return domain.Quotation{
-		Units: unitsStr,
-		Nano:  int(nano),
-	}
+	result := parseNano(a.Units, a.Nano).Add(parseNano(b.Units, b.Nano))
+	units := result.Div(decNano).IntPart()
+	nano := result.Mod(decNano).IntPart()
+	return domain.Quotation{Units: unitsStr(units, nano), Nano: int(nano)}
 }
 
 func SubtractQuotations(a, b domain.Quotation) domain.Quotation {
-	unitsA, _ := strconv.ParseInt(a.Units, 10, 64)
-	unitsB, _ := strconv.ParseInt(b.Units, 10, 64)
-
-	decA := decimal.NewFromInt(unitsA*1_000_000_000 + int64(a.Nano))
-	decB := decimal.NewFromInt(unitsB*1_000_000_000 + int64(b.Nano))
-
-	result := decA.Sub(decB)
-
-	units := result.Div(decimal.NewFromInt(1_000_000_000)).IntPart()
-	nano := result.Mod(decimal.NewFromInt(1_000_000_000)).IntPart()
-
-	unitsStr := strconv.FormatInt(units, 10)
-	if units == 0 && nano < 0 {
-		unitsStr = "-0" // Tinkoff API требует "-0" для отрицательных чисел меньше 1
-	}
-
-	return domain.Quotation{
-		Units: unitsStr,
-		Nano:  int(nano),
-	}
+	result := parseNano(a.Units, a.Nano).Sub(parseNano(b.Units, b.Nano))
+	units := result.Div(decNano).IntPart()
+	nano := result.Mod(decNano).IntPart()
+	return domain.Quotation{Units: unitsStr(units, nano), Nano: int(nano)}
 }
 
 func MultiplyQuotation(a, b domain.Quotation) domain.Quotation {
-	unitsA, _ := strconv.ParseInt(a.Units, 10, 64)
-	unitsB, _ := strconv.ParseInt(b.Units, 10, 64)
-
-	aRub := decimal.NewFromInt(unitsA).Add(decimal.NewFromInt(int64(a.Nano)).Div(decimal.NewFromInt(1e9)))
-	bRub := decimal.NewFromInt(unitsB).Add(decimal.NewFromInt(int64(b.Nano)).Div(decimal.NewFromInt(1e9)))
-
-	result := aRub.Mul(bRub)
-
+	result := parseDecimal(a.Units, a.Nano).Mul(parseDecimal(b.Units, b.Nano))
 	units := result.IntPart()
-	nano := result.Sub(result.Floor()).Mul(decimal.NewFromInt(1e9)).IntPart()
-
-	return domain.Quotation{
-		Units: strconv.FormatInt(units, 10),
-		Nano:  int(nano),
-	}
+	nano := result.Sub(result.Floor()).Mul(decNano).IntPart()
+	return domain.Quotation{Units: strconv.FormatInt(units, 10), Nano: int(nano)}
 }
 
 func DivideQuotation(a, b domain.Quotation) (domain.Quotation, error) {
-	unitsA, _ := strconv.ParseInt(a.Units, 10, 64)
-	unitsB, _ := strconv.ParseInt(b.Units, 10, 64)
-
-	aRub := decimal.NewFromInt(unitsA).Add(decimal.NewFromInt(int64(a.Nano)).Div(decimal.NewFromInt(1e9)))
-	bRub := decimal.NewFromInt(unitsB).Add(decimal.NewFromInt(int64(b.Nano)).Div(decimal.NewFromInt(1e9)))
-
-	if bRub.IsZero() {
+	divisor := parseDecimal(b.Units, b.Nano)
+	if divisor.IsZero() {
 		return domain.Quotation{}, fmt.Errorf("division by zero")
 	}
+	result := parseDecimal(a.Units, a.Nano).Div(divisor)
 
-	result := aRub.Div(bRub)
-
-	var units int64
-	var nano int64
-
+	var units, nano int64
 	if result.IsNegative() {
-		// Округляем вверх для отрицательных
 		units = result.Ceil().IntPart()
-		nano = result.Sub(decimal.NewFromInt(units)).Mul(decimal.NewFromInt(1e9)).IntPart()
+		nano = result.Sub(decimal.NewFromInt(units)).Mul(decNano).IntPart()
 	} else {
-		// Округляем вниз для положительных
 		units = result.Floor().IntPart()
-		nano = result.Sub(result.Floor()).Mul(decimal.NewFromInt(1e9)).IntPart()
+		nano = result.Sub(result.Floor()).Mul(decNano).IntPart()
 	}
-
-	unitsStr := strconv.FormatInt(units, 10)
-	if units == 0 && nano < 0 {
-		unitsStr = "-0"
-	}
-
-	return domain.Quotation{
-		Units: unitsStr,
-		Nano:  int(nano),
-	}, nil
+	return domain.Quotation{Units: unitsStr(units, nano), Nano: int(nano)}, nil
 }
