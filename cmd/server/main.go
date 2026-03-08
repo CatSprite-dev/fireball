@@ -16,10 +16,13 @@ func main() {
 	calculator := service.NewCalculator(apiClient)
 	authHandler := handlers.NewAuthHandler(calculator)
 
+	rateLimiter := handlers.NewRateLimiter(2)
+	limitedAuthHandler := rateLimiter.Middleware(authHandler.HandlerAuth)
+
 	mux := http.NewServeMux()
 	fileServer := http.FileServer(http.Dir("frontend/dist"))
 
-	mux.HandleFunc("/auth", authHandler.HandlerAuth)
+	mux.HandleFunc("/auth", limitedAuthHandler)
 
 	mux.Handle("/", fileServer)
 
