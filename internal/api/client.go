@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -17,6 +18,7 @@ type Client struct {
 	usersLimiter       *rate.Limiter
 	operationsLimiter  *rate.Limiter
 	instrumentsLimiter *rate.Limiter
+	requestCount       atomic.Int64
 }
 
 func NewClient(baseURL string) *Client {
@@ -32,6 +34,8 @@ func NewClient(baseURL string) *Client {
 }
 
 func (client *Client) DoRequest(url string, httpMethod string, token string, payload interface{}) ([]byte, error) {
+	client.requestCount.Add(1)
+
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("payload marshal error:  %w", err)
@@ -62,4 +66,12 @@ func (client *Client) DoRequest(url string, httpMethod string, token string, pay
 	}
 
 	return data, nil
+}
+
+func (client *Client) RequestCount() int64 {
+	return client.requestCount.Load()
+}
+
+func (client *Client) ResetRequestCount() {
+	client.requestCount.Store(0)
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/CatSprite-dev/fireball/internal/domain"
@@ -35,4 +36,7 @@ func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 	pkg.RespondWithJSON(w, http.StatusOK, returnVals{
 		UserPortfolio: userPortfolio,
 	})
+
+	log.Printf("Число запросов HandlerAuth = %d", h.portfolioService.ApiClient.RequestCount())
+	h.portfolioService.ApiClient.ResetRequestCount()
 }

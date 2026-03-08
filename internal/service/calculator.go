@@ -11,17 +11,17 @@ import (
 )
 
 type Calculator struct {
-	apiClient *api.Client
+	ApiClient *api.Client
 }
 
 func NewCalculator(apiClient *api.Client) *Calculator {
-	return &Calculator{apiClient: apiClient}
+	return &Calculator{ApiClient: apiClient}
 }
 
 func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio, error) {
 	t := time.Now()
 
-	userAccounts, err := calc.apiClient.GetAccounts(token, pkg.AccountStatusOpen)
+	userAccounts, err := calc.ApiClient.GetAccounts(token, pkg.AccountStatusOpen)
 	if err != nil {
 		return domain.UserFullPortfolio{}, err
 	}
@@ -32,7 +32,7 @@ func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio
 	accountID := userAccounts.Accounts[0].ID
 	openedDate := userAccounts.Accounts[0].OpenedDate
 
-	rawPortfolio, err := calc.apiClient.GetPortfolio(token, accountID)
+	rawPortfolio, err := calc.ApiClient.GetPortfolio(token, accountID)
 	if err != nil {
 		return domain.UserFullPortfolio{}, err
 	}
@@ -53,7 +53,7 @@ func (calc *Calculator) GetDividends(
 	from time.Time,
 	to time.Time) (map[string]domain.MoneyValue, error) {
 
-	operations, err := calc.apiClient.GetUserOperationsByCursor(
+	operations, err := calc.ApiClient.GetUserOperationsByCursor(
 		token,
 		accountID,
 		instrumentId,
@@ -82,7 +82,7 @@ func (calc *Calculator) GetDividends(
 }
 
 func (calc *Calculator) GetInstrumentInfo(token string, instrumentIdType pkg.InstrumentIdType, instrumentId string) (domain.Instrument, error) {
-	rawInstrument, err := calc.apiClient.GetInstrumentBy(token, instrumentIdType, pkg.ClassCodeUnspecified, instrumentId)
+	rawInstrument, err := calc.ApiClient.GetInstrumentBy(token, instrumentIdType, pkg.ClassCodeUnspecified, instrumentId)
 	if err != nil {
 		return domain.Instrument{}, err
 	}
@@ -93,7 +93,7 @@ func (calc *Calculator) GetInstrumentInfo(token string, instrumentIdType pkg.Ins
 func (calc *Calculator) GetIndexByTicker(token string, ticker string) (domain.IndicativeInstruments, error) {
 	result := domain.IndicativeInstruments{}
 
-	rawInstruments, err := calc.apiClient.Indicatives(token)
+	rawInstruments, err := calc.ApiClient.Indicatives(token)
 	if err != nil {
 		return domain.IndicativeInstruments{}, err
 	}
