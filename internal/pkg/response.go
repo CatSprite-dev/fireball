@@ -29,6 +29,7 @@ func RespondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	if err != nil {
 		log.Printf("Error marshaling json: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	w.WriteHeader(code)
 	w.Write(data)

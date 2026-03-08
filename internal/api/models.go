@@ -4,6 +4,17 @@ import (
 	"time"
 )
 
+type MoneyValue struct {
+	Currency string `json:"currency"`
+	Units    string `json:"units"`
+	Nano     int    `json:"nano"`
+}
+
+type Quotation struct {
+	Units string `json:"units"`
+	Nano  int    `json:"nano"`
+}
+
 type UserInfo struct {
 	QualifiedForWorkWith []string `json:"qualifiedForWorkWith"`
 	RiskLevelCode        string   `json:"riskLevelCode"`
@@ -29,186 +40,75 @@ type UserOperations struct {
 	HasNext    bool   `json:"hasNext"`
 	NextCursor string `json:"nextCursor"`
 	Items      []struct {
-		Cursor            string    `json:"cursor"`
-		BrokerAccountID   string    `json:"brokerAccountId"`
-		ID                string    `json:"id"`
-		ParentOperationID string    `json:"parentOperationId"`
-		Name              string    `json:"name"`
-		Date              time.Time `json:"date"`
-		Type              string    `json:"type"`
-		Description       string    `json:"description"`
-		State             string    `json:"state"`
-		InstrumentUID     string    `json:"instrumentUid"`
-		Figi              string    `json:"figi"`
-		InstrumentType    string    `json:"instrumentType"`
-		InstrumentKind    string    `json:"instrumentKind"`
-		PositionUID       string    `json:"positionUid"`
-		Ticker            string    `json:"ticker"`
-		ClassCode         string    `json:"classCode"`
-		Payment           struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"payment"`
-		Price struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"price"`
-		Commission struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"commission"`
-		Yield struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"yield"`
-		YieldRelative struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		} `json:"yieldRelative"`
-		AccruedInt struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"accruedInt"`
-		Quantity        string `json:"quantity"`
-		QuantityRest    string `json:"quantityRest"`
-		QuantityDone    string `json:"quantityDone"`
-		CancelReason    string `json:"cancelReason"`
-		AssetUID        string `json:"assetUid"`
-		ChildOperations []struct {
-			InstrumentUID string `json:"instrumentUid"`
-			Payment       struct {
-				Currency string `json:"currency"`
-				Units    string `json:"units"`
-				Nano     int    `json:"nano"`
-			} `json:"payment"`
+		Cursor            string     `json:"cursor"`
+		BrokerAccountID   string     `json:"brokerAccountId"`
+		ID                string     `json:"id"`
+		ParentOperationID string     `json:"parentOperationId"`
+		Name              string     `json:"name"`
+		Date              time.Time  `json:"date"`
+		Type              string     `json:"type"`
+		Description       string     `json:"description"`
+		State             string     `json:"state"`
+		InstrumentUID     string     `json:"instrumentUid"`
+		Figi              string     `json:"figi"`
+		InstrumentType    string     `json:"instrumentType"`
+		InstrumentKind    string     `json:"instrumentKind"`
+		PositionUID       string     `json:"positionUid"`
+		Ticker            string     `json:"ticker"`
+		ClassCode         string     `json:"classCode"`
+		Payment           MoneyValue `json:"payment"`
+		Price             MoneyValue `json:"price"`
+		Commission        MoneyValue `json:"commission"`
+		Yield             MoneyValue `json:"yield"`
+		YieldRelative     Quotation  `json:"yieldRelative"`
+		AccruedInt        MoneyValue `json:"accruedInt"`
+		Quantity          string     `json:"quantity"`
+		QuantityRest      string     `json:"quantityRest"`
+		QuantityDone      string     `json:"quantityDone"`
+		CancelReason      string     `json:"cancelReason"`
+		AssetUID          string     `json:"assetUid"`
+		ChildOperations   []struct {
+			InstrumentUID string     `json:"instrumentUid"`
+			Payment       MoneyValue `json:"payment"`
 		} `json:"childOperations"`
 	} `json:"items"`
 }
 
 type UserPortfolio struct {
-	TotalAmountShares struct {
-		Currency string `json:"currency"`
-		Units    string `json:"units"`
-		Nano     int    `json:"nano"`
-	} `json:"totalAmountShares"`
-	TotalAmountBonds struct {
-		Currency string `json:"currency"`
-		Units    string `json:"units"`
-		Nano     int    `json:"nano"`
-	} `json:"totalAmountBonds"`
-	TotalAmountEtf struct {
-		Currency string `json:"currency"`
-		Units    string `json:"units"`
-		Nano     int    `json:"nano"`
-	} `json:"totalAmountEtf"`
-	TotalAmountCurrencies struct {
-		Currency string `json:"currency"`
-		Units    string `json:"units"`
-		Nano     int    `json:"nano"`
-	} `json:"totalAmountCurrencies"`
-	TotalAmountFutures struct {
-		Currency string `json:"currency"`
-		Units    string `json:"units"`
-		Nano     int    `json:"nano"`
-	} `json:"totalAmountFutures"`
-	ExpectedYield struct {
-		Units string `json:"units"`
-		Nano  int    `json:"nano"`
-	} `json:"expectedYield"`
-	Positions []struct {
-		Figi           string `json:"figi"`
-		InstrumentType string `json:"instrumentType"`
-		Quantity       struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		} `json:"quantity"`
-		AveragePositionPrice struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"averagePositionPrice"`
-		ExpectedYield struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		} `json:"expectedYield"`
-		AveragePositionPricePt struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		} `json:"averagePositionPricePt"`
-		CurrentPrice struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"currentPrice"`
-		AveragePositionPriceFifo struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"averagePositionPriceFifo"`
-		QuantityLots struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		} `json:"quantityLots"`
-		Blocked     bool `json:"blocked"`
-		BlockedLots struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		} `json:"blockedLots"`
-		PositionUID   string `json:"positionUid"`
-		InstrumentUID string `json:"instrumentUid"`
-		VarMargin     struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"varMargin"`
-		ExpectedYieldFifo struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		} `json:"expectedYieldFifo"`
-		DailyYield struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"dailyYield"`
-		Ticker     string `json:"ticker"`
-		ClassCode  string `json:"classCode"`
-		CurrentNkd struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		} `json:"currentNkd,omitempty"`
+	TotalAmountShares     MoneyValue `json:"totalAmountShares"`
+	TotalAmountBonds      MoneyValue `json:"totalAmountBonds"`
+	TotalAmountEtf        MoneyValue `json:"totalAmountEtf"`
+	TotalAmountCurrencies MoneyValue `json:"totalAmountCurrencies"`
+	TotalAmountFutures    MoneyValue `json:"totalAmountFutures"`
+	ExpectedYield         Quotation  `json:"expectedYield"`
+	Positions             []struct {
+		Figi                     string     `json:"figi"`
+		InstrumentType           string     `json:"instrumentType"`
+		Quantity                 Quotation  `json:"quantity"`
+		AveragePositionPrice     MoneyValue `json:"averagePositionPrice"`
+		ExpectedYield            Quotation  `json:"expectedYield"`
+		AveragePositionPricePt   Quotation  `json:"averagePositionPricePt"`
+		CurrentPrice             MoneyValue `json:"currentPrice"`
+		AveragePositionPriceFifo MoneyValue `json:"averagePositionPriceFifo"`
+		QuantityLots             Quotation  `json:"quantityLots"`
+		Blocked                  bool       `json:"blocked"`
+		BlockedLots              Quotation  `json:"blockedLots"`
+		PositionUID              string     `json:"positionUid"`
+		InstrumentUID            string     `json:"instrumentUid"`
+		VarMargin                MoneyValue `json:"varMargin"`
+		ExpectedYieldFifo        Quotation  `json:"expectedYieldFifo"`
+		DailyYield               MoneyValue `json:"dailyYield"`
+		Ticker                   string     `json:"ticker"`
+		ClassCode                string     `json:"classCode"`
+		CurrentNkd               MoneyValue `json:"currentNkd,omitempty"`
 	} `json:"positions"`
-	AccountID          string `json:"accountId"`
-	TotalAmountOptions struct {
-		Currency string `json:"currency"`
-		Units    string `json:"units"`
-		Nano     int    `json:"nano"`
-	} `json:"totalAmountOptions"`
-	TotalAmountSp struct {
-		Currency string `json:"currency"`
-		Units    string `json:"units"`
-		Nano     int    `json:"nano"`
-	} `json:"totalAmountSp"`
-	TotalAmountPortfolio struct {
-		Currency string `json:"currency"`
-		Units    string `json:"units"`
-		Nano     int    `json:"nano"`
-	} `json:"totalAmountPortfolio"`
-	VirtualPositions []any `json:"virtualPositions"`
-	DailyYield       struct {
-		Currency string `json:"currency"`
-		Units    string `json:"units"`
-		Nano     int    `json:"nano"`
-	} `json:"dailyYield"`
-	DailyYieldRelative struct {
-		Units string `json:"units"`
-		Nano  int    `json:"nano"`
-	} `json:"dailyYieldRelative"`
+	AccountID            string     `json:"accountId"`
+	TotalAmountOptions   MoneyValue `json:"totalAmountOptions"`
+	TotalAmountSp        MoneyValue `json:"totalAmountSp"`
+	TotalAmountPortfolio MoneyValue `json:"totalAmountPortfolio"`
+	VirtualPositions     []any      `json:"virtualPositions"`
+	DailyYield           MoneyValue `json:"dailyYield"`
+	DailyYieldRelative   Quotation  `json:"dailyYieldRelative"`
 }
 
 type IndicativeInstruments struct {
@@ -228,25 +128,16 @@ type IndicativeInstruments struct {
 
 type Instrument struct {
 	Instrument struct {
-		AssetUID  string `json:"assetUid"`
-		Figi      string `json:"figi"`
-		DshortMin struct {
-			Nano  int    `json:"nano"`
-			Units string `json:"units"`
-		} `json:"dshortMin"`
-		CountryOfRisk  string   `json:"countryOfRisk"`
-		Lot            int      `json:"lot"`
-		UID            string   `json:"uid"`
-		RequiredTests  []string `json:"requiredTests"`
-		BlockedTcaFlag bool     `json:"blockedTcaFlag"`
-		Dlong          struct {
-			Nano  int    `json:"nano"`
-			Units string `json:"units"`
-		} `json:"dlong"`
-		DlongClient struct {
-			Nano  int    `json:"nano"`
-			Units string `json:"units"`
-		} `json:"dlongClient"`
+		AssetUID            string    `json:"assetUid"`
+		Figi                string    `json:"figi"`
+		DshortMin           Quotation `json:"dshortMin"`
+		CountryOfRisk       string    `json:"countryOfRisk"`
+		Lot                 int       `json:"lot"`
+		UID                 string    `json:"uid"`
+		RequiredTests       []string  `json:"requiredTests"`
+		BlockedTcaFlag      bool      `json:"blockedTcaFlag"`
+		Dlong               Quotation `json:"dlong"`
+		DlongClient         Quotation `json:"dlongClient"`
 		SellAvailableFlag   bool      `json:"sellAvailableFlag"`
 		Currency            string    `json:"currency"`
 		First1DayCandleDate time.Time `json:"first1dayCandleDate"`
@@ -255,45 +146,27 @@ type Instrument struct {
 			LogoBaseColor string `json:"logoBaseColor"`
 			TextColor     string `json:"textColor"`
 		} `json:"brand"`
-		BuyAvailableFlag      bool   `json:"buyAvailableFlag"`
-		WeekendFlag           bool   `json:"weekendFlag"`
-		ClassCode             string `json:"classCode"`
-		Ticker                string `json:"ticker"`
-		InstrumentType        string `json:"instrumentType"`
-		ForQualInvestorFlag   bool   `json:"forQualInvestorFlag"`
-		ForIisFlag            bool   `json:"forIisFlag"`
-		PositionUID           string `json:"positionUid"`
-		APITradeAvailableFlag bool   `json:"apiTradeAvailableFlag"`
-		DlongMin              struct {
-			Nano  int    `json:"nano"`
-			Units string `json:"units"`
-		} `json:"dlongMin"`
-		ShortEnabledFlag bool `json:"shortEnabledFlag"`
-		Kshort           struct {
-			Nano  int    `json:"nano"`
-			Units string `json:"units"`
-		} `json:"kshort"`
-		First1MinCandleDate time.Time `json:"first1minCandleDate"`
-		MinPriceIncrement   struct {
-			Nano  int    `json:"nano"`
-			Units string `json:"units"`
-		} `json:"minPriceIncrement"`
-		OtcFlag      bool `json:"otcFlag"`
-		DshortClient struct {
-			Nano  int    `json:"nano"`
-			Units string `json:"units"`
-		} `json:"dshortClient"`
-		Klong struct {
-			Nano  int    `json:"nano"`
-			Units string `json:"units"`
-		} `json:"klong"`
-		Dshort struct {
-			Nano  int    `json:"nano"`
-			Units string `json:"units"`
-		} `json:"dshort"`
-		Name              string `json:"name"`
-		Exchange          string `json:"exchange"`
-		CountryOfRiskName string `json:"countryOfRiskName"`
-		Isin              string `json:"isin"`
+		BuyAvailableFlag      bool      `json:"buyAvailableFlag"`
+		WeekendFlag           bool      `json:"weekendFlag"`
+		ClassCode             string    `json:"classCode"`
+		Ticker                string    `json:"ticker"`
+		InstrumentType        string    `json:"instrumentType"`
+		ForQualInvestorFlag   bool      `json:"forQualInvestorFlag"`
+		ForIisFlag            bool      `json:"forIisFlag"`
+		PositionUID           string    `json:"positionUid"`
+		APITradeAvailableFlag bool      `json:"apiTradeAvailableFlag"`
+		DlongMin              Quotation `json:"dlongMin"`
+		ShortEnabledFlag      bool      `json:"shortEnabledFlag"`
+		Kshort                Quotation `json:"kshort"`
+		First1MinCandleDate   time.Time `json:"first1minCandleDate"`
+		MinPriceIncrement     Quotation `json:"minPriceIncrement"`
+		OtcFlag               bool      `json:"otcFlag"`
+		DshortClient          Quotation `json:"dshortClient"`
+		Klong                 Quotation `json:"klong"`
+		Dshort                Quotation `json:"dshort"`
+		Name                  string    `json:"name"`
+		Exchange              string    `json:"exchange"`
+		CountryOfRiskName     string    `json:"countryOfRiskName"`
+		Isin                  string    `json:"isin"`
 	} `json:"instrument"`
 }
