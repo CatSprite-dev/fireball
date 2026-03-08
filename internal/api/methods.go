@@ -36,10 +36,13 @@ func (client *Client) GetAccounts(token string, accountStatus pkg.AccountStatus)
 func (client *Client) GetInfo(token string) (UserInfo, error) {
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.UsersService/GetInfo"
 
-	payload := `{}`
+	payload := struct{}{}
+
+	client.usersLimiter.Wait(context.Background())
+
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
-		return UserInfo{}, err
+		return UserInfo{}, fmt.Errorf("do request error (api.GetInfo): %w", err)
 	}
 
 	var user UserInfo
@@ -175,10 +178,13 @@ func (client *Client) GetInstrumentBy(token string, idType pkg.InstrumentIdType,
 func (client *Client) Indicatives(token string) (IndicativeInstruments, error) {
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Indicatives"
 
-	payload := `{}`
+	payload := struct{}{}
+
+	client.operationsLimiter.Wait(context.Background())
+
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
-		return IndicativeInstruments{}, err
+		return IndicativeInstruments{}, fmt.Errorf("do request error (api.Indicatives): %w", err)
 	}
 	var indicativeInstruments IndicativeInstruments
 	err = json.Unmarshal(data, &indicativeInstruments)
@@ -216,15 +222,17 @@ func (client *Client) GetCandles(token string,
 		Limit:            limit,
 	}
 
+	client.operationsLimiter.Wait(context.Background())
+
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
-		return Candles{}, fmt.Errorf("do request error (GetCandles): %s", err)
+		return Candles{}, fmt.Errorf("do request error (GetCandles): %w", err)
 	}
 
 	var candles Candles
 	err = json.Unmarshal(data, &candles)
 	if err != nil {
-		return Candles{}, fmt.Errorf("unmarshal error (GetCandles): %s", err)
+		return Candles{}, fmt.Errorf("unmarshal error (GetCandles): %w", err)
 	}
 
 	return candles, nil

@@ -39,6 +39,7 @@ export interface Portfolio {
     positions: Position[];
     totalAmountPortfolio?: Price;
     expectedYield?: Price;
+    totalReturn?: Price;
 }
 
 export interface Investment {

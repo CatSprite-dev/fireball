@@ -351,7 +351,7 @@ function calculateMetrics(): Metrics {
     // Total Gain/Loss
     let totalGain = 0;
     if (portfolio?.expectedYield) {
-        totalGain = parsePrice(portfolio.expectedYield);
+        totalGain = parsePrice(portfolio.totalReturn);
     } else {
         const totalInvested = investments.reduce((sum, inv) => sum + inv.quantity * inv.purchasePrice, 0);
         const currentVal = investments.reduce((sum, inv) => sum + inv.quantity * inv.currentPrice, 0);
@@ -722,8 +722,8 @@ function renderHoldings(): void {
                         ? '—' 
                         : `${formatCurrency(inv.dividends)} (${dividendsPercent >= 0 ? '+' : ''}${dividendsPercent.toFixed(2)}%)`}
                 </td>
-                <td class="p-4 align-middle text-right ${gain >= 0 ? 'text-green-600' : 'text-red-600'}">
-                    ${gain >= 0 ? '+' : ''}${formatCurrency(inv.totalYield)} (${totalYieldPercent >= 0 ? '+' : ''}${totalYieldPercent.toFixed(2)}%)
+                <td class="p-4 align-middle text-right ${inv.totalYield >= 0 ? 'text-green-600' : 'text-red-600'}">
+                    ${inv.totalYield >= 0 ? '+' : ''}${formatCurrency(inv.totalYield)} (${totalYieldPercent >= 0 ? '+' : ''}${totalYieldPercent.toFixed(2)}%)
                     ${gainIcon}
                 </td>
             </tr>

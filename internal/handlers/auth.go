@@ -49,6 +49,5 @@ func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 
 	// _, err = h.portfolioService.GetCandlesForPortfolio(token, userPortfolio, time.Now().AddDate(-1, 0, 0), time.Now(), pkg.CandleIntervalDay)
 
-	log.Printf("Общая доходность: %v", userPortfolio.TotalReturn)
 	log.Printf("Время выполнения HandlerAuth: %.2f сек\n", time.Since(t).Seconds())
 }

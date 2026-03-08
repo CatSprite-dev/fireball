@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -24,13 +25,18 @@ func enrichFullPortfolio(calc *Calculator, portfolio domain.UserFullPortfolio, t
 		portfolio.AllDividends = dividends
 	}
 
-	// 3. Метрики каждой позиции
-	portfolio, err = enrichPositions(portfolio, calc, token, accountID, openedDate)
+	// 3. Metrics for position
+	portfolio, err = enrichPositions(portfolio, calc, token)
+
+	// 4. TotalReturn
+	portfolio.TotalReturn, err = calc.GetTotalReturn(token, portfolio, accountID, openedDate)
+	if err != nil {
+		log.Printf("failed to calculate TotalReturn: %v", err)
+	}
 	return portfolio, nil
 }
 
 func enrichPortfolioMetrics(portfolio domain.UserFullPortfolio) (domain.UserFullPortfolio, error) {
-	// Filling ExpectedYield for whole portfolio
 	coeff, err := DivideMoneyValue(
 		domain.MoneyValue{
 			Units: portfolio.ExpectedYieldRelative.Units,
@@ -45,7 +51,7 @@ func enrichPortfolioMetrics(portfolio domain.UserFullPortfolio) (domain.UserFull
 	return portfolio, nil
 }
 
-func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token string, accountID string, openedDate time.Time) (domain.UserFullPortfolio, error) {
+func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token string) (domain.UserFullPortfolio, error) {
 	var wg sync.WaitGroup
 
 	for i := range portfolio.Positions {
@@ -67,6 +73,9 @@ func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token
 func getPositionInfo(wg *sync.WaitGroup, p *domain.Position, calc *Calculator, token string) {
 	defer wg.Done()
 	instrument, err := calc.GetInstrumentInfo(token, pkg.InstrumentIdTypePositionUid, p.PositionUID)
+	if errors.Is(err, ErrNotFound) {
+		instrument, err = calc.GetInstrumentInfo(token, pkg.InstrumentIdTypeFigi, p.Figi)
+	}
 	if err != nil {
 		log.Printf("failed to get instrument info for position %s: %s: %v\n", p.PositionUID, p.Figi, err)
 		return

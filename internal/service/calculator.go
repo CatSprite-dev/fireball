@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"log"
+	"net/http"
 	"sync"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/domain"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 )
+
+var ErrNotFound = errors.New("not found")
 
 type Calculator struct {
 	apiClient *api.Client
@@ -34,6 +37,9 @@ func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio
 	openedDate := userAccounts.Accounts[0].OpenedDate
 
 	rawPortfolio, err := calc.apiClient.GetPortfolio(token, accountID)
+	if err != nil {
+		return domain.UserFullPortfolio{}, err
+	}
 	fullEmptyPortfolio := convertFullPortfolio(rawPortfolio)
 	enrichedFullPortfolio, err := enrichFullPortfolio(calc, fullEmptyPortfolio, token, accountID, openedDate)
 	if err != nil {
@@ -83,6 +89,10 @@ func (calc *Calculator) GetDividends(
 func (calc *Calculator) GetInstrumentInfo(token string, instrumentIdType pkg.InstrumentIdType, instrumentId string) (domain.Instrument, error) {
 	rawInstrument, err := calc.apiClient.GetInstrumentBy(token, instrumentIdType, pkg.ClassCodeUnspecified, instrumentId)
 	if err != nil {
+		var requestErr api.RequestError
+		if errors.As(err, &requestErr) && requestErr.StatusCode == http.StatusNotFound {
+			return domain.Instrument{}, ErrNotFound
+		}
 		return domain.Instrument{}, err
 	}
 	instrument := convertInstrument(rawInstrument)
@@ -215,7 +225,6 @@ func (calc *Calculator) GetCandlesForPortfolio(token string, portfolio domain.Us
 	candlesOfPositions := make(map[string]domain.Candles)
 	for _, pos := range portfolio.Positions {
 		wg.Add(1)
-		log.Printf("Позиция: %s, тикер: %s, кол-во: %s\n", pos.Name, pos.Ticker, pos.Quantity.Units)
 		go func(p domain.Position) {
 			candles, err := calc.GetCandles(token, p.InstrumentUID, from, to, candleInterval, pkg.CandleSourceExchange)
 			resultCh <- candleResult{
