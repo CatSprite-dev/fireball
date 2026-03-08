@@ -165,7 +165,7 @@ func (calc *Calculator) GetTotalReturn(token string, portfolio domain.UserFullPo
 	netCashFlow := domain.MoneyValue{}
 	for _, block := range operations {
 		for _, item := range block.Items {
-			netCashFlow = AddMoneyValue(netCashFlow, item.Payment)
+			netCashFlow = AddMoneyValue(netCashFlow, domain.MoneyValue(item.Payment))
 		}
 	}
 

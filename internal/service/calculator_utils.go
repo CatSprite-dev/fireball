@@ -61,7 +61,7 @@ func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token
 
 	wg.Wait()
 
-	return portfolio
+	return portfolio, nil
 }
 
 func getPositionInfo(wg *sync.WaitGroup, p *domain.Position, calc *Calculator, token string) {
