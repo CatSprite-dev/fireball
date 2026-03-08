@@ -7,11 +7,16 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 type Client struct {
-	httpClient http.Client
-	baseURL    string
+	httpClient         http.Client
+	baseURL            string
+	usersLimiter       *rate.Limiter
+	operationsLimiter  *rate.Limiter
+	instrumentsLimiter *rate.Limiter
 }
 
 func NewClient(baseURL string) *Client {
@@ -19,19 +24,22 @@ func NewClient(baseURL string) *Client {
 		httpClient: http.Client{
 			Timeout: 15 * time.Second,
 		},
-		baseURL: baseURL,
+		baseURL:            baseURL,
+		usersLimiter:       rate.NewLimiter(rate.Every(time.Minute), 100),
+		operationsLimiter:  rate.NewLimiter(rate.Every(time.Minute), 200),
+		instrumentsLimiter: rate.NewLimiter(rate.Every(time.Minute), 200),
 	}
 }
 
 func (client *Client) DoRequest(url string, httpMethod string, token string, payload interface{}) ([]byte, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("payload marshal error:  %v", err)
+		return nil, fmt.Errorf("payload marshal error:  %w", err)
 	}
 
 	req, err := http.NewRequest(httpMethod, url, bytes.NewBuffer(body))
 	if err != nil {
-		return nil, fmt.Errorf("request error: %s", err)
+		return nil, fmt.Errorf("request error: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
@@ -39,13 +47,18 @@ func (client *Client) DoRequest(url string, httpMethod string, token string, pay
 
 	res, err := client.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("response error: %s", err)
+		return nil, fmt.Errorf("response error: %w", err)
 	}
 
 	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, fmt.Errorf("upstream HTTP code %d: %s", res.StatusCode, url)
+	}
+
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read error: %s", err)
+		return nil, fmt.Errorf("read error: %w", err)
 	}
 
 	return data, nil

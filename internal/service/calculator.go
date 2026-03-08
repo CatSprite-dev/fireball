@@ -34,10 +34,6 @@ func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio
 	openedDate := userAccounts.Accounts[0].OpenedDate
 
 	rawPortfolio, err := calc.apiClient.GetPortfolio(token, accountID)
-	if err != nil {
-		return domain.UserFullPortfolio{}, err
-	}
-
 	fullEmptyPortfolio := convertFullPortfolio(rawPortfolio)
 	enrichedFullPortfolio, err := enrichFullPortfolio(calc, fullEmptyPortfolio, token, accountID, openedDate)
 	if err != nil {
@@ -78,7 +74,7 @@ func (calc *Calculator) GetDividends(
 				continue
 			}
 			current := result[key]
-			result[key] = AddMoneyValue(current, item.Payment)
+			result[key] = AddMoneyValue(current, domain.MoneyValue(item.Payment))
 		}
 	}
 	return result, nil

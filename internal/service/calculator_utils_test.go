@@ -8,221 +8,114 @@ import (
 
 func TestConvertToFullPortfolio(t *testing.T) {
 	rawPortfolio := api.UserPortfolio{
-		TotalAmountShares: struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		}{
+		TotalAmountShares: api.MoneyValue{
 			Currency: "RUB",
 			Units:    "100",
 			Nano:     0,
 		},
-		TotalAmountBonds: struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		}{
+		TotalAmountBonds: api.MoneyValue{
 			Currency: "RUB",
 			Units:    "50",
 			Nano:     0,
 		},
-		TotalAmountEtf: struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		}{
+		TotalAmountEtf: api.MoneyValue{
 			Currency: "RUB",
 			Units:    "30",
 			Nano:     0,
 		},
-		TotalAmountCurrencies: struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		}{
+		TotalAmountCurrencies: api.MoneyValue{
 			Currency: "RUB",
 			Units:    "20",
 			Nano:     0,
 		},
-		TotalAmountFutures: struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		}{
+		TotalAmountFutures: api.MoneyValue{
 			Currency: "RUB",
 			Units:    "10",
 			Nano:     0,
 		},
-		ExpectedYield: struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		}{
+		ExpectedYield: api.Quotation{
 			Units: "15",
 			Nano:  0,
 		},
 		Positions: []struct {
-			Figi           string `json:"figi"`
-			InstrumentType string `json:"instrumentType"`
-			Quantity       struct {
-				Units string `json:"units"`
-				Nano  int    `json:"nano"`
-			} `json:"quantity"`
-			AveragePositionPrice struct {
-				Currency string `json:"currency"`
-				Units    string `json:"units"`
-				Nano     int    `json:"nano"`
-			} `json:"averagePositionPrice"`
-			ExpectedYield struct {
-				Units string `json:"units"`
-				Nano  int    `json:"nano"`
-			} `json:"expectedYield"`
-			AveragePositionPricePt struct {
-				Units string `json:"units"`
-				Nano  int    `json:"nano"`
-			} `json:"averagePositionPricePt"`
-			CurrentPrice struct {
-				Currency string `json:"currency"`
-				Units    string `json:"units"`
-				Nano     int    `json:"nano"`
-			} `json:"currentPrice"`
-			AveragePositionPriceFifo struct {
-				Currency string `json:"currency"`
-				Units    string `json:"units"`
-				Nano     int    `json:"nano"`
-			} `json:"averagePositionPriceFifo"`
-			QuantityLots struct {
-				Units string `json:"units"`
-				Nano  int    `json:"nano"`
-			} `json:"quantityLots"`
-			Blocked     bool `json:"blocked"`
-			BlockedLots struct {
-				Units string `json:"units"`
-				Nano  int    `json:"nano"`
-			} `json:"blockedLots"`
-			PositionUID   string `json:"positionUid"`
-			InstrumentUID string `json:"instrumentUid"`
-			VarMargin     struct {
-				Currency string `json:"currency"`
-				Units    string `json:"units"`
-				Nano     int    `json:"nano"`
-			} `json:"varMargin"`
-			ExpectedYieldFifo struct {
-				Units string `json:"units"`
-				Nano  int    `json:"nano"`
-			} `json:"expectedYieldFifo"`
-			DailyYield struct {
-				Currency string `json:"currency"`
-				Units    string `json:"units"`
-				Nano     int    `json:"nano"`
-			} `json:"dailyYield"`
-			Ticker     string `json:"ticker"`
-			ClassCode  string `json:"classCode"`
-			CurrentNkd struct {
-				Currency string `json:"currency"`
-				Units    string `json:"units"`
-				Nano     int    `json:"nano"`
-			} `json:"currentNkd,omitempty"`
+			Figi                     string         `json:"figi"`
+			InstrumentType           string         `json:"instrumentType"`
+			Quantity                 api.Quotation  `json:"quantity"`
+			AveragePositionPrice     api.MoneyValue `json:"averagePositionPrice"`
+			ExpectedYield            api.Quotation  `json:"expectedYield"`
+			AveragePositionPricePt   api.Quotation  `json:"averagePositionPricePt"`
+			CurrentPrice             api.MoneyValue `json:"currentPrice"`
+			AveragePositionPriceFifo api.MoneyValue `json:"averagePositionPriceFifo"`
+			QuantityLots             api.Quotation  `json:"quantityLots"`
+			Blocked                  bool           `json:"blocked"`
+			BlockedLots              api.Quotation  `json:"blockedLots"`
+			PositionUID              string         `json:"positionUid"`
+			InstrumentUID            string         `json:"instrumentUid"`
+			VarMargin                api.MoneyValue `json:"varMargin"`
+			ExpectedYieldFifo        api.Quotation  `json:"expectedYieldFifo"`
+			DailyYield               api.MoneyValue `json:"dailyYield"`
+			Ticker                   string         `json:"ticker"`
+			ClassCode                string         `json:"classCode"`
+			CurrentNkd               api.MoneyValue `json:"currentNkd,omitempty"`
 		}{
 			{
 				Figi:           "BBG000B9XRY4",
 				InstrumentType: "Stock",
-				Quantity: struct {
-					Units string `json:"units"`
-					Nano  int    `json:"nano"`
-				}{
+				Quantity: api.Quotation{
 					Units: "10",
 					Nano:  0,
 				},
-				AveragePositionPrice: struct {
-					Currency string `json:"currency"`
-					Units    string `json:"units"`
-					Nano     int    `json:"nano"`
-				}{
+				AveragePositionPrice: api.MoneyValue{
 					Currency: "RUB",
 					Units:    "500",
 					Nano:     0,
 				},
-				ExpectedYield: struct {
-					Units string `json:"units"`
-					Nano  int    `json:"nano"`
-				}{
+				ExpectedYield: api.Quotation{
 					Units: "50",
 					Nano:  0,
 				},
-				AveragePositionPricePt: struct {
-					Units string `json:"units"`
-					Nano  int    `json:"nano"`
-				}{
+				AveragePositionPricePt: api.Quotation{
 					Units: "500",
 					Nano:  0,
 				},
-				CurrentPrice: struct {
-					Currency string `json:"currency"`
-					Units    string `json:"units"`
-					Nano     int    `json:"nano"`
-				}{
+				CurrentPrice: api.MoneyValue{
 					Currency: "RUB",
 					Units:    "550",
 					Nano:     0,
 				},
-				AveragePositionPriceFifo: struct {
-					Currency string `json:"currency"`
-					Units    string `json:"units"`
-					Nano     int    `json:"nano"`
-				}{
+				AveragePositionPriceFifo: api.MoneyValue{
 					Currency: "RUB",
 					Units:    "500",
 					Nano:     0,
 				},
-				QuantityLots: struct {
-					Units string `json:"units"`
-					Nano  int    `json:"nano"`
-				}{
+				QuantityLots: api.Quotation{
 					Units: "10",
 					Nano:  0,
 				},
 				Blocked: false,
-				BlockedLots: struct {
-					Units string `json:"units"`
-					Nano  int    `json:"nano"`
-				}{
+				BlockedLots: api.Quotation{
 					Units: "0",
 					Nano:  0,
 				},
 				PositionUID:   "test-position-uid",
 				InstrumentUID: "test-instrument-uid",
-				VarMargin: struct {
-					Currency string `json:"currency"`
-					Units    string `json:"units"`
-					Nano     int    `json:"nano"`
-				}{
+				VarMargin: api.MoneyValue{
 					Currency: "RUB",
 					Units:    "0",
 					Nano:     0,
 				},
-				ExpectedYieldFifo: struct {
-					Units string `json:"units"`
-					Nano  int    `json:"nano"`
-				}{
+				ExpectedYieldFifo: api.Quotation{
 					Units: "50",
 					Nano:  0,
 				},
-				DailyYield: struct {
-					Currency string `json:"currency"`
-					Units    string `json:"units"`
-					Nano     int    `json:"nano"`
-				}{
+				DailyYield: api.MoneyValue{
 					Currency: "RUB",
 					Units:    "50",
 					Nano:     0,
 				},
 				Ticker:    "AAPL",
 				ClassCode: "USD",
-				CurrentNkd: struct {
-					Currency string `json:"currency"`
-					Units    string `json:"units"`
-					Nano     int    `json:"nano"`
-				}{
+				CurrentNkd: api.MoneyValue{
 					Currency: "RUB",
 					Units:    "0",
 					Nano:     0,
@@ -230,47 +123,28 @@ func TestConvertToFullPortfolio(t *testing.T) {
 			},
 		},
 		AccountID: "test-account-id",
-		TotalAmountOptions: struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		}{
+		TotalAmountOptions: api.MoneyValue{
 			Currency: "RUB",
 			Units:    "0",
 			Nano:     0,
 		},
-		TotalAmountSp: struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		}{
+		TotalAmountSp: api.MoneyValue{
 			Currency: "RUB",
 			Units:    "0",
 			Nano:     0,
 		},
-		TotalAmountPortfolio: struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		}{
+		TotalAmountPortfolio: api.MoneyValue{
 			Currency: "RUB",
 			Units:    "210",
 			Nano:     0,
 		},
 		VirtualPositions: []any{},
-		DailyYield: struct {
-			Currency string `json:"currency"`
-			Units    string `json:"units"`
-			Nano     int    `json:"nano"`
-		}{
+		DailyYield: api.MoneyValue{
 			Currency: "RUB",
 			Units:    "50",
 			Nano:     0,
 		},
-		DailyYieldRelative: struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		}{
+		DailyYieldRelative: api.Quotation{
 			Units: "5",
 			Nano:  0,
 		},

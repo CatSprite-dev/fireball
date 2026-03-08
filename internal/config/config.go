@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"time"
 
@@ -19,7 +20,12 @@ type Config struct {
 }
 
 func NewConfig() *Config {
-	godotenv.Load(".env")
+	err := godotenv.Load(".env")
+	//mmmmmmmmmmmmm for now
+	if err != nil {
+		log.Println("failed loading .env file")
+		os.Exit(1)
+	}
 	investURL := os.Getenv("investURL")
 	sandboxURL := os.Getenv("sandboxUrl")
 
