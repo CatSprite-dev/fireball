@@ -232,6 +232,25 @@ func TestMultiplyQuotations(t *testing.T) {
 	if result.Units != expected4.Units || result.Nano != expected4.Nano {
 		t.Errorf("MultiplyQuotation(%v, %v) = %v; expected %v", a4, b4, result, expected4)
 	}
+
+	a5 := domain.Quotation{Units: "-0", Nano: -83500000}       // -0.0835
+	b5 := domain.Quotation{Units: "100", Nano: 0}              // 100
+	expected = domain.Quotation{Units: "-8", Nano: -350000000} // -8.35
+	result = MultiplyQuotation(a5, b5)
+
+	if result.Units != expected.Units || result.Nano != expected.Nano {
+		t.Errorf("MultiplyQuotation(%v, %v) = %v; expected %v", a5, b5, result, expected)
+	}
+
+	a6 := domain.Quotation{Units: "-0", Nano: -123456789}       // -0.123456789
+	b6 := domain.Quotation{Units: "100", Nano: 0}               // 100
+	expected = domain.Quotation{Units: "-12", Nano: -345678900} // -12.3456789
+	result = MultiplyQuotation(a6, b6)
+
+	if result.Units != expected.Units || result.Nano != expected.Nano {
+		t.Errorf("MultiplyQuotation(%v, %v) = %v; expected %v", a6, b6, result, expected)
+	}
+
 }
 
 func TestDivideQuotations(t *testing.T) {
