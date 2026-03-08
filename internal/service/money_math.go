@@ -68,7 +68,6 @@ func DivideMoneyValue(a, b domain.MoneyValue) (domain.MoneyValue, error) {
 		return domain.MoneyValue{}, fmt.Errorf("division by zero")
 	}
 	result := parseDecimal(a.Units, a.Nano).Div(divisor)
-
 	units, nano := splitDecimal(result)
 	return domain.MoneyValue{Currency: a.Currency, Units: unitsStr(units, nano), Nano: int(nano)}, nil
 }
@@ -101,7 +100,6 @@ func DivideQuotation(a, b domain.Quotation) (domain.Quotation, error) {
 		return domain.Quotation{}, fmt.Errorf("division by zero")
 	}
 	result := parseDecimal(a.Units, a.Nano).Div(divisor)
-
 	units, nano := splitDecimal(result)
 	return domain.Quotation{Units: unitsStr(units, nano), Nano: int(nano)}, nil
 }

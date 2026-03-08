@@ -26,7 +26,7 @@ func enrichFullPortfolio(calc *Calculator, portfolio domain.UserFullPortfolio, t
 	}
 
 	// 3. Metrics for position
-	portfolio, err = enrichPositions(portfolio, calc, token)
+	portfolio = enrichPositions(portfolio, calc, token)
 
 	// 4. TotalReturn
 	portfolio.TotalReturn, err = calc.GetTotalReturn(token, portfolio, accountID, openedDate)
@@ -51,7 +51,7 @@ func enrichPortfolioMetrics(portfolio domain.UserFullPortfolio) (domain.UserFull
 	return portfolio, nil
 }
 
-func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token string) (domain.UserFullPortfolio, error) {
+func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token string) domain.UserFullPortfolio {
 	var wg sync.WaitGroup
 
 	for i := range portfolio.Positions {
@@ -67,7 +67,7 @@ func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token
 
 	wg.Wait()
 
-	return portfolio, nil
+	return portfolio
 }
 
 func getPositionInfo(wg *sync.WaitGroup, p *domain.Position, calc *Calculator, token string) {
