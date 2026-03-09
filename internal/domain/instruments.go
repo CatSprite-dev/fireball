@@ -14,11 +14,6 @@ type IndicativeInstruments struct {
 	Instruments []Instrument
 }
 
-type Candles struct {
-	// Time Close Open High Low IsComplete
-	Candles []Candle `json:"candles"`
-}
-
 type Candle struct {
 	Time       time.Time `json:"time"`
 	Close      Quotation `json:"close"`
@@ -29,6 +24,6 @@ type Candle struct {
 }
 
 type ChartData struct {
-	IndexCandles     Candles
-	PortfolioCandles Candles
+	IndexCandles     []Candle
+	PortfolioCandles []Candle
 }

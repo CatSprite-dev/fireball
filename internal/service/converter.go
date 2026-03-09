@@ -80,8 +80,8 @@ func convertIndicativeInstrument(raw api.IndicativeInstruments) domain.Indicativ
 	return indicatineInstruments
 }
 
-func convertCandles(raw api.Candles) domain.Candles {
-	candles := domain.Candles{}
+func convertCandles(raw api.Candles) []domain.Candle {
+	candles := []domain.Candle{}
 	for _, rawCandle := range raw.Candles {
 		candle := domain.Candle{
 			Time: rawCandle.Time,
@@ -103,7 +103,7 @@ func convertCandles(raw api.Candles) domain.Candles {
 			},
 			IsComplete: rawCandle.IsComplete,
 		}
-		candles.Candles = append(candles.Candles, candle)
+		candles = append(candles, candle)
 	}
 	return candles
 }

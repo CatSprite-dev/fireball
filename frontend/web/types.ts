@@ -83,10 +83,8 @@ export interface Candle {
 }
 
 export interface ChartData {
-    index_candles: {
-        candles: Candle[];
-    };
-    // возможно, другие поля
+    IndexCandles: Candle[];
+    PortfolioCandles: Candle[];
 }
 
 declare global {

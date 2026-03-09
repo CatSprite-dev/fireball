@@ -173,26 +173,14 @@ type Instrument struct {
 
 type Candles struct {
 	Candles []struct {
-		Volume string `json:"volume"`
-		High   struct {
-			Nano  int    `json:"nano"`
-			Units string `json:"units"`
-		} `json:"high"`
-		Low struct {
-			Nano  int    `json:"nano"`
-			Units string `json:"units"`
-		} `json:"low"`
+		Volume     string    `json:"volume"`
+		High       Quotation `json:"high"`
+		Low        Quotation `json:"low"`
 		VolumeBuy  string    `json:"volumeBuy"`
 		VolumeSell string    `json:"volumeSell"`
 		Time       time.Time `json:"time"`
-		Close      struct {
-			Nano  int    `json:"nano"`
-			Units string `json:"units"`
-		} `json:"close"`
-		Open struct {
-			Nano  int    `json:"nano"`
-			Units string `json:"units"`
-		} `json:"open"`
-		IsComplete bool `json:"isComplete"`
+		Close      Quotation `json:"close"`
+		Open       Quotation `json:"open"`
+		IsComplete bool      `json:"isComplete"`
 	} `json:"candles"`
 }

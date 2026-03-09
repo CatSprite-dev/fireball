@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/api"
@@ -121,11 +120,11 @@ func (calc *Calculator) GetCandles(token string,
 	from time.Time,
 	to time.Time,
 	interval pkg.CandleInterval,
-	candleSourceType pkg.CandleSource) (domain.Candles, error) {
+	candleSourceType pkg.CandleSource) ([]domain.Candle, error) {
 
 	rawCandles, err := calc.ApiClient.GetCandles(token, &from, &to, interval, instrumentId, candleSourceType, 0)
 	if err != nil {
-		return domain.Candles{}, err
+		return []domain.Candle{}, err
 	}
 
 	candles := convertCandles(rawCandles)
@@ -144,7 +143,7 @@ func (calc *Calculator) GetChartData(token string, indexTicker string, from time
 	if err != nil {
 		return domain.ChartData{}, err
 	}
-	if len(indexCandles.Candles) == 0 {
+	if len(indexCandles) == 0 {
 		return domain.ChartData{}, errors.New("no candles data available")
 	}
 
@@ -184,7 +183,7 @@ func (calc *Calculator) GetTotalReturn(token string, portfolio domain.UserFullPo
 	return totalReturn, nil
 }
 
-func (calc *Calculator) GetCandlesForPortfolio(token string, portfolio domain.UserFullPortfolio, from time.Time, to time.Time, candleInterval pkg.CandleInterval) (domain.Candles, error) {
+func (calc *Calculator) CalculateHistoricalHoldings(token string, portfolio domain.UserFullPortfolio, from time.Time, to time.Time, candleInterval pkg.CandleInterval) (map[time.Time]map[string]domain.Quotation, error) {
 	// Взять текущую сумму портфеля
 	// Взять историю операций по портфелю
 	// Взять историю цен по каждому инструменту в портфеле
@@ -195,9 +194,7 @@ func (calc *Calculator) GetCandlesForPortfolio(token string, portfolio domain.Us
 	// Если были покупки то отнять количество купленных бумаг от текущего количества в портфеле
 	// Умножаем получившееся количество бумаг на цену закрытия свечи и получаем стоиомсть портфеля в этот интервал
 
-	wg := sync.WaitGroup{}
-
-	_, err := calc.ApiClient.GetUserOperationsByCursor(
+	operations, err := calc.ApiClient.GetUserOperationsByCursor(
 		token,
 		portfolio.AccountID,
 		"",
@@ -211,42 +208,104 @@ func (calc *Calculator) GetCandlesForPortfolio(token string, portfolio domain.Us
 		true,
 	)
 	if err != nil {
-		return domain.Candles{}, err
+		return map[time.Time]map[string]domain.Quotation{}, err
 	}
 
+	candlesOfPositions, err := calc.FetchCandlesForPositions(token, portfolio, from, to, candleInterval)
+	if err != nil {
+		return map[time.Time]map[string]domain.Quotation{}, err
+	}
+
+	start := candlesOfPositions[portfolio.Positions[0].InstrumentUID][len(candlesOfPositions[portfolio.Positions[0].InstrumentUID])-1].Time
+	end := candlesOfPositions[portfolio.Positions[0].InstrumentUID][0].Time
+
+	// Инициализируем начальное состояние (сегодня)
+	positionsQuantity := make(map[time.Time]map[string]domain.Quotation)
+	positionsQuantity[start] = make(map[string]domain.Quotation)
+	for _, pos := range portfolio.Positions {
+		if _, exists := candlesOfPositions[pos.Figi]; !exists {
+			// Догружаем свечи если в истории нет
+			candles, err := calc.GetCandles(token, pos.Figi, from, to, candleInterval, pkg.CandleSourceExchange)
+			if err != nil {
+				log.Printf("Ошибка загрузки свечей для %s: %v", pos.Ticker, err)
+				continue
+			}
+			candlesOfPositions[pos.InstrumentUID] = candles
+		}
+	}
+
+	currentDate := start
+	for currentDate.After(end) || currentDate.Equal(end) {
+		yesterday := currentDate.AddDate(0, 0, -1)
+
+		// Копируем состояние из текущего дня во вчера
+		positionsQuantity[yesterday] = make(map[string]domain.Quotation)
+		for ticker, qty := range positionsQuantity[currentDate] {
+			positionsQuantity[yesterday][ticker] = qty
+		}
+
+		// Обрабатываем операции этого дня
+		for _, block := range operations {
+			for _, item := range block.Items {
+				opDate := item.Date.Truncate(24 * time.Hour)
+
+				if opDate.Equal(currentDate) {
+					switch item.Type {
+					case string(pkg.OperationTypeBuy):
+						// Купили сегодня → вчера было меньше
+						current := positionsQuantity[yesterday][item.Ticker]
+						positionsQuantity[yesterday][item.Ticker] = SubtractQuotations(current, domain.Quotation{Units: item.Quantity})
+
+					case string(pkg.OperationTypeSell):
+						// Продали сегодня → вчера было больше
+						current := positionsQuantity[yesterday][item.Ticker]
+						positionsQuantity[yesterday][item.Ticker] = AddQuotations(current, domain.Quotation{Units: item.Quantity})
+					}
+				}
+			}
+		}
+
+		currentDate = yesterday
+	}
+
+	return positionsQuantity, nil
+}
+
+func (calc *Calculator) FetchCandlesForPositions(
+	token string,
+	portfolio domain.UserFullPortfolio,
+	from time.Time,
+	to time.Time,
+	candleInterval pkg.CandleInterval) (map[string][]domain.Candle, error) {
+
 	type candleResult struct {
-		instrumentID string
-		candles      domain.Candles
-		err          error
+		figi    string
+		candles []domain.Candle
+		err     error
 	}
 
 	resultCh := make(chan candleResult, len(portfolio.Positions))
 
-	candlesOfPositions := make(map[string]domain.Candles)
 	for _, pos := range portfolio.Positions {
-		wg.Add(1)
 		go func(p domain.Position) {
-			candles, err := calc.GetCandles(token, p.InstrumentUID, from, to, candleInterval, pkg.CandleSourceExchange)
+			candles, err := calc.GetCandles(token, p.Figi, from, to, candleInterval, pkg.CandleSourceExchange)
 			resultCh <- candleResult{
-				instrumentID: p.InstrumentUID,
-				candles:      candles,
-				err:          err,
+				figi:    p.InstrumentUID,
+				candles: candles,
+				err:     err,
 			}
 		}(pos)
-		wg.Done()
 	}
 
+	candlesOfPositions := make(map[string][]domain.Candle)
 	for i := 0; i < len(portfolio.Positions); i++ {
 		res := <-resultCh
 		if res.err != nil {
-			log.Printf("Ошибка при получении свечей для инструмента %s: %v\n", res.instrumentID, res.err)
+			log.Printf("Ошибка при получении свечей для инструмента %s: %v\n", res.figi, res.err)
 			continue
 		}
-		candlesOfPositions[res.instrumentID] = res.candles
+		candlesOfPositions[res.figi] = res.candles
 	}
 
-	close(resultCh)
-
-	wg.Wait()
-	return domain.Candles{}, nil
+	return candlesOfPositions, nil
 }

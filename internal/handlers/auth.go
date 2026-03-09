@@ -3,6 +3,7 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"runtime"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/domain"
@@ -19,6 +20,10 @@ func NewAuthHandler(calc *service.Calculator) *AuthHandler {
 }
 
 func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	startAlloc := m.Alloc
+
 	type returnVals struct {
 		UserPortfolio domain.UserFullPortfolio `json:"user_portfolio"`
 		ChartData     domain.ChartData         `json:"chart_data"`
@@ -46,6 +51,12 @@ func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 		ChartData:     chartData,
 	})
 
+	runtime.ReadMemStats(&m)
+	log.Printf("Память: использовано %d MB, всего %d MB, системой %d MB, сборок мусора %d",
+		(m.Alloc-startAlloc)/1024/1024,
+		m.Alloc/1024/1024,
+		m.Sys/1024/1024,
+		m.NumGC)
 	log.Printf("Число запросов HandlerAuth = %d", h.portfolioService.ApiClient.RequestCount())
 	h.portfolioService.ApiClient.ResetRequestCount()
 }

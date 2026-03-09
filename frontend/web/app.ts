@@ -445,8 +445,22 @@ function renderChart(): void {
     }
 
     const chartData = (window as any).chartData;
+    console.log("Chart data received:", chartData);
     
-    if (!chartData?.IndexCandles?.candles?.length) {
+    let candles: Candle[] = [];
+    
+    if (chartData?.IndexCandles && Array.isArray(chartData.IndexCandles)) {
+        candles = chartData.IndexCandles;
+        console.log("Using IndexCandles format, count:", candles.length);
+    } else if (chartData?.index_candles?.candles) {
+        candles = chartData.index_candles.candles;
+        console.log("Using old format, count:", candles.length);
+    } else if (Array.isArray(chartData)) {
+        candles = chartData;
+        console.log("Using array format, count:", candles.length);
+    }
+    
+    if (!candles || candles.length === 0) {
         console.warn("No chart data available", chartData);
         const ctx = canvas.getContext('2d');
         if (ctx) {
@@ -459,15 +473,13 @@ function renderChart(): void {
         return;
     }
 
-    const candles = chartData.IndexCandles.candles;
+    console.log(`Rendering ${candles.length} candles`);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Получаем реальные размеры контейнера
     const containerWidth = canvas.parentElement?.clientWidth || window.innerWidth;
     const containerHeight = 180;
     
-    // Устанавливаем физические размеры canvas
     const dpr = window.devicePixelRatio || 1;
     canvas.style.width = `${containerWidth}px`;
     canvas.style.height = `${containerHeight}px`;
@@ -481,21 +493,26 @@ function renderChart(): void {
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
 
-    // Находим мин/макс цены закрытия
     let minPrice = Infinity;
     let maxPrice = -Infinity;
     
     candles.forEach((candle: Candle) => {
         const close = parseQuantity(candle.close);
-        minPrice = Math.min(minPrice, close);
-        maxPrice = Math.max(maxPrice, close);
+        if (!isNaN(close)) {
+            minPrice = Math.min(minPrice, close);
+            maxPrice = Math.max(maxPrice, close);
+        }
     });
+
+    if (minPrice === Infinity || maxPrice === -Infinity) {
+        console.warn("Invalid price data");
+        return;
+    }
 
     const priceRange = maxPrice - minPrice;
     minPrice = Math.max(0, minPrice - priceRange * 0.05);
     maxPrice = maxPrice + priceRange * 0.05;
 
-    // Очищаем canvas
     ctx.clearRect(0, 0, width, height);
 
     // 1. СНАЧАЛА рисуем сетку (она будет на заднем плане)
@@ -518,6 +535,8 @@ function renderChart(): void {
 
     candles.forEach((candle: Candle, index: number) => {
         const close = parseQuantity(candle.close);
+        if (isNaN(close)) return;
+        
         const x = padding.left + (index / (candles.length - 1)) * chartWidth;
         const y = padding.top + ((maxPrice - close) / (maxPrice - minPrice)) * chartHeight;
 
@@ -555,6 +574,8 @@ function renderChart(): void {
     ];
     
     dateIndices.forEach((i, idx) => {
+        if (i >= candles.length) return;
+        
         const x = padding.left + (i / (candles.length - 1)) * chartWidth;
         
         let adjustedX = x;
