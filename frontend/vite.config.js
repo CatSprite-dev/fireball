@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import { resolve } from 'path'
 import htmlMinifier from 'vite-plugin-html-minifier'
 import tailwindcss from '@tailwindcss/vite'
+import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   root: 'web',
@@ -24,6 +25,7 @@ export default defineConfig({
     sourcemap: true,
   },
   plugins: [
+    vue(),
     tailwindcss(),
     htmlMinifier({
       minify: true,
