@@ -46,7 +46,6 @@ func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio
 	}
 
 	log.Printf("Время выполнения GetFullPortfolio: %.2f сек\n", time.Since(t).Seconds())
-	_, err = calc.GetTotalReturn(token, enrichedFullPortfolio, accountID, openedDate)
 	return enrichedFullPortfolio, nil
 }
 
@@ -85,8 +84,11 @@ func (calc *Calculator) GetDividends(
 	return result, nil
 }
 
-func (calc *Calculator) GetInstrumentInfo(token string, instrumentIdType pkg.InstrumentIdType, instrumentId string) (domain.Instrument, error) {
-	rawInstrument, err := calc.ApiClient.GetInstrumentBy(token, instrumentIdType, pkg.ClassCodeUnspecified, instrumentId)
+func (calc *Calculator) GetInstrumentInfo(token string, instrumentIdType pkg.InstrumentIdType, classCode pkg.ClassCode, instrumentId string) (domain.Instrument, error) {
+	if classCode == "" {
+		classCode = pkg.ClassCodeUnspecified
+	}
+	rawInstrument, err := calc.ApiClient.GetInstrumentBy(token, instrumentIdType, classCode, instrumentId)
 	if err != nil {
 		var requestErr api.RequestError
 		if errors.As(err, &requestErr) && requestErr.StatusCode == http.StatusNotFound {
@@ -163,6 +165,8 @@ func (calc *Calculator) GetTotalReturn(token string, portfolio domain.UserFullPo
 		[]pkg.OperationType{
 			pkg.OperationTypeInput,
 			pkg.OperationTypeOutput,
+			pkg.OperationTypeInpMulti,
+			pkg.OperationTypeOutMulti,
 		},
 		pkg.OperationStateExecuted,
 		true,
@@ -171,14 +175,35 @@ func (calc *Calculator) GetTotalReturn(token string, portfolio domain.UserFullPo
 		return domain.MoneyValue{}, err
 	}
 
+	sumIn := domain.MoneyValue{}
+	sumOut := domain.MoneyValue{}
+	transIn := domain.MoneyValue{}
+	transOut := domain.MoneyValue{}
 	netCashFlow := domain.MoneyValue{}
 	for _, block := range operations {
 		for _, item := range block.Items {
 			netCashFlow = AddMoneyValue(netCashFlow, domain.MoneyValue(item.Payment))
+			switch item.Type {
+			case string(pkg.OperationTypeInput):
+				sumIn = AddMoneyValue(sumIn, domain.MoneyValue(item.Payment))
+			case string(pkg.OperationTypeOutput):
+				sumOut = AddMoneyValue(sumOut, domain.MoneyValue(item.Payment))
+			case string(pkg.OperationTypeInpMulti):
+				transIn = AddMoneyValue(transIn, domain.MoneyValue(item.Payment))
+			case string(pkg.OperationTypeOutMulti):
+				transOut = AddMoneyValue(transOut, domain.MoneyValue(item.Payment))
+			}
 		}
 	}
 
 	totalReturn := SubtractMoneyValue(portfolio.TotalAmountPortfolio, netCashFlow)
+
+	log.Printf("Input: %v\n", sumIn.Units)
+	log.Printf("Output: %v\n", sumOut.Units)
+	log.Printf("TransInput: %v\n", transIn.Units)
+	log.Printf("TransOutput: %v\n", transOut.Units)
+	log.Printf("CashFlow: %v\n", netCashFlow.Units)
+	log.Printf("TotalReturn: %v", totalReturn.Units)
 
 	return totalReturn, nil
 }

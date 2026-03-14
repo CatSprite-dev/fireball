@@ -57,6 +57,7 @@ func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 		m.Alloc/1024/1024,
 		m.Sys/1024/1024,
 		m.NumGC)
+
 	log.Printf("Число запросов HandlerAuth = %d", h.portfolioService.ApiClient.RequestCount())
 	h.portfolioService.ApiClient.ResetRequestCount()
 }

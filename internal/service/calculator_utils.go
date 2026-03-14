@@ -72,9 +72,9 @@ func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token
 
 func getPositionInfo(wg *sync.WaitGroup, p *domain.Position, calc *Calculator, token string) {
 	defer wg.Done()
-	instrument, err := calc.GetInstrumentInfo(token, pkg.InstrumentIdTypePositionUid, p.PositionUID)
+	instrument, err := calc.GetInstrumentInfo(token, pkg.InstrumentIdTypePositionUid, "", p.PositionUID)
 	if errors.Is(err, ErrNotFound) {
-		instrument, err = calc.GetInstrumentInfo(token, pkg.InstrumentIdTypeFigi, p.Figi)
+		instrument, err = calc.GetInstrumentInfo(token, pkg.InstrumentIdTypeFigi, "", p.Figi)
 	}
 	if err != nil {
 		log.Printf("failed to get instrument info for position %s: %s: %v\n", p.PositionUID, p.Figi, err)
