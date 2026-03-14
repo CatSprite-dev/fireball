@@ -315,7 +315,7 @@ func (calc *Calculator) FetchCandlesForPositions(
 		go func(p domain.Position) {
 			candles, err := calc.GetCandles(token, p.Figi, from, to, candleInterval, pkg.CandleSourceExchange)
 			resultCh <- candleResult{
-				figi:    p.InstrumentUID,
+				figi:    p.Figi,
 				candles: candles,
 				err:     err,
 			}
