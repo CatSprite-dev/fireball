@@ -242,7 +242,7 @@ async function loadInvestments(): Promise<void> {
     }
     
     try {
-        console.log("Запрашиваем портфель с токеном:", token);
+        console.log("Запрашиваем портфель...");
         
         const response = await fetch("/auth", {
             method: 'POST',
@@ -444,23 +444,22 @@ function renderChart(): void {
         return;
     }
 
-    const chartData = (window as any).chartData;
+    const chartData = (window as any).chartData as ChartData;
     console.log("Chart data received:", chartData);
-    
-    let candles: Candle[] = [];
-    
-    if (chartData?.IndexCandles && Array.isArray(chartData.IndexCandles)) {
-        candles = chartData.IndexCandles;
-        console.log("Using IndexCandles format, count:", candles.length);
-    } else if (chartData?.index_candles?.candles) {
-        candles = chartData.index_candles.candles;
-        console.log("Using old format, count:", candles.length);
-    } else if (Array.isArray(chartData)) {
-        candles = chartData;
-        console.log("Using array format, count:", candles.length);
-    }
-    
-    if (!candles || candles.length === 0) {
+
+    const indexCandles: Candle[] = chartData?.IndexCandles ?? [];
+    const portfolioCandles: Candle[] = chartData?.PortfolioCandles ?? [];
+    const indexValues = indexCandles.map(c => parseQuantity(c.close));
+    const portfolioValues = portfolioCandles.map(c => parseQuantity(c.close));
+
+    console.log("Index values first 3:", indexValues.slice(0, 3));
+    console.log("Index values last 3:", indexValues.slice(-3));
+    console.log("Portfolio values first 3:", portfolioValues.slice(0, 3));
+    console.log("Portfolio values last 3:", portfolioValues.slice(-3));
+    console.log("Index base (first non-zero):", indexValues.find(v => v !== 0));
+    console.log("Portfolio base (first non-zero):", portfolioValues.find(v => v !== 0));
+
+    if (indexCandles.length === 0 && portfolioCandles.length === 0) {
         console.warn("No chart data available", chartData);
         const ctx = canvas.getContext('2d');
         if (ctx) {
@@ -468,18 +467,16 @@ function renderChart(): void {
             ctx.font = '14px sans-serif';
             ctx.fillStyle = '#6b7280';
             ctx.textAlign = 'center';
-            ctx.fillText('No chart data', canvas.width/2, canvas.height/2);
+            ctx.fillText('No chart data', canvas.width / 2, canvas.height / 2);
         }
         return;
     }
 
-    console.log(`Rendering ${candles.length} candles`);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const containerWidth = canvas.parentElement?.clientWidth || window.innerWidth;
     const containerHeight = 180;
-    
     const dpr = window.devicePixelRatio || 1;
     canvas.style.width = `${containerWidth}px`;
     canvas.style.height = `${containerHeight}px`;
@@ -493,29 +490,31 @@ function renderChart(): void {
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
 
-    let minPrice = Infinity;
-    let maxPrice = -Infinity;
-    
-    candles.forEach((candle: Candle) => {
-        const close = parseQuantity(candle.close);
-        if (!isNaN(close)) {
-            minPrice = Math.min(minPrice, close);
-            maxPrice = Math.max(maxPrice, close);
-        }
-    });
-
-    if (minPrice === Infinity || maxPrice === -Infinity) {
-        console.warn("Invalid price data");
-        return;
+    // Нормализуем оба ряда к % от первого значения для сравнения
+    function normalize(candles: Candle[]): number[] {
+        const values = candles.map(c => parseQuantity(c.close));
+        
+        // Находим первое ненулевое значение как базу
+        const base = values.find(v => !isNaN(v) && v !== 0);
+        if (base === undefined) return [];
+        
+        return values.map(v => isNaN(v) ? 0 : ((v - base) / Math.abs(base)) * 100);
     }
 
-    const priceRange = maxPrice - minPrice;
-    minPrice = Math.max(0, minPrice - priceRange * 0.05);
-    maxPrice = maxPrice + priceRange * 0.05;
+    const indexNorm = normalize(indexCandles);
+    const portfolioNorm = normalize(portfolioCandles);
+
+    // Общий диапазон Y по обоим рядам
+    const allValues = [...indexNorm, ...portfolioNorm];
+    let minVal = Math.min(...allValues);
+    let maxVal = Math.max(...allValues);
+    const range = maxVal - minVal || 1;
+    minVal -= range * 0.05;
+    maxVal += range * 0.05;
 
     ctx.clearRect(0, 0, width, height);
 
-    // 1. СНАЧАЛА рисуем сетку (она будет на заднем плане)
+    // Сетка
     ctx.strokeStyle = '#e5e7eb';
     ctx.lineWidth = 0.8;
     ctx.beginPath();
@@ -526,74 +525,91 @@ function renderChart(): void {
     }
     ctx.stroke();
 
-    // 2. ПОТОМ рисуем график (он будет поверх сетки)
-    ctx.beginPath();
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 2.5;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
+    // Нулевая линия
+    if (minVal < 0 && maxVal > 0) {
+        const zeroY = padding.top + (maxVal / (maxVal - minVal)) * chartHeight;
+        ctx.strokeStyle = '#d1d5db';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(padding.left, zeroY);
+        ctx.lineTo(width - padding.right, zeroY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
 
-    candles.forEach((candle: Candle, index: number) => {
-        const close = parseQuantity(candle.close);
-        if (isNaN(close)) return;
-        
-        const x = padding.left + (index / (candles.length - 1)) * chartWidth;
-        const y = padding.top + ((maxPrice - close) / (maxPrice - minPrice)) * chartHeight;
+    // Рисуем линию по нормализованным значениям
+    function drawLine(ctx: CanvasRenderingContext2D, values: number[], color: string): void {
+        if (values.length < 2) return;
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        values.forEach((v, i) => {
+            const x = padding.left + (i / (values.length - 1)) * chartWidth;
+            const y = padding.top + ((maxVal - v) / (maxVal - minVal)) * chartHeight;
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+    }
 
-        if (index === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
-    });
-    ctx.stroke();
+    drawLine(ctx, indexNorm, '#0891B2');      // индекс — серый
+    drawLine(ctx, portfolioNorm, '#FFA500'); // портфель — синий
 
-    // 3. Подписи цен (поверх всего)
+    // Подписи Y (%)
     ctx.fillStyle = '#6b7280';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    
     for (let i = 0; i <= 4; i++) {
-        const price = minPrice + (maxPrice - minPrice) * (1 - i / 4);
+        const val = minVal + (maxVal - minVal) * (1 - i / 4);
         const y = padding.top + (i / 4) * chartHeight;
-        ctx.fillText(price.toFixed(0), padding.left - 8, y);
+        ctx.fillText(`${val >= 0 ? '+' : ''}${val.toFixed(1)}%`, padding.left - 8, y);
     }
 
-    // 4. Подписи дат
+    // Подписи дат (берём из более длинного ряда)
+    const refCandles = indexCandles.length >= portfolioCandles.length ? indexCandles : portfolioCandles;
+    const dateIndices = [
+        0,
+        Math.floor(refCandles.length / 4),
+        Math.floor(refCandles.length / 2),
+        Math.floor(3 * refCandles.length / 4),
+        refCandles.length - 1,
+    ];
+    ctx.fillStyle = '#6b7280';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.font = '11px sans-serif';
-    
-    const dateIndices = [
-        0, 
-        Math.floor(candles.length/4), 
-        Math.floor(candles.length/2), 
-        Math.floor(3*candles.length/4), 
-        candles.length-1
-    ];
-    
-    dateIndices.forEach((i, idx) => {
-        if (i >= candles.length) return;
-        
-        const x = padding.left + (i / (candles.length - 1)) * chartWidth;
-        
-        let adjustedX = x;
-        if (idx === dateIndices.length - 1) {
-            const textWidth = ctx.measureText('99.99').width;
-            if (x + textWidth/2 > width - padding.right) {
-                adjustedX = width - padding.right - textWidth/2;
-            }
-        }
-        
-        const date = new Date(candles[i].time).toLocaleDateString('ru-RU', { 
-            day: '2-digit', 
-            month: '2-digit' 
+    dateIndices.forEach((i) => {
+        if (i >= refCandles.length) return;
+        const x = padding.left + (i / (refCandles.length - 1)) * chartWidth;
+        const date = new Date(refCandles[i].time).toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
         });
-        ctx.fillText(date, adjustedX, height - padding.bottom + 8);
+        ctx.fillText(date, x, height - padding.bottom + 8);
     });
 
-    // 5. Рамка графика (опционально, поверх всего)
+    // Легенда
+    const legend = [
+        { label: 'Портфель', color: '#FFA500' },
+        { label: 'IMOEX',    color: '#0891B2' },
+    ];
+    ctx.font = '11px sans-serif';
+    ctx.textBaseline = 'middle';
+    let legendX = padding.left;
+    const legendY = padding.top - 12;
+    legend.forEach(({ label, color }) => {
+        ctx.fillStyle = color;
+        ctx.fillRect(legendX, legendY - 4, 16, 3);
+        ctx.fillStyle = '#374151';
+        ctx.textAlign = 'left';
+        ctx.fillText(label, legendX + 20, legendY);
+        legendX += ctx.measureText(label).width + 40;
+    });
+
+    // Рамка
     ctx.strokeStyle = '#e5e7eb';
     ctx.lineWidth = 1;
     ctx.strokeRect(padding.left, padding.top, chartWidth, chartHeight);
