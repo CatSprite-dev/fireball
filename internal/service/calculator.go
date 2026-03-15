@@ -26,29 +26,30 @@ func NewCalculator(apiClient *api.Client) *Calculator {
 func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio, error) {
 	t := time.Now()
 
-	userAccounts, err := calc.ApiClient.GetAccounts(token, pkg.AccountStatusOpen)
+	accounts, err := calc.ApiClient.GetAccounts(token, pkg.AccountStatusOpen)
 	if err != nil {
 		return domain.UserFullPortfolio{}, err
 	}
-	if len(userAccounts.Accounts) == 0 {
+	if len(accounts.Accounts) == 0 {
 		return domain.UserFullPortfolio{}, errors.New("found no accounts")
 	}
 
-	accountID := userAccounts.Accounts[0].ID
-	openedDate := userAccounts.Accounts[0].OpenedDate
+	accountID := accounts.Accounts[0].ID
+	openedDate := accounts.Accounts[0].OpenedDate
 
 	rawPortfolio, err := calc.ApiClient.GetPortfolio(token, accountID)
 	if err != nil {
 		return domain.UserFullPortfolio{}, err
 	}
-	fullEmptyPortfolio := convertFullPortfolio(rawPortfolio)
-	enrichedFullPortfolio, err := enrichFullPortfolio(calc, fullEmptyPortfolio, token, accountID, openedDate)
+	portfolio := convertFullPortfolio(rawPortfolio)
+	portfolio, err = enrichFullPortfolio(calc, portfolio, token, accountID, openedDate)
+
 	if err != nil {
 		return domain.UserFullPortfolio{}, err
 	}
 
 	log.Printf("Время выполнения GetFullPortfolio: %.2f сек\n", time.Since(t).Seconds())
-	return enrichedFullPortfolio, nil
+	return portfolio, nil
 }
 
 func (calc *Calculator) GetDividends(
@@ -185,14 +186,29 @@ func (calc *Calculator) GetCandles(
 	instrumentId string,
 	from time.Time,
 	to time.Time,
-	interval pkg.CandleInterval,
+	candleInterval pkg.CandleInterval,
 	candleSourceType pkg.CandleSource,
 ) ([]domain.Candle, error) {
-	rawCandles, err := calc.ApiClient.GetCandles(token, &from, &to, interval, instrumentId, candleSourceType, 0)
-	if err != nil {
-		return []domain.Candle{}, err
+	maxRange := maxIntervalRange(candleInterval)
+	var allCandles []domain.Candle
+
+	chunkFrom := from
+	for chunkFrom.Before(to) {
+		chunkTo := chunkFrom.Add(maxRange)
+		if chunkTo.After(to) {
+			chunkTo = to
+		}
+
+		rawCandles, err := calc.ApiClient.GetCandles(token, &chunkFrom, &chunkTo, candleInterval, instrumentId, candleSourceType, 0)
+		if err != nil {
+			return nil, err
+		}
+		allCandles = append(allCandles, convertCandles(rawCandles)...)
+
+		chunkFrom = chunkTo
 	}
-	return convertCandles(rawCandles), nil
+
+	return allCandles, nil
 }
 
 func (calc *Calculator) GetChartData(
@@ -202,19 +218,20 @@ func (calc *Calculator) GetChartData(
 	from time.Time,
 	to time.Time,
 	candleInterval pkg.CandleInterval,
+	candleSource pkg.CandleSource,
 ) (domain.ChartData, error) {
 	index, err := calc.GetIndexByTicker(token, indexTicker)
 	if err != nil {
 		return domain.ChartData{}, err
 	}
 
-	portfolioCandles, err := calc.GetCandlesForPortfolio(token, portfolio, from, to, candleInterval)
+	portfolioCandles, err := calc.GetCandlesForPortfolio(token, portfolio, from, to, candleInterval, candleSource)
 	if err != nil {
 		log.Printf("failed to get portfolio candles: %v", err)
 		portfolioCandles = []domain.Candle{}
 	}
 
-	indexCandles, err := calc.GetCandles(token, index.UID, from, to, candleInterval, pkg.CandleSourceExchange)
+	indexCandles, err := calc.GetCandles(token, index.UID, from, to, candleInterval, candleSource)
 	if err != nil {
 		log.Printf("failed to get index candles: %v", err)
 		indexCandles = []domain.Candle{}
@@ -235,7 +252,17 @@ func (calc *Calculator) GetCandlesForPortfolio(
 	from time.Time,
 	to time.Time,
 	candleInterval pkg.CandleInterval,
+	candleSource pkg.CandleSource,
 ) ([]domain.Candle, error) {
+
+	if portfolio.OpenedDate.After(from) {
+		from = portfolio.OpenedDate
+	}
+
+	log.Printf("GetCandlesForPortfolio: from=%s openedDate=%s",
+		from.Format("2006-01-02"),
+		portfolio.OpenedDate.Format("2006-01-02"),
+	)
 
 	historicalHoldings, err := calc.CalculateHistoricalHoldings(token, portfolio, from, to, candleInterval)
 	if err != nil {
@@ -244,7 +271,7 @@ func (calc *Calculator) GetCandlesForPortfolio(
 
 	figis := extractUniqueFigis(historicalHoldings)
 
-	candlesOfPositions, err := calc.FetchHistoricalCandlesForPortfolio(token, figis, from, to, candleInterval)
+	historicalCandlesForPortfolio, err := calc.FetchHistoricalCandlesForPortfolio(token, figis, from, to, candleInterval, candleSource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch candles: %w", err)
 	}
@@ -256,8 +283,9 @@ func (calc *Calculator) GetCandlesForPortfolio(
 		if !isBond(pos.InstrumentType) {
 			continue
 		}
-		candles, ok := candlesOfPositions[pos.Figi]
+		candles, ok := historicalCandlesForPortfolio[pos.Figi]
 		if !ok || len(candles) == 0 {
+			log.Printf("Not found candles for %v, figi: %v", pos.Name, pos.Figi)
 			continue
 		}
 		lastClose := candles[len(candles)-1].Close
@@ -278,32 +306,25 @@ func (calc *Calculator) GetCandlesForPortfolio(
 
 	// Build day-keyed candle index for fast lookup
 	candleIndex := make(map[string]map[time.Time]domain.Candle)
-	for figi, candles := range candlesOfPositions {
+	for figi, candles := range historicalCandlesForPortfolio {
 		candleIndex[figi] = make(map[time.Time]domain.Candle)
 		for _, c := range candles {
 			t := truncateToInterval(c.Time, candleInterval)
 			candleIndex[figi][t] = c
-			if figi == figis[0] { // только первый figi
-				log.Printf("candleIndex figi=%s raw=%s truncated=%s close=%s",
-					figi, c.Time.Format("2006-01-02T15:04:05"),
-					t.Format("2006-01-02T15:04:05"),
-					c.Close.Units)
-			}
-
 		}
 	}
 
-	days := make([]time.Time, 0, len(historicalHoldings))
-	for day := range historicalHoldings {
-		days = append(days, day)
+	intervals := make([]time.Time, 0, len(historicalHoldings))
+	for interval := range historicalHoldings {
+		intervals = append(intervals, interval)
 	}
-	slices.SortFunc(days, time.Time.Compare)
+	slices.SortFunc(intervals, time.Time.Compare)
 
-	result := make([]domain.Candle, 0, len(days))
+	result := make([]domain.Candle, 0, len(intervals))
 	lastPrice := make(map[string]domain.Candle)
 	twrCumulative := domain.Quotation{Units: "1", Nano: 0}
 
-	for _, day := range days {
+	for _, day := range intervals {
 		positions := historicalHoldings[day]
 
 		var openVal, highVal, lowVal, closeVal domain.Quotation
@@ -351,6 +372,7 @@ func (calc *Calculator) GetCandlesForPortfolio(
 			log.Printf("failed to compute day factor for %s: %v", day.Format("2006-01-02"), err)
 			continue
 		}
+
 		twrPrev := twrCumulative
 		twrCumulative = MultiplyQuotation(twrCumulative, dayFactor)
 
@@ -376,9 +398,10 @@ func (calc *Calculator) GetCandlesForPortfolio(
 		})
 
 	}
-	log.Printf("GetCandlesForPortfolio: total=%d interval=%s", len(result), candleInterval)
-	for _, c := range result {
-		log.Printf("  %s open=%s close=%s", c.Time.Format("2006-01"), c.Open.Units, c.Close.Units)
+	if len(result) > 0 {
+		log.Printf("TWR final: %s.%d", twrCumulative.Units, twrCumulative.Nano)
+		log.Printf("First candle time: %v, open: %v, close: %v", result[0].Time, result[0].Open, result[0].Close)
+		log.Printf("Last candle time: %v, open: %v, close: %v", result[len(result)-1].Time, result[len(result)-1].Open, result[len(result)-1].Close)
 	}
 
 	return result, nil
@@ -391,7 +414,7 @@ func (calc *Calculator) CalculateHistoricalHoldings(
 	portfolio domain.UserFullPortfolio,
 	from time.Time,
 	to time.Time,
-	interval pkg.CandleInterval,
+	candleInterval pkg.CandleInterval,
 ) (map[time.Time]map[string]domain.Quotation, error) {
 
 	operations, err := calc.ApiClient.GetUserOperationsByCursor(
@@ -411,8 +434,8 @@ func (calc *Calculator) CalculateHistoricalHoldings(
 		return nil, err
 	}
 
-	start := truncateToInterval(to, interval)
-	end := truncateToInterval(from, interval)
+	start := truncateToInterval(to, candleInterval)
+	end := truncateToInterval(from, candleInterval)
 
 	positionsQuantity := make(map[time.Time]map[string]domain.Quotation)
 	positionsQuantity[start] = make(map[string]domain.Quotation)
@@ -425,7 +448,16 @@ func (calc *Calculator) CalculateHistoricalHoldings(
 
 	currentTime := start
 	for currentTime.After(end) {
-		prevTime := prevInterval(currentTime, interval)
+		// Define prevTime
+		var prevTime time.Time
+		switch candleInterval {
+		case pkg.CandleIntervalWeek:
+			prevTime = currentTime.AddDate(0, 0, -7)
+		case pkg.CandleIntervalMonth:
+			prevTime = currentTime.AddDate(0, -1, 0)
+		default:
+			prevTime = currentTime.Add(-candleIntervalDuration(candleInterval))
+		}
 
 		positionsQuantity[prevTime] = make(map[string]domain.Quotation)
 		for figi, qty := range positionsQuantity[currentTime] {
@@ -438,7 +470,7 @@ func (calc *Calculator) CalculateHistoricalHoldings(
 					continue
 				}
 				// Операция попадает в интервал [prevTime, currentTime)
-				opTime := truncateToInterval(item.Date, interval)
+				opTime := truncateToInterval(item.Date, candleInterval)
 				if !opTime.Equal(currentTime) {
 					continue
 				}
@@ -465,74 +497,6 @@ func (calc *Calculator) CalculateHistoricalHoldings(
 	return positionsQuantity, nil
 }
 
-func candleIntervalDuration(interval pkg.CandleInterval) time.Duration {
-	switch interval {
-	case pkg.CandleInterval5Sec:
-		return 5 * time.Second
-	case pkg.CandleInterval10Sec:
-		return 10 * time.Second
-	case pkg.CandleInterval30Sec:
-		return 30 * time.Second
-	case pkg.CandleInterval1Min:
-		return time.Minute
-	case pkg.CandleInterval2Min:
-		return 2 * time.Minute
-	case pkg.CandleInterval3Min:
-		return 3 * time.Minute
-	case pkg.CandleInterval5Min:
-		return 5 * time.Minute
-	case pkg.CandleInterval10Min:
-		return 10 * time.Minute
-	case pkg.CandleInterval15Min:
-		return 15 * time.Minute
-	case pkg.CandleInterval30Min:
-		return 30 * time.Minute
-	case pkg.CandleIntervalHour:
-		return time.Hour
-	case pkg.CandleInterval2Hour:
-		return 2 * time.Hour
-	case pkg.CandleInterval4Hour:
-		return 4 * time.Hour
-	case pkg.CandleIntervalDay:
-		return 24 * time.Hour
-	case pkg.CandleIntervalWeek:
-		return 7 * 24 * time.Hour
-	case pkg.CandleIntervalMonth:
-		return 30 * 24 * time.Hour
-	default:
-		return 24 * time.Hour
-	}
-}
-
-func truncateToInterval(t time.Time, interval pkg.CandleInterval) time.Time {
-	t = t.UTC()
-	switch interval {
-	case pkg.CandleIntervalWeek:
-		weekday := int(t.Weekday())
-		if weekday == 0 {
-			weekday = 7
-		}
-		return t.Truncate(24*time.Hour).AddDate(0, 0, -(weekday - 1))
-	case pkg.CandleIntervalMonth:
-		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
-	case pkg.CandleIntervalDay:
-		return t.Truncate(24 * time.Hour)
-	default:
-		return t.Truncate(candleIntervalDuration(interval))
-	}
-}
-
-func prevInterval(t time.Time, interval pkg.CandleInterval) time.Time {
-	switch interval {
-	case pkg.CandleIntervalWeek:
-		return t.AddDate(0, 0, -7)
-	case pkg.CandleIntervalMonth:
-		return t.AddDate(0, -1, 0)
-	default:
-		return t.Add(-candleIntervalDuration(interval))
-	}
-}
-
 // FetchHistoricalCandlesForPortfolio fetches candles for all figis in parallel.
 // Uses CandleSourceUnspecified which covers all instrument types including bonds.
 func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
@@ -541,6 +505,7 @@ func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
 	from time.Time,
 	to time.Time,
 	candleInterval pkg.CandleInterval,
+	candleSource pkg.CandleSource,
 ) (map[string][]domain.Candle, error) {
 
 	type candleResult struct {
@@ -553,7 +518,7 @@ func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
 
 	for _, figi := range figis {
 		go func(f string) {
-			candles, err := calc.GetCandles(token, f, from, to, candleInterval, pkg.CandleSourceUnspecified)
+			candles, err := calc.GetCandles(token, f, from, to, candleInterval, candleSource)
 			resultCh <- candleResult{figi: f, candles: candles, err: err}
 		}(figi)
 	}
@@ -569,47 +534,4 @@ func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
 	}
 
 	return result, nil
-}
-
-func extractUniqueFigis(holdings map[time.Time]map[string]domain.Quotation) []string {
-	seen := make(map[string]struct{})
-	for _, positions := range holdings {
-		for figi, qty := range positions {
-			if figi == "" {
-				continue
-			}
-			if parseDecimal(qty.Units, qty.Nano).IsPositive() {
-				seen[figi] = struct{}{}
-			}
-		}
-	}
-	result := make([]string, 0, len(seen))
-	for figi := range seen {
-		result = append(result, figi)
-	}
-	return result
-}
-
-// isInvestmentInstrument returns true for tradeable securities (shares, bonds, ETFs, etc.)
-// Handles both lowercase (Position.InstrumentType) and uppercase (operation InstrumentKind) formats.
-func isInvestmentInstrument(kind string) bool {
-	switch kind {
-	case "share", "bond", "etf", "sp", "clearing_certificate", "commodity":
-		return true
-	}
-	switch pkg.InstrumentType(kind) {
-	case pkg.InstrumentTypeBond,
-		pkg.InstrumentTypeShare,
-		pkg.InstrumentTypeETF,
-		pkg.InstrumentTypeSP,
-		pkg.InstrumentTypeClearingCertificate,
-		pkg.InstrumentTypeCommodity:
-		return true
-	}
-	return false
-}
-
-// isBond handles both lowercase and uppercase bond type strings.
-func isBond(kind string) bool {
-	return kind == "bond" || pkg.InstrumentType(kind) == pkg.InstrumentTypeBond
 }

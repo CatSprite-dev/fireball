@@ -1,12 +1,15 @@
 package service
 
 import (
+	"time"
+
 	"github.com/CatSprite-dev/fireball/internal/api"
 	"github.com/CatSprite-dev/fireball/internal/domain"
 )
 
 func convertFullPortfolio(raw api.UserPortfolio) domain.UserFullPortfolio {
 	full := domain.UserFullPortfolio{
+		OpenedDate:            time.Time{},
 		TotalAmountShares:     domain.MoneyValue(raw.TotalAmountShares),
 		TotalAmountBonds:      domain.MoneyValue(raw.TotalAmountBonds),
 		TotalAmountEtf:        domain.MoneyValue(raw.TotalAmountEtf),

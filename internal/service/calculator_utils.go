@@ -11,6 +11,7 @@ import (
 )
 
 func enrichFullPortfolio(calc *Calculator, portfolio domain.UserFullPortfolio, token string, accountID string, openedDate time.Time) (domain.UserFullPortfolio, error) {
+	portfolio.OpenedDate = openedDate
 	// 1. General portfolio metrics
 	portfolio, err := enrichPortfolioMetrics(portfolio)
 	if err != nil {
@@ -135,4 +136,143 @@ func getPositionMetrics(wg *sync.WaitGroup, portfolio *domain.UserFullPortfolio,
 		return
 	}
 	p.TotalYieldRelative = MultiplyQuotation(p.TotalYieldRelative, domain.Quotation{Units: "100", Nano: 0})
+}
+
+func maxIntervalRange(interval pkg.CandleInterval) time.Duration {
+	switch interval {
+	case pkg.CandleInterval5Sec:
+		return 200 * time.Minute
+	case pkg.CandleInterval10Sec:
+		return 200 * time.Minute
+	case pkg.CandleInterval30Sec:
+		return 20 * time.Hour
+	case pkg.CandleInterval1Min:
+		return 24 * time.Hour
+	case pkg.CandleInterval2Min:
+		return 24 * time.Hour
+	case pkg.CandleInterval3Min:
+		return 24 * time.Hour
+	case pkg.CandleInterval5Min:
+		return 7 * 24 * time.Hour
+	case pkg.CandleInterval10Min:
+		return 7 * 24 * time.Hour
+	case pkg.CandleInterval15Min:
+		return 21 * 24 * time.Hour
+	case pkg.CandleInterval30Min:
+		return 21 * 24 * time.Hour
+	case pkg.CandleIntervalHour:
+		return 90 * 24 * time.Hour
+	case pkg.CandleInterval2Hour:
+		return 90 * 24 * time.Hour
+	case pkg.CandleInterval4Hour:
+		return 90 * 24 * time.Hour
+	case pkg.CandleIntervalDay:
+		return 6 * 365 * 24 * time.Hour
+	case pkg.CandleIntervalWeek:
+		return 5 * 365 * 24 * time.Hour
+	case pkg.CandleIntervalMonth:
+		return 10 * 365 * 24 * time.Hour
+	default:
+		return 24 * time.Hour
+	}
+}
+
+func truncateToInterval(t time.Time, interval pkg.CandleInterval) time.Time {
+	t = t.UTC()
+	switch interval {
+	case pkg.CandleIntervalWeek:
+		weekday := int(t.Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		return t.Truncate(24*time.Hour).AddDate(0, 0, -(weekday - 1))
+	case pkg.CandleIntervalMonth:
+		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
+	case pkg.CandleIntervalDay:
+		return t.Truncate(24 * time.Hour)
+	default:
+		return t.Truncate(candleIntervalDuration(interval))
+	}
+}
+
+func candleIntervalDuration(interval pkg.CandleInterval) time.Duration {
+	switch interval {
+	case pkg.CandleInterval5Sec:
+		return 5 * time.Second
+	case pkg.CandleInterval10Sec:
+		return 10 * time.Second
+	case pkg.CandleInterval30Sec:
+		return 30 * time.Second
+	case pkg.CandleInterval1Min:
+		return time.Minute
+	case pkg.CandleInterval2Min:
+		return 2 * time.Minute
+	case pkg.CandleInterval3Min:
+		return 3 * time.Minute
+	case pkg.CandleInterval5Min:
+		return 5 * time.Minute
+	case pkg.CandleInterval10Min:
+		return 10 * time.Minute
+	case pkg.CandleInterval15Min:
+		return 15 * time.Minute
+	case pkg.CandleInterval30Min:
+		return 30 * time.Minute
+	case pkg.CandleIntervalHour:
+		return time.Hour
+	case pkg.CandleInterval2Hour:
+		return 2 * time.Hour
+	case pkg.CandleInterval4Hour:
+		return 4 * time.Hour
+	case pkg.CandleIntervalDay:
+		return 24 * time.Hour
+	case pkg.CandleIntervalWeek:
+		return 7 * 24 * time.Hour
+	case pkg.CandleIntervalMonth:
+		return 30 * 24 * time.Hour
+	default:
+		return 24 * time.Hour
+	}
+}
+
+func extractUniqueFigis(holdings map[time.Time]map[string]domain.Quotation) []string {
+	uniqueFigis := make(map[string]struct{})
+	for _, positions := range holdings {
+		for figi, qty := range positions {
+			if figi == "" {
+				continue
+			}
+			if parseDecimal(qty.Units, qty.Nano).IsPositive() {
+				uniqueFigis[figi] = struct{}{}
+			}
+		}
+	}
+	result := make([]string, 0, len(uniqueFigis))
+	for figi := range uniqueFigis {
+		result = append(result, figi)
+	}
+	return result
+}
+
+// isInvestmentInstrument returns true for tradeable securities (shares, bonds, ETFs, etc.)
+// Handles both lowercase (Position.InstrumentType) and uppercase (operation InstrumentKind) formats.
+func isInvestmentInstrument(kind string) bool {
+	switch kind {
+	case "share", "bond", "etf", "sp", "clearing_certificate", "commodity":
+		return true
+	}
+	switch pkg.InstrumentType(kind) {
+	case pkg.InstrumentTypeBond,
+		pkg.InstrumentTypeShare,
+		pkg.InstrumentTypeETF,
+		pkg.InstrumentTypeSP,
+		pkg.InstrumentTypeClearingCertificate,
+		pkg.InstrumentTypeCommodity:
+		return true
+	}
+	return false
+}
+
+// isBond handles both lowercase and uppercase bond type strings.
+func isBond(kind string) bool {
+	return kind == "bond" || pkg.InstrumentType(kind) == pkg.InstrumentTypeBond
 }

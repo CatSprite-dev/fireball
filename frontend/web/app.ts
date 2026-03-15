@@ -439,28 +439,33 @@ function renderMetrics(): void {
 
 function renderChart(): void {
     const canvas = performanceChart;
-    if (!canvas) {
-        console.warn("Canvas element not found");
-        return;
-    }
+    if (!canvas) return;
 
     const chartData = (window as any).chartData as ChartData;
-    console.log("Chart data received:", chartData);
-
     const indexCandles: Candle[] = chartData?.IndexCandles ?? [];
     const portfolioCandles: Candle[] = chartData?.PortfolioCandles ?? [];
-    const indexValues = indexCandles.map(c => parseQuantity(c.close));
-    const portfolioValues = portfolioCandles.map(c => parseQuantity(c.close));
 
-    console.log("Index values first 3:", indexValues.slice(0, 3));
-    console.log("Index values last 3:", indexValues.slice(-3));
-    console.log("Portfolio values first 3:", portfolioValues.slice(0, 3));
-    console.log("Portfolio values last 3:", portfolioValues.slice(-3));
-    console.log("Index base (first non-zero):", indexValues.find(v => v !== 0));
-    console.log("Portfolio base (first non-zero):", portfolioValues.find(v => v !== 0));
+    function findCommonStart(index: Candle[], portfolio: Candle[]): string | null {
+        const portfolioDates = new Set(portfolio.map(c => c.time));
+        const common = index.find(c => portfolioDates.has(c.time));
+        return common?.time ?? null;
+    }
+
+    const commonStart = findCommonStart(indexCandles, portfolioCandles);
+
+    function normalize(candles: Candle[]): number[] {
+        const startIdx = commonStart
+            ? candles.findIndex(c => c.time === commonStart)
+            : 0;
+        const base = parseQuantity(candles[Math.max(startIdx, 0)]?.close);
+        if (!base || isNaN(base)) return candles.map(() => 0);
+        return candles.map(c => {
+            const v = parseQuantity(c.close);
+            return isNaN(v) ? 0 : ((v - base) / Math.abs(base)) * 100;
+        });
+    }
 
     if (indexCandles.length === 0 && portfolioCandles.length === 0) {
-        console.warn("No chart data available", chartData);
         const ctx = canvas.getContext('2d');
         if (ctx) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -474,71 +479,94 @@ function renderChart(): void {
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
+    
+    // Canvas setup
+    const dpr = window.devicePixelRatio || 1;
     const containerWidth = canvas.parentElement?.clientWidth || window.innerWidth;
     const containerHeight = 180;
-    const dpr = window.devicePixelRatio || 1;
     canvas.style.width = `${containerWidth}px`;
     canvas.style.height = `${containerHeight}px`;
     canvas.width = containerWidth * dpr;
     canvas.height = containerHeight * dpr;
     ctx.scale(dpr, dpr);
 
-    const width = containerWidth;
-    const height = containerHeight;
     const padding = { top: 25, right: 30, bottom: 45, left: 55 };
-    const chartWidth = width - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
-
-    // Нормализуем оба ряда к % от первого значения для сравнения
-    function normalize(candles: Candle[]): number[] {
-        const values = candles.map(c => parseQuantity(c.close));
-        
-        // Находим первое ненулевое значение как базу
-        const base = values.find(v => !isNaN(v) && v !== 0);
-        if (base === undefined) return [];
-        
-        return values.map(v => isNaN(v) ? 0 : ((v - base) / Math.abs(base)) * 100);
-    }
+    const chartWidth = containerWidth - padding.left - padding.right;
+    const chartHeight = containerHeight - padding.top - padding.bottom;
 
     const indexNorm = normalize(indexCandles);
     const portfolioNorm = normalize(portfolioCandles);
 
-    // Общий диапазон Y по обоим рядам
+    const commonStartIdx = commonStart
+    ? indexCandles.findIndex(c => c.time === commonStart)
+    : 0;
+    const trimmedIndexCandles = indexCandles.slice(Math.max(commonStartIdx, 0));
+    const trimmedIndexNorm = indexNorm.slice(Math.max(commonStartIdx, 0));
+
+    // Y range with padding
     const allValues = [...indexNorm, ...portfolioNorm];
-    let minVal = Math.min(...allValues);
-    let maxVal = Math.max(...allValues);
-    const range = maxVal - minVal || 1;
-    minVal -= range * 0.05;
-    maxVal += range * 0.05;
+    const rawMin = Math.min(...allValues);
+    const rawMax = Math.max(...allValues);
+    const range = rawMax - rawMin || 1;
+    const minVal = rawMin - range * 0.05;
+    const maxVal = rawMax + range * 0.05;
 
-    ctx.clearRect(0, 0, width, height);
+    // Helpers
+    const toX = (i: number, total: number) =>
+        padding.left + (i / (total - 1)) * chartWidth;
+    const toY = (v: number) =>
+        padding.top + ((maxVal - v) / (maxVal - minVal)) * chartHeight;
 
-    // Сетка
+    // Detect if dates span multiple years
+    const refCandles = trimmedIndexCandles.length >= portfolioCandles.length 
+    ? trimmedIndexCandles 
+    : portfolioCandles;
+    const firstYear = new Date(refCandles[0]?.time).getFullYear();
+    const lastYear = new Date(refCandles[refCandles.length - 1]?.time).getFullYear();
+    const multiYear = firstYear !== lastYear;
+
+    function formatDate(time: string): string {
+        const date = new Date(time);
+        if (multiYear) {
+            return date.toLocaleDateString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: '2-digit',
+            });
+        }
+        return date.toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+        });
+    }
+
+    ctx.clearRect(0, 0, containerWidth, containerHeight);
+
+    // Grid lines
     ctx.strokeStyle = '#e5e7eb';
     ctx.lineWidth = 0.8;
     ctx.beginPath();
     for (let i = 0; i <= 4; i++) {
         const y = padding.top + (i / 4) * chartHeight;
         ctx.moveTo(padding.left, y);
-        ctx.lineTo(width - padding.right, y);
+        ctx.lineTo(containerWidth - padding.right, y);
     }
     ctx.stroke();
 
-    // Нулевая линия
+    // Zero line
     if (minVal < 0 && maxVal > 0) {
-        const zeroY = padding.top + (maxVal / (maxVal - minVal)) * chartHeight;
+        const zeroY = toY(0);
         ctx.strokeStyle = '#d1d5db';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
         ctx.moveTo(padding.left, zeroY);
-        ctx.lineTo(width - padding.right, zeroY);
+        ctx.lineTo(containerWidth - padding.right, zeroY);
         ctx.stroke();
         ctx.setLineDash([]);
     }
 
-    // Рисуем линию по нормализованным значениям
+    // Draw line
     function drawLine(ctx: CanvasRenderingContext2D, values: number[], color: string): void {
         if (values.length < 2) return;
         ctx.beginPath();
@@ -547,17 +575,19 @@ function renderChart(): void {
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
         values.forEach((v, i) => {
-            const x = padding.left + (i / (values.length - 1)) * chartWidth;
-            const y = padding.top + ((maxVal - v) / (maxVal - minVal)) * chartHeight;
-            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            i === 0
+                ? ctx.moveTo(toX(i, values.length), toY(v))
+                : ctx.lineTo(toX(i, values.length), toY(v));
         });
         ctx.stroke();
     }
 
-    drawLine(ctx, indexNorm, '#0891B2');      // индекс — серый
-    drawLine(ctx, portfolioNorm, '#FFA500'); // портфель — синий
+    const indexColor = '#FFA500';
+    const portfolioColor = '#0891B2';
+    drawLine(ctx, trimmedIndexNorm, indexColor);
+    drawLine(ctx, portfolioNorm, portfolioColor);
 
-    // Подписи Y (%)
+    // Y labels
     ctx.fillStyle = '#6b7280';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'right';
@@ -568,8 +598,7 @@ function renderChart(): void {
         ctx.fillText(`${val >= 0 ? '+' : ''}${val.toFixed(1)}%`, padding.left - 8, y);
     }
 
-    // Подписи дат (берём из более длинного ряда)
-    const refCandles = indexCandles.length >= portfolioCandles.length ? indexCandles : portfolioCandles;
+    // X labels
     const dateIndices = [
         0,
         Math.floor(refCandles.length / 4),
@@ -581,26 +610,21 @@ function renderChart(): void {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.font = '11px sans-serif';
-    dateIndices.forEach((i) => {
+    dateIndices.forEach(i => {
         if (i >= refCandles.length) return;
-        const x = padding.left + (i / (refCandles.length - 1)) * chartWidth;
-        const date = new Date(refCandles[i].time).toLocaleDateString('ru-RU', {
-            day: '2-digit',
-            month: '2-digit',
-        });
-        ctx.fillText(date, x, height - padding.bottom + 8);
+        const x = toX(i, refCandles.length);
+        ctx.fillText(formatDate(refCandles[i].time), x, containerHeight - padding.bottom + 8);
     });
 
-    // Легенда
-    const legend = [
-        { label: 'Портфель', color: '#FFA500' },
-        { label: 'IMOEX',    color: '#0891B2' },
-    ];
+    // Legend
     ctx.font = '11px sans-serif';
     ctx.textBaseline = 'middle';
     let legendX = padding.left;
     const legendY = padding.top - 12;
-    legend.forEach(({ label, color }) => {
+    [
+        { label: 'Портфель', color: portfolioColor },
+        { label: 'IMOEX', color: indexColor },
+    ].forEach(({ label, color }) => {
         ctx.fillStyle = color;
         ctx.fillRect(legendX, legendY - 4, 16, 3);
         ctx.fillStyle = '#374151';
@@ -609,10 +633,16 @@ function renderChart(): void {
         legendX += ctx.measureText(label).width + 40;
     });
 
-    // Рамка
+    // Border
     ctx.strokeStyle = '#e5e7eb';
     ctx.lineWidth = 1;
     ctx.strokeRect(padding.left, padding.top, chartWidth, chartHeight);
+
+    console.log("renderChart called, portfolio candles:", portfolioCandles.length, 
+    "first:", portfolioCandles[0]?.time,
+    "last:", portfolioCandles[portfolioCandles.length-1]?.time)
+
+    console.log("trimmedIndex:", trimmedIndexNorm.length, "portfolio:", portfolioNorm.length);
 }
 
 function renderAssetAllocation(): void {

@@ -1,6 +1,9 @@
 package domain
 
+import "time"
+
 type UserFullPortfolio struct {
+	OpenedDate            time.Time             `json:"openedDate"`
 	TotalAmountShares     MoneyValue            `json:"totalAmountShares"`
 	TotalAmountBonds      MoneyValue            `json:"totalAmountBonds"`
 	TotalAmountEtf        MoneyValue            `json:"totalAmountEtf"`
