@@ -237,7 +237,7 @@ func (calc *Calculator) GetCandlesForPortfolio(
 	candleInterval pkg.CandleInterval,
 ) ([]domain.Candle, error) {
 
-	historicalHoldings, err := calc.CalculateHistoricalHoldings(token, portfolio, from, to)
+	historicalHoldings, err := calc.CalculateHistoricalHoldings(token, portfolio, from, to, candleInterval)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get historical holdings: %w", err)
 	}
@@ -281,8 +281,15 @@ func (calc *Calculator) GetCandlesForPortfolio(
 	for figi, candles := range candlesOfPositions {
 		candleIndex[figi] = make(map[time.Time]domain.Candle)
 		for _, c := range candles {
-			day := c.Time.UTC().Truncate(24 * time.Hour)
-			candleIndex[figi][day] = c
+			t := truncateToInterval(c.Time, candleInterval)
+			candleIndex[figi][t] = c
+			if figi == figis[0] { // только первый figi
+				log.Printf("candleIndex figi=%s raw=%s truncated=%s close=%s",
+					figi, c.Time.Format("2006-01-02T15:04:05"),
+					t.Format("2006-01-02T15:04:05"),
+					c.Close.Units)
+			}
+
 		}
 	}
 
@@ -369,6 +376,10 @@ func (calc *Calculator) GetCandlesForPortfolio(
 		})
 
 	}
+	log.Printf("GetCandlesForPortfolio: total=%d interval=%s", len(result), candleInterval)
+	for _, c := range result {
+		log.Printf("  %s open=%s close=%s", c.Time.Format("2006-01"), c.Open.Units, c.Close.Units)
+	}
 
 	return result, nil
 }
@@ -380,6 +391,7 @@ func (calc *Calculator) CalculateHistoricalHoldings(
 	portfolio domain.UserFullPortfolio,
 	from time.Time,
 	to time.Time,
+	interval pkg.CandleInterval,
 ) (map[time.Time]map[string]domain.Quotation, error) {
 
 	operations, err := calc.ApiClient.GetUserOperationsByCursor(
@@ -399,8 +411,8 @@ func (calc *Calculator) CalculateHistoricalHoldings(
 		return nil, err
 	}
 
-	start := to.UTC().Truncate(24 * time.Hour)
-	end := from.UTC().Truncate(24 * time.Hour)
+	start := truncateToInterval(to, interval)
+	end := truncateToInterval(from, interval)
 
 	positionsQuantity := make(map[time.Time]map[string]domain.Quotation)
 	positionsQuantity[start] = make(map[string]domain.Quotation)
@@ -411,13 +423,13 @@ func (calc *Calculator) CalculateHistoricalHoldings(
 		positionsQuantity[start][pos.Figi] = pos.Quantity
 	}
 
-	currentDate := start
-	for currentDate.After(end) {
-		yesterday := currentDate.AddDate(0, 0, -1)
+	currentTime := start
+	for currentTime.After(end) {
+		prevTime := prevInterval(currentTime, interval)
 
-		positionsQuantity[yesterday] = make(map[string]domain.Quotation)
-		for figi, qty := range positionsQuantity[currentDate] {
-			positionsQuantity[yesterday][figi] = qty
+		positionsQuantity[prevTime] = make(map[string]domain.Quotation)
+		for figi, qty := range positionsQuantity[currentTime] {
+			positionsQuantity[prevTime][figi] = qty
 		}
 
 		for _, block := range operations {
@@ -425,8 +437,9 @@ func (calc *Calculator) CalculateHistoricalHoldings(
 				if item.Figi == "" {
 					continue
 				}
-				opDate := item.Date.UTC().Truncate(24 * time.Hour)
-				if !opDate.Equal(currentDate) {
+				// Операция попадает в интервал [prevTime, currentTime)
+				opTime := truncateToInterval(item.Date, interval)
+				if !opTime.Equal(currentTime) {
 					continue
 				}
 				switch item.Type {
@@ -434,22 +447,90 @@ func (calc *Calculator) CalculateHistoricalHoldings(
 					if !isInvestmentInstrument(item.InstrumentKind) {
 						continue
 					}
-					current := positionsQuantity[yesterday][item.Figi]
-					positionsQuantity[yesterday][item.Figi] = SubtractQuotations(current, domain.Quotation{Units: item.Quantity})
+					current := positionsQuantity[prevTime][item.Figi]
+					positionsQuantity[prevTime][item.Figi] = SubtractQuotations(current, domain.Quotation{Units: item.Quantity})
 				case string(pkg.OperationTypeSell):
 					if !isInvestmentInstrument(item.InstrumentKind) {
 						continue
 					}
-					current := positionsQuantity[yesterday][item.Figi]
-					positionsQuantity[yesterday][item.Figi] = AddQuotations(current, domain.Quotation{Units: item.Quantity})
+					current := positionsQuantity[prevTime][item.Figi]
+					positionsQuantity[prevTime][item.Figi] = AddQuotations(current, domain.Quotation{Units: item.Quantity})
 				}
 			}
 		}
 
-		currentDate = yesterday
+		currentTime = prevTime
 	}
 
 	return positionsQuantity, nil
+}
+
+func candleIntervalDuration(interval pkg.CandleInterval) time.Duration {
+	switch interval {
+	case pkg.CandleInterval5Sec:
+		return 5 * time.Second
+	case pkg.CandleInterval10Sec:
+		return 10 * time.Second
+	case pkg.CandleInterval30Sec:
+		return 30 * time.Second
+	case pkg.CandleInterval1Min:
+		return time.Minute
+	case pkg.CandleInterval2Min:
+		return 2 * time.Minute
+	case pkg.CandleInterval3Min:
+		return 3 * time.Minute
+	case pkg.CandleInterval5Min:
+		return 5 * time.Minute
+	case pkg.CandleInterval10Min:
+		return 10 * time.Minute
+	case pkg.CandleInterval15Min:
+		return 15 * time.Minute
+	case pkg.CandleInterval30Min:
+		return 30 * time.Minute
+	case pkg.CandleIntervalHour:
+		return time.Hour
+	case pkg.CandleInterval2Hour:
+		return 2 * time.Hour
+	case pkg.CandleInterval4Hour:
+		return 4 * time.Hour
+	case pkg.CandleIntervalDay:
+		return 24 * time.Hour
+	case pkg.CandleIntervalWeek:
+		return 7 * 24 * time.Hour
+	case pkg.CandleIntervalMonth:
+		return 30 * 24 * time.Hour
+	default:
+		return 24 * time.Hour
+	}
+}
+
+func truncateToInterval(t time.Time, interval pkg.CandleInterval) time.Time {
+	t = t.UTC()
+	switch interval {
+	case pkg.CandleIntervalWeek:
+		weekday := int(t.Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		return t.Truncate(24*time.Hour).AddDate(0, 0, -(weekday - 1))
+	case pkg.CandleIntervalMonth:
+		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
+	case pkg.CandleIntervalDay:
+		return t.Truncate(24 * time.Hour)
+	default:
+		return t.Truncate(candleIntervalDuration(interval))
+	}
+}
+
+func prevInterval(t time.Time, interval pkg.CandleInterval) time.Time {
+	switch interval {
+	case pkg.CandleIntervalWeek:
+		return t.AddDate(0, 0, -7)
+	case pkg.CandleIntervalMonth:
+		return t.AddDate(0, -1, 0)
+	default:
+		return t.Add(-candleIntervalDuration(interval))
+	}
 }
 
 // FetchHistoricalCandlesForPortfolio fetches candles for all figis in parallel.
