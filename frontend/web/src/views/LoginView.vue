@@ -139,7 +139,7 @@ input {
     width: 100%;
     border: 1 px solid var(--input);
     border-radius: 6px;
-    background: var(--background);
+    background: var(--input);
     padding: 0 12px;
     font-size: 0.875rem;
     color: var(--foreground);

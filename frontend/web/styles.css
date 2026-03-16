@@ -15,7 +15,7 @@
 }
 
 :root.dark {
-    --background: #11213ed2;
+    --background: #02172ad2;
     --foreground: #f8fafc;
     --muted: #1e293b;
     --muted-foreground: #94a3b8;
@@ -24,7 +24,7 @@
     --card: #182136;
     --card-foreground: #f8fafc;
     --border: #1e293b;
-    --input: #1e293b;
+    --input: #23334d;
     --ring: #cbd5e1;
     --red: #e25050;
     --green: #35bb91;

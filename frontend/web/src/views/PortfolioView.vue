@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/auth'
 import MetricsGrid from '../components/MetricsGrid.vue'
 import OverviewTab from '../components/OverviewTab.vue'
 import HoldingsTab from '../components/HoldingsTab.vue'
+import PortfolioSkeleton from '../components/PortfolioSkeleton.vue'
 
 const router = useRouter()
 const portfolio = usePortfolioStore()
@@ -45,9 +46,7 @@ onMounted(() => {
       </button>
     </div>
 
-    <div v-if="portfolio.isLoading" class="state-message">
-      Loading portfolio...
-    </div>
+    <PortfolioSkeleton v-if="portfolio.isLoading" />
 
     <div v-else-if="portfolio.error" class="state-message error">
       {{ portfolio.error }}
@@ -77,7 +76,11 @@ onMounted(() => {
         <OverviewTab v-if="activeTab==='overview'" :investments="portfolio.investments"/>
         <HoldingsTab v-if="activeTab==='holdings'" :investments="portfolio.investments"/>
       </div>
-      <button class="refresh-btn" v-on:click="portfolio.load()">
+    </template>
+    <button v-if="!portfolio.isLoading"
+      class="refresh-btn" 
+      @click="portfolio.load()" 
+      title="Refresh portfolio">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
           viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
@@ -87,8 +90,6 @@ onMounted(() => {
           <path d="M8 16H3v5"/>
         </svg>
       </button>
-    </template>
-
   </div>
 </template>
 
