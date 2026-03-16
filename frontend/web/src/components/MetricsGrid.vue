@@ -132,11 +132,6 @@ defineProps<{
     color: var(--muted-foreground);
 }
 
-.positive {
-    color: #059669;
-}
-
-.negative {
-    color: #dc2626;
-}
+.positive { color: #059669; }
+.negative { color: #dc2626; }
 </style>

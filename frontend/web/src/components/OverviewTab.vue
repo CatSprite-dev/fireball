@@ -229,11 +229,6 @@ const topPerformers = computed<InvestmentWithGain[]>(() => {
     font-size: 0.75rem;
 }
 
-.positive {
-    color: #059669;
-}
-
-.negative {
-    color: #dc2626;
-}
+.positive { color: #059669; }
+.negative { color: #dc2626; }
 </style>
