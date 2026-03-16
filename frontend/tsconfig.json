@@ -9,8 +9,10 @@
     "outDir": "./dist",
     "rootDir": "./web",
     "allowJs": true,
-    "checkJs": false
+    "checkJs": false,
+    "moduleResolution": "bundler",
+    "jsx": "preserve"
   },
-  "include": ["web/*"],
+  "include": ["web/**/*"],
   "exclude": ["node_modules", "./dist"]
 }
