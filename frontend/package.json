@@ -15,13 +15,10 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@tailwindcss/vite": "^4.2.0",
     "@vitejs/plugin-basic-ssl": "^2.1.4",
     "@vitejs/plugin-vue": "^6.0.5",
-    "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1",
-    "vite-plugin-html-minifier": "^1.0.5"
+    "vite": "^7.3.1"
   },
   "dependencies": {
     "pinia": "^3.0.4",

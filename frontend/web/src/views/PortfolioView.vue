@@ -19,7 +19,9 @@ function logout() {
 }
 
 onMounted(() => {
-  portfolio.load()
+  if (!portfolio.raw) {
+    portfolio.load()
+  }
 })
 </script>
 

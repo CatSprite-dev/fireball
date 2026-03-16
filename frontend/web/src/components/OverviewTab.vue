@@ -10,9 +10,10 @@ const props = defineProps<{
 }>()
 
 const typeLabels: Record<string, string> = {
-    stock: 'Stocks',
+    share: 'Stocks',
     etf: 'ETFs',
     bond: 'Bonds',
+    futures: 'Futures',
     crypto: 'Crypto',
     currency: 'Currency',
 }

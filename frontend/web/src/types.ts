@@ -19,6 +19,10 @@ export interface Position {
     currentPrice: MoneyValue
     expectedYield: MoneyValue
     dividends: MoneyValue
+    dailyYield: MoneyValue
+    blocked: boolean
+    figi: string
+    instrumentUid: string
 }
 
 export interface UserFullPortfolio {

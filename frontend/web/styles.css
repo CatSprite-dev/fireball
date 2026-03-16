@@ -1,6 +1,3 @@
-@import "tailwindcss";
-
-@layer base {
 :root {
     --background: #ffffff;
     --foreground: #020817;
@@ -32,32 +29,6 @@
 body {
     color: var(--foreground);
     background: var(--background);
-    transition: background-color 0.3s, color 0.3s;
-}
-
-.tab-btn.active {
-    background-color: var(--background);
-    color: var(--foreground);
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-}
-
-.hidden {
-    display: none;
-}
-
-.text-green-600 {
-    color: #059669;
-}
-
-.text-red-600 {
-    color: #dc2626;
-}
-
-#themeToggle {
-    color: var(--foreground);
-}
-
-#themeToggle:hover {
-    background-color: var(--muted);
-}
+    margin: 0;
+    font-family: system-ui, sans-serif;
 }

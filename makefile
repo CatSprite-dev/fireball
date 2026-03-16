@@ -11,7 +11,7 @@ setup-environment:
 
 build-frontend:
 	@echo "Building frontend assets..."
-	@cd frontend && npm run build
+	@bash -c 'source ~/.nvm/nvm.sh && cd frontend && nvm use && npm run build'
 
 run-server:
 	@echo "Starting server..."
@@ -19,4 +19,4 @@ run-server:
 
 dev:
 	@echo "Rolling up vite..."
-	@cd frontend && npm run dev
+	@bash -c 'source ~/.nvm/nvm.sh && cd frontend && nvm use && npm run dev'
