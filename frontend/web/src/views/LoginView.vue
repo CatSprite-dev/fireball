@@ -1,19 +1,20 @@
-<script setup land="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+import { usePortfolioStore } from '../stores/portfolio'
 
-const router = useRouter();
-const auth = useAuthStore();
+const router = useRouter()
+const auth = useAuthStore()
 
 const token = ref('')
-const error = ref('');
-const isLoading = ref(false);
+const error = ref('')
+const isLoading = ref(false)
 
 async function submit() {
     if (!token.value.trim()) {
-        error.value = 'Token is required';
-        return;
+        error.value = 'Token is required'
+        return
     }
 
     isLoading.value = true
@@ -38,7 +39,9 @@ async function submit() {
             return
         }
 
+        const portfolio = usePortfolioStore()
         auth.setToken(token.value.trim())
+        await portfolio.load()
         router.push('/')
     } finally {
         isLoading.value = false

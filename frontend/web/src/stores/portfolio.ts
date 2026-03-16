@@ -1,12 +1,12 @@
-import { defineStore } from "pinia";
-import { ref, computed } from "vue";
-import { useAuthStore } from "./auth";
-import { fetchPortfolio } from "../api/auth";
-import type { UserFullPortfolio, Investment, Metrics } from "../types";
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { useAuthStore } from './auth'
+import { fetchPortfolio } from '../api/auth'
+import type { UserFullPortfolio, Investment, Metrics } from '../types'
 
 function parseMoney(m: { units: string; nano: number } | undefined): number {
-    if (!m) return 0;
-    return parseFloat(m.units || '0') + (m.nano || 0) / 1e9;
+    if (!m) return 0
+    return parseFloat(m.units || '0') + (m.nano || 0) / 1e9
 }
 
 export const usePortfolioStore = defineStore('portfolio', () => {
@@ -44,7 +44,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
         const totalInvested = investments.value.reduce(
             (sum, inv) => sum + inv.quantity * inv.purchasePrice, 0
-        );
+        )
         const currentValue = parseMoney(raw.value.totalAmountPortfolio)
         const totalGain = parseMoney(raw.value.expectedYield)
         const totalGainPercent = totalInvested > 0 ? (totalGain / totalInvested) * 100 : 0

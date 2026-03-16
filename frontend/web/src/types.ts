@@ -1,24 +1,24 @@
 export interface Quotation{
-    units: string;
-    nano: number;
+    units: string
+    nano: number
 }
 
 export interface MoneyValue {
-    currency: string;
-    units: string;
-    nano: number;
+    currency: string
+    units: string
+    nano: number
 }
 
 export interface Position {
-    positionUid: string;
-    name: string;
-    ticker: string;
-    instrumentType: string;
-    quantity: MoneyValue;
-    averagePositionPrice: MoneyValue;
-    currentPrice: MoneyValue;
-    expectedYield: MoneyValue;
-    dividends: MoneyValue;
+    positionUid: string
+    name: string
+    ticker: string
+    instrumentType: string
+    quantity: MoneyValue
+    averagePositionPrice: MoneyValue
+    currentPrice: MoneyValue
+    expectedYield: MoneyValue
+    dividends: MoneyValue
 }
 
 export interface UserFullPortfolio {
@@ -55,8 +55,8 @@ export interface Investment {
 }
 
 export interface InvestmentWithGain extends Investment {
-    gain: number;
-    gainPercent: number;
+    gain: number
+    gainPercent: number
 }
 
 export interface Metrics {
@@ -70,6 +70,6 @@ export interface Metrics {
 }
 
 export interface DataPoint {
-    invested: number;
-    value: number;
+    invested: number
+    value: number
 }

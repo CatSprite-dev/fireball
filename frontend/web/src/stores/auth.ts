@@ -1,6 +1,6 @@
-import { defineStore } from "pinia";
-import { tokenToString } from "typescript";
-import { ref, computed } from "vue";
+import { defineStore } from 'pinia'
+import { tokenToString } from 'typescript'
+import { ref, computed } from 'vue'
 
 export const useAuthStore = defineStore('auth', () => {
     const token = ref(localStorage.getItem('token') ?? '')

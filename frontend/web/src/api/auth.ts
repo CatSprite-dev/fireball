@@ -1,4 +1,4 @@
-import type { AuthResponse, UserFullPortfolio } from "../types";
+import type { AuthResponse, UserFullPortfolio } from "../types"
 
 export async function fetchPortfolio(token: string): Promise<UserFullPortfolio> {
     const response = await fetch('/auth', {
