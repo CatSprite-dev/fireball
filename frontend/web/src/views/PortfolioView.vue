@@ -13,6 +13,8 @@ const auth = useAuthStore()
 
 const activeTab = ref<'overview' | 'holdings'>('overview')
 
+
+
 function logout() {
   auth.logout()
   router.push('/login')
@@ -75,6 +77,16 @@ onMounted(() => {
         <OverviewTab v-if="activeTab==='overview'" :investments="portfolio.investments"/>
         <HoldingsTab v-if="activeTab==='holdings'" :investments="portfolio.investments"/>
       </div>
+      <button class="refresh-btn" v-on:click="portfolio.load()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+          <path d="M21 3v5h-5"/>
+          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+          <path d="M8 16H3v5"/>
+        </svg>
+      </button>
     </template>
 
   </div>
@@ -160,5 +172,27 @@ onMounted(() => {
   background: var(--background);
   color: var(--foreground);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+}
+
+.refresh-btn {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgb(0, 0, 0 / 0.2);
+  transition: opacity 0.15s;
+}
+
+.refresh-btn:hover {
+  opacity: 0.9;
 }
 </style>

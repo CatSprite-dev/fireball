@@ -56,7 +56,7 @@ async function submit() {
                 <h1>Welcome to Investment Fireball</h1>
                 <p>Enter your API token to access your portfolio</p>
             </div>
-
+            
             <div class="login-body">
                 <label>Tinkoff API Token</label>
                 <input
@@ -104,7 +104,9 @@ async function submit() {
 
 .login-header {
     padding: 24px;
+    padding-bottom: 12px;
     border-bottom: 1px solid var (--border);
+
 }
 
 .login-header h1 {
@@ -121,6 +123,7 @@ async function submit() {
 
 .login-body {
     padding: 24px;
+    padding-top: 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
