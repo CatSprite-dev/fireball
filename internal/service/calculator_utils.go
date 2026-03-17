@@ -276,3 +276,36 @@ func isInvestmentInstrument(kind string) bool {
 func isBond(kind string) bool {
 	return kind == "bond" || pkg.InstrumentType(kind) == pkg.InstrumentTypeBond
 }
+
+func (calc *Calculator) getPaymentsByDay(
+	token string,
+	accountID string,
+	from time.Time,
+	to time.Time,
+	candleInterval pkg.CandleInterval,
+) (map[time.Time]domain.MoneyValue, error) {
+
+	operations, err := calc.ApiClient.GetUserOperationsByCursor(
+		token,
+		accountID,
+		"",
+		&from,
+		&to,
+		[]pkg.OperationType{pkg.OperationTypeDividend, pkg.OperationTypeCoupon},
+		pkg.OperationStateExecuted,
+		false,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[time.Time]domain.MoneyValue)
+	for _, block := range operations {
+		for _, item := range block.Items {
+			interval := truncateToInterval(item.Date, candleInterval)
+			current := result[interval]
+			result[interval] = AddMoneyValue(current, domain.MoneyValue(item.Payment))
+		}
+	}
+	return result, nil
+}

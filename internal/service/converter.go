@@ -110,3 +110,35 @@ func convertCandles(raw api.Candles) []domain.Candle {
 	}
 	return candles
 }
+
+func convertOperations(raw []api.UserOperations) domain.UserOperations {
+	result := domain.UserOperations{}
+	for _, block := range raw {
+		for _, rawItem := range block.Items {
+			item := domain.Item{
+				BrokerAccountID: rawItem.BrokerAccountID,
+				ID:              rawItem.ID,
+				InstrumentName:  rawItem.Name,
+				Date:            rawItem.Date,
+				Type:            rawItem.Type,
+				Description:     rawItem.Description,
+				State:           rawItem.State,
+				InstrumentUID:   rawItem.InstrumentUID,
+				Figi:            rawItem.Figi,
+				InstrumentType:  rawItem.InstrumentKind,
+				PositionUID:     rawItem.PositionUID,
+				Ticker:          rawItem.Ticker,
+				ClassCode:       rawItem.ClassCode,
+				Payment:         domain.MoneyValue(rawItem.Payment),
+				InstrumentPrice: domain.MoneyValue(rawItem.Price),
+				Commission:      domain.MoneyValue(rawItem.Commission),
+				Yield:           domain.MoneyValue(rawItem.Yield),
+				YieldRelative:   domain.Quotation(rawItem.YieldRelative),
+				AccruedInt:      domain.MoneyValue(rawItem.AccruedInt),
+				Quantity:        rawItem.Quantity,
+			}
+			result.Items = append(result.Items, item)
+		}
+	}
+	return result
+}

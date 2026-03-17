@@ -27,3 +27,30 @@ type ChartData struct {
 	IndexCandles     []Candle
 	PortfolioCandles []Candle
 }
+
+type UserOperations struct {
+	Items []Item
+}
+
+type Item struct {
+	BrokerAccountID string     `json:"brokerAccountId"`
+	ID              string     `json:"id"`
+	InstrumentName  string     `json:"name"`
+	Date            time.Time  `json:"date"`
+	Type            string     `json:"type"`
+	Description     string     `json:"description"`
+	State           string     `json:"state"`
+	InstrumentUID   string     `json:"instrumentUid"`
+	Figi            string     `json:"figi"`
+	InstrumentType  string     `json:"instrumentType"`
+	PositionUID     string     `json:"positionUid"`
+	Ticker          string     `json:"ticker"`
+	ClassCode       string     `json:"classCode"`
+	Payment         MoneyValue `json:"payment"`
+	InstrumentPrice MoneyValue `json:"price"`
+	Commission      MoneyValue `json:"commission"`
+	Yield           MoneyValue `json:"yield"`
+	YieldRelative   Quotation  `json:"yieldRelative"`
+	AccruedInt      MoneyValue `json:"accruedInt"`
+	Quantity        string     `json:"quantity"`
+}

@@ -52,6 +52,33 @@ func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio
 	return portfolio, nil
 }
 
+func (calc *Calculator) GetOperations(token string,
+	accountId string,
+	instrumentId string,
+	from *time.Time,
+	to *time.Time,
+	operationTypes []pkg.OperationType,
+	operationState pkg.OperationState,
+	WithoutCommissions bool) (domain.UserOperations, error) {
+
+	rawOperations, err := calc.ApiClient.GetUserOperationsByCursor(
+		token,
+		accountId,
+		instrumentId,
+		from,
+		to,
+		operationTypes,
+		operationState,
+		WithoutCommissions,
+	)
+	if err != nil {
+		return domain.UserOperations{}, err
+	}
+
+	operations := convertOperations(rawOperations)
+	return operations, nil
+}
+
 func (calc *Calculator) GetDividends(
 	token string,
 	accountID string,
@@ -259,11 +286,6 @@ func (calc *Calculator) GetCandlesForPortfolio(
 		from = portfolio.OpenedDate
 	}
 
-	log.Printf("GetCandlesForPortfolio: from=%s openedDate=%s",
-		from.Format("2006-01-02"),
-		portfolio.OpenedDate.Format("2006-01-02"),
-	)
-
 	historicalHoldings, err := calc.CalculateHistoricalHoldings(token, portfolio, from, to, candleInterval)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get historical holdings: %w", err)
@@ -274,6 +296,11 @@ func (calc *Calculator) GetCandlesForPortfolio(
 	historicalCandlesForPortfolio, err := calc.FetchHistoricalCandlesForPortfolio(token, figis, from, to, candleInterval, candleSource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch candles: %w", err)
+	}
+
+	dividendsByDay, err := calc.getPaymentsByDay(token, portfolio.AccountID, from, to, candleInterval)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dividends: %w", err)
 	}
 
 	// Compute bond multiplier: nominal/100 = currentPrice / lastCandleClose
@@ -324,10 +351,10 @@ func (calc *Calculator) GetCandlesForPortfolio(
 	lastPrice := make(map[string]domain.Candle)
 	twrCumulative := domain.Quotation{Units: "1", Nano: 0}
 
-	for _, day := range intervals {
-		positions := historicalHoldings[day]
+	for _, interval := range intervals {
+		positions := historicalHoldings[interval]
 
-		var openVal, highVal, lowVal, closeVal domain.Quotation
+		var openVal, closeVal domain.Quotation
 		hasAnyCandle := false
 
 		for figi, qty := range positions {
@@ -337,7 +364,7 @@ func (calc *Calculator) GetCandlesForPortfolio(
 
 			var candle domain.Candle
 			var ok bool
-			candle, ok = candleIndex[figi][day]
+			candle, ok = candleIndex[figi][interval]
 			if ok {
 				lastPrice[figi] = candle
 				hasAnyCandle = true
@@ -348,53 +375,32 @@ func (calc *Calculator) GetCandlesForPortfolio(
 			}
 
 			// Apply bond multiplier if needed to convert % price to RUB
-			open, high, low, close_ := candle.Open, candle.High, candle.Low, candle.Close
+			open, close_ := candle.Open, candle.Close
 			if m, ok := figiToMultiplier[figi]; ok {
 				open = MultiplyQuotation(open, m)
-				high = MultiplyQuotation(high, m)
-				low = MultiplyQuotation(low, m)
 				close_ = MultiplyQuotation(close_, m)
 			}
 
 			openVal = AddQuotations(openVal, MultiplyQuotation(qty, open))
-			highVal = AddQuotations(highVal, MultiplyQuotation(qty, high))
-			lowVal = AddQuotations(lowVal, MultiplyQuotation(qty, low))
 			closeVal = AddQuotations(closeVal, MultiplyQuotation(qty, close_))
+		}
+
+		if div, ok := dividendsByDay[interval]; ok {
+			divDec := parseDecimal(div.Units, div.Nano)
+			if divDec.IsPositive() {
+				divQ := domain.Quotation{Units: div.Units, Nano: div.Nano}
+				closeVal = AddQuotations(closeVal, divQ)
+			}
 		}
 
 		if !hasAnyCandle {
 			continue
 		}
 
-		// TWR: dayFactor = closeVal / openVal
-		dayFactor, err := DivideQuotation(closeVal, openVal)
-		if err != nil {
-			log.Printf("failed to compute day factor for %s: %v", day.Format("2006-01-02"), err)
-			continue
-		}
-
-		twrPrev := twrCumulative
-		twrCumulative = MultiplyQuotation(twrCumulative, dayFactor)
-
-		twrHigh, err := DivideQuotation(MultiplyQuotation(twrPrev, highVal), openVal)
-		if err != nil {
-			log.Printf("failed to compute twrHigh for %s: %v", day.Format("2006-01-02"), err)
-			continue
-		}
-
-		twrLow, err := DivideQuotation(MultiplyQuotation(twrPrev, lowVal), openVal)
-		if err != nil {
-			log.Printf("failed to compute twrLow for %s: %v", day.Format("2006-01-02"), err)
-			continue
-		}
-
 		result = append(result, domain.Candle{
-			Time:       day,
-			Open:       twrPrev,       // вчерашний TWR = открытие сегодня
-			High:       twrHigh,       // twrPrev × (high / open)
-			Low:        twrLow,        // twrPrev × (low / open)
-			Close:      twrCumulative, // накопленный TWR
-			IsComplete: true,
+			Time:  interval,
+			Open:  openVal,  // вчерашний TWR = открытие сегодня
+			Close: closeVal, // накопленный TWR
 		})
 
 	}
