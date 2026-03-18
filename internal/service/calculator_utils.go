@@ -12,13 +12,13 @@ import (
 
 func enrichFullPortfolio(calc *Calculator, portfolio domain.UserFullPortfolio, token string, accountID string, openedDate time.Time) (domain.UserFullPortfolio, error) {
 	portfolio.OpenedDate = openedDate
-	// 1. General portfolio metrics
-	portfolio, err := enrichPortfolioMetrics(portfolio)
+
+	var err error
+	portfolio, err = enrichPortfolioMetrics(portfolio)
 	if err != nil {
 		return domain.UserFullPortfolio{}, err
 	}
 
-	// 2. Dividents for whole portfolio
 	dividends, err := calc.GetDividends(token, accountID, "", openedDate, time.Now().UTC())
 	if err != nil {
 		log.Printf("failed to get dividends: %v", err)
@@ -26,10 +26,8 @@ func enrichFullPortfolio(calc *Calculator, portfolio domain.UserFullPortfolio, t
 		portfolio.AllDividends = dividends
 	}
 
-	// 3. Metrics for position
 	portfolio = enrichPositions(portfolio, calc, token)
 
-	// 4. TotalReturn
 	portfolio.TotalReturn, err = calc.GetTotalReturn(token, portfolio, accountID, openedDate)
 	if err != nil {
 		log.Printf("failed to calculate TotalReturn: %v", err)
@@ -39,10 +37,7 @@ func enrichFullPortfolio(calc *Calculator, portfolio domain.UserFullPortfolio, t
 
 func enrichPortfolioMetrics(portfolio domain.UserFullPortfolio) (domain.UserFullPortfolio, error) {
 	coeff, err := DivideMoneyValue(
-		domain.MoneyValue{
-			Units: portfolio.ExpectedYieldRelative.Units,
-			Nano:  portfolio.ExpectedYieldRelative.Nano,
-		},
+		domain.MoneyValue{Units: portfolio.ExpectedYieldRelative.Units, Nano: portfolio.ExpectedYieldRelative.Nano},
 		domain.MoneyValue{Units: "100", Nano: 0},
 	)
 	if err != nil {
@@ -54,20 +49,13 @@ func enrichPortfolioMetrics(portfolio domain.UserFullPortfolio) (domain.UserFull
 
 func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token string) domain.UserFullPortfolio {
 	var wg sync.WaitGroup
-
 	for i := range portfolio.Positions {
 		wg.Add(2)
 		pos := &portfolio.Positions[i]
-
-		// Name and type for pos
 		go getPositionInfo(&wg, pos, calc, token)
-
-		// ExpectedYieldRelative, DailyYieldRelative, TotalYield, TotalYieldRelative and dividents for each pos
 		go getPositionMetrics(&wg, &portfolio, pos)
 	}
-
 	wg.Wait()
-
 	return portfolio
 }
 
@@ -87,23 +75,13 @@ func getPositionInfo(wg *sync.WaitGroup, p *domain.Position, calc *Calculator, t
 
 func getPositionMetrics(wg *sync.WaitGroup, portfolio *domain.UserFullPortfolio, p *domain.Position) {
 	defer wg.Done()
-	// ExpectedYieldRelative
-	posAmount := MultiplyMoneyValue(p.AveragePositionPrice,
-		domain.MoneyValue{
-			Units: p.Quantity.Units,
-			Nano:  p.Quantity.Nano,
-		},
-	)
+
+	posAmount := MultiplyMoneyValue(p.AveragePositionPrice, domain.MoneyValue{Units: p.Quantity.Units, Nano: p.Quantity.Nano})
+
 	var err error
 	p.ExpectedYieldRelative, err = DivideQuotation(
-		domain.Quotation{
-			Units: p.ExpectedYield.Units,
-			Nano:  p.ExpectedYield.Nano,
-		},
-		domain.Quotation{
-			Units: posAmount.Units,
-			Nano:  posAmount.Nano,
-		},
+		domain.Quotation{Units: p.ExpectedYield.Units, Nano: p.ExpectedYield.Nano},
+		domain.Quotation{Units: posAmount.Units, Nano: posAmount.Nano},
 	)
 	if err != nil {
 		log.Printf("failed to calculate ExpectedYieldRelative for position %s: %v\n", p.PositionUID, err)
@@ -111,25 +89,12 @@ func getPositionMetrics(wg *sync.WaitGroup, portfolio *domain.UserFullPortfolio,
 	}
 	p.ExpectedYieldRelative = MultiplyQuotation(p.ExpectedYieldRelative, domain.Quotation{Units: "100", Nano: 0})
 
-	//DailyYieldRelative
-	// p.DailyYieldRelative =
-
-	// Dividends
 	p.Dividends = portfolio.AllDividends[p.Ticker]
-
-	// TotalYield
 	p.TotalYield = AddMoneyValue(p.ExpectedYield, p.Dividends)
 
-	// TotalYieldRelative
 	p.TotalYieldRelative, err = DivideQuotation(
-		domain.Quotation{
-			Units: p.TotalYield.Units,
-			Nano:  p.TotalYield.Nano,
-		},
-		domain.Quotation{
-			Units: posAmount.Units,
-			Nano:  posAmount.Nano,
-		},
+		domain.Quotation{Units: p.TotalYield.Units, Nano: p.TotalYield.Nano},
+		domain.Quotation{Units: posAmount.Units, Nano: posAmount.Nano},
 	)
 	if err != nil {
 		log.Printf("failed to calculate TotalYieldRelative for position %s: %v", p.PositionUID, err)
@@ -234,16 +199,12 @@ func candleIntervalDuration(interval pkg.CandleInterval) time.Duration {
 	}
 }
 
+// extractUniqueFigis returns all figis that had a positive quantity at any point in time.
 func extractUniqueFigis(holdings map[time.Time]map[string]domain.Quotation) []string {
 	uniqueFigis := make(map[string]struct{})
 	for _, positions := range holdings {
-		for figi, qty := range positions {
-			if figi == "" {
-				continue
-			}
-			if parseDecimal(qty.Units, qty.Nano).IsPositive() {
-				uniqueFigis[figi] = struct{}{}
-			}
+		for figi := range positions {
+			uniqueFigis[figi] = struct{}{}
 		}
 	}
 	result := make([]string, 0, len(uniqueFigis))
@@ -253,11 +214,11 @@ func extractUniqueFigis(holdings map[time.Time]map[string]domain.Quotation) []st
 	return result
 }
 
-// isInvestmentInstrument returns true for tradeable securities (shares, bonds, ETFs, etc.)
+// isInvestmentInstrument returns true for tradeable securities.
 // Handles both lowercase (Position.InstrumentType) and uppercase (operation InstrumentKind) formats.
 func isInvestmentInstrument(kind string) bool {
 	switch kind {
-	case "share", "bond", "etf", "sp", "clearing_certificate", "commodity":
+	case "share", "bond", "etf", "sp", "clearing_certificate", "commodity", "currency":
 		return true
 	}
 	switch pkg.InstrumentType(kind) {
@@ -273,39 +234,99 @@ func isInvestmentInstrument(kind string) bool {
 }
 
 // isBond handles both lowercase and uppercase bond type strings.
-func isBond(kind string) bool {
-	return kind == "bond" || pkg.InstrumentType(kind) == pkg.InstrumentTypeBond
+func isBond(instrumentType string) bool {
+	return instrumentType == "bond" || pkg.InstrumentType(instrumentType) == pkg.InstrumentTypeBond
 }
 
-func (calc *Calculator) getPaymentsByDay(
-	token string,
-	accountID string,
-	from time.Time,
-	to time.Time,
+// getPaymentsByInterval sums dividends and coupons received per interval.
+func getPaymentsByInterval(
+	operations domain.UserOperations,
 	candleInterval pkg.CandleInterval,
 ) (map[time.Time]domain.MoneyValue, error) {
-
-	operations, err := calc.ApiClient.GetUserOperationsByCursor(
-		token,
-		accountID,
-		"",
-		&from,
-		&to,
-		[]pkg.OperationType{pkg.OperationTypeDividend, pkg.OperationTypeCoupon},
-		pkg.OperationStateExecuted,
-		false,
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	result := make(map[time.Time]domain.MoneyValue)
-	for _, block := range operations {
-		for _, item := range block.Items {
+	for _, item := range operations.Items {
+		switch pkg.OperationType(item.Type) {
+		case pkg.OperationTypeDividend, pkg.OperationTypeCoupon:
 			interval := truncateToInterval(item.Date, candleInterval)
-			current := result[interval]
-			result[interval] = AddMoneyValue(current, domain.MoneyValue(item.Payment))
+			result[interval] = AddMoneyValue(result[interval], domain.MoneyValue(item.Payment))
 		}
 	}
 	return result, nil
+}
+
+// BuildIndexPortfolioCandles simulates portfolio performance if all buy/sell
+// operations were executed in the index instead.
+// qty_change = |payment| / index_price at operation interval
+func buildIndexPortfolioCandles(
+	operations domain.UserOperations,
+	indexCandles []domain.Candle,
+	portfolioCandles []domain.Candle,
+	candleInterval pkg.CandleInterval,
+) []domain.Candle {
+	if len(indexCandles) == 0 || len(portfolioCandles) == 0 {
+		return nil
+	}
+
+	candleIndex := make(map[time.Time]domain.Candle)
+	for _, c := range indexCandles {
+		candleIndex[truncateToInterval(c.Time, candleInterval)] = c
+	}
+
+	opsByInterval := make(map[time.Time][]domain.Item)
+	for _, item := range operations.Items {
+		switch pkg.OperationType(item.Type) {
+		case pkg.OperationTypeBuy, pkg.OperationTypeSell:
+			if !isInvestmentInstrument(item.InstrumentType) {
+				continue
+			}
+			interval := truncateToInterval(item.Date, candleInterval)
+			opsByInterval[interval] = append(opsByInterval[interval], item)
+		}
+	}
+
+	var currentQty domain.Quotation
+	var lastIndexCandle domain.Candle
+
+	// Seed initial position: buy index for the open value of the first portfolio candle
+	firstInterval := truncateToInterval(portfolioCandles[0].Time, candleInterval)
+	if firstIndexCandle, ok := candleIndex[firstInterval]; ok {
+		initialQty, err := DivideQuotation(portfolioCandles[0].Open, firstIndexCandle.Open)
+		if err == nil {
+			currentQty = initialQty
+		}
+	}
+
+	result := make([]domain.Candle, 0, len(portfolioCandles))
+
+	for _, portfolioCandle := range portfolioCandles {
+		interval := truncateToInterval(portfolioCandle.Time, candleInterval)
+
+		if c, ok := candleIndex[interval]; ok {
+			lastIndexCandle = c
+		}
+		if lastIndexCandle.Close.Units == "" && lastIndexCandle.Close.Nano == 0 {
+			continue
+		}
+
+		openVal := MultiplyQuotation(currentQty, lastIndexCandle.Open)
+
+		for _, item := range opsByInterval[interval] {
+			qtyChange, err := DivideQuotation(
+				domain.Quotation{Units: item.Payment.Units, Nano: item.Payment.Nano},
+				lastIndexCandle.Close,
+			)
+			if err != nil {
+				continue
+			}
+			currentQty = SubtractQuotations(currentQty, qtyChange)
+		}
+
+		result = append(result, domain.Candle{
+			Time:  portfolioCandle.Time,
+			Open:  openVal,
+			Close: MultiplyQuotation(currentQty, lastIndexCandle.Close),
+		})
+	}
+
+	return result
 }

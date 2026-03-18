@@ -140,6 +140,41 @@ func (client *Client) GetUserOperationsByCursor(
 	return allOperations, nil
 }
 
+func (client *Client) BondBy(token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (Bond, error) {
+	type InstrumentRequest struct {
+		IDType    pkg.InstrumentIdType `json:"idType"`
+		ClassCode pkg.ClassCode        `json:"classCode,omitempty"`
+		ID        string               `json:"id"`
+	}
+
+	if idType == pkg.InstrumentIdTypeTicker && classCode == pkg.ClassCodeUnspecified {
+		return Bond{}, fmt.Errorf("classCode is required when idType is TICKER")
+	}
+
+	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/BondBy"
+
+	payload := InstrumentRequest{
+		IDType:    idType,
+		ClassCode: classCode,
+		ID:        id,
+	}
+
+	client.instrumentsLimiter.Wait(context.Background())
+
+	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+	if err != nil {
+		return Bond{}, fmt.Errorf("do request error (BondsBy): %w", err)
+	}
+
+	var bond Bond
+	err = json.Unmarshal(data, &bond)
+	if err != nil {
+		return Bond{}, fmt.Errorf("unmarshal error (BondsBy): %w", err)
+	}
+
+	return bond, nil
+}
+
 func (client *Client) GetInstrumentBy(token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (Instrument, error) {
 	type InstrumentRequest struct {
 		IDType    pkg.InstrumentIdType `json:"idType"`

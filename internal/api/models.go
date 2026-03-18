@@ -171,6 +171,68 @@ type Instrument struct {
 	} `json:"instrument"`
 }
 
+type Bond struct {
+	Bond struct {
+		AssetUID            string     `json:"assetUid"`
+		CallDate            time.Time  `json:"callDate"`
+		CountryOfRisk       string     `json:"countryOfRisk"`
+		BlockedTcaFlag      bool       `json:"blockedTcaFlag"`
+		DlongClient         Quotation  `json:"dlongClient"`
+		MaturityDate        time.Time  `json:"maturityDate"`
+		SellAvailableFlag   bool       `json:"sellAvailableFlag"`
+		First1DayCandleDate time.Time  `json:"first1dayCandleDate"`
+		PlacementPrice      MoneyValue `json:"placementPrice"`
+		Sector              string     `json:"sector"`
+		Brand               struct {
+			LogoName      string `json:"logoName"`
+			LogoBaseColor string `json:"logoBaseColor"`
+			TextColor     string `json:"textColor"`
+		} `json:"brand"`
+		LiquidityFlag         bool       `json:"liquidityFlag"`
+		ForIisFlag            bool       `json:"forIisFlag"`
+		PositionUID           string     `json:"positionUid"`
+		ShortEnabledFlag      bool       `json:"shortEnabledFlag"`
+		DshortClient          Quotation  `json:"dshortClient"`
+		Dshort                Quotation  `json:"dshort"`
+		Name                  string     `json:"name"`
+		Exchange              string     `json:"exchange"`
+		SubordinatedFlag      bool       `json:"subordinatedFlag"`
+		FloatingCouponFlag    bool       `json:"floatingCouponFlag"`
+		Figi                  string     `json:"figi"`
+		DshortMin             Quotation  `json:"dshortMin"`
+		Lot                   int        `json:"lot"`
+		UID                   string     `json:"uid"`
+		RequiredTests         []string   `json:"requiredTests"`
+		Dlong                 Quotation  `json:"dlong"`
+		Nominal               MoneyValue `json:"nominal"`
+		Currency              string     `json:"currency"`
+		AciValue              MoneyValue `json:"aciValue"`
+		BuyAvailableFlag      bool       `json:"buyAvailableFlag"`
+		WeekendFlag           bool       `json:"weekendFlag"`
+		ClassCode             string     `json:"classCode"`
+		Ticker                string     `json:"ticker"`
+		CouponQuantityPerYear int        `json:"couponQuantityPerYear"`
+		ForQualInvestorFlag   bool       `json:"forQualInvestorFlag"`
+		InitialNominal        MoneyValue `json:"initialNominal"`
+		APITradeAvailableFlag bool       `json:"apiTradeAvailableFlag"`
+		DlongMin              Quotation  `json:"dlongMin"`
+		Kshort                Quotation  `json:"kshort"`
+		First1MinCandleDate   time.Time  `json:"first1minCandleDate"`
+		StateRegDate          time.Time  `json:"stateRegDate"`
+		IssueSizePlan         string     `json:"issueSizePlan"`
+		MinPriceIncrement     Quotation  `json:"minPriceIncrement"`
+		OtcFlag               bool       `json:"otcFlag"`
+		Klong                 Quotation  `json:"klong"`
+		IssueKind             string     `json:"issueKind"`
+		PlacementDate         time.Time  `json:"placementDate"`
+		AmortizationFlag      bool       `json:"amortizationFlag"`
+		PerpetualFlag         bool       `json:"perpetualFlag"`
+		IssueSize             string     `json:"issueSize"`
+		CountryOfRiskName     string     `json:"countryOfRiskName"`
+		Isin                  string     `json:"isin"`
+	} `json:"instrument"`
+}
+
 type Candles struct {
 	Candles []struct {
 		Volume     string    `json:"volume"`

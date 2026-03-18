@@ -1,6 +1,8 @@
 package domain
 
-import "time"
+import (
+	"time"
+)
 
 type Instrument struct {
 	Figi           string `json:"figi"`
@@ -8,6 +10,18 @@ type Instrument struct {
 	UID            string `json:"uid"`
 	InstrumentType string `json:"instrumentType"`
 	Name           string `json:"name"`
+}
+
+type Bond struct {
+	PositionUID string     `json:"positionUid"`
+	Name        string     `json:"name"`
+	Figi        string     `json:"figi"`
+	UID         string     `json:"uid"`
+	Nominal     MoneyValue `json:"nominal"`
+	Currency    string     `json:"currency"`
+	AciValue    MoneyValue `json:"aciValue"`
+	ClassCode   string     `json:"classCode"`
+	Ticker      string     `json:"ticker"`
 }
 
 type IndicativeInstruments struct {
@@ -24,8 +38,9 @@ type Candle struct {
 }
 
 type ChartData struct {
-	IndexCandles     []Candle
-	PortfolioCandles []Candle
+	Times            []time.Time `json:"times"`
+	IndexCandles     []Quotation `json:"indexCandles"`
+	PortfolioCandles []Quotation `json:"portfolioCandles"`
 }
 
 type UserOperations struct {

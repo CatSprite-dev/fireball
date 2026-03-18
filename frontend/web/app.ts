@@ -442,30 +442,11 @@ function renderChart(): void {
     if (!canvas) return;
 
     const chartData = (window as any).chartData as ChartData;
-    const indexCandles: Candle[] = chartData?.IndexCandles ?? [];
-    const portfolioCandles: Candle[] = chartData?.PortfolioCandles ?? [];
+    const times: string[] = chartData?.times ?? [];
+    const indexValues: Quantity[] = chartData?.indexCandles ?? [];
+    const portfolioValues: Quantity[] = chartData?.portfolioCandles ?? [];
 
-    function findCommonStart(index: Candle[], portfolio: Candle[]): string | null {
-        const portfolioDates = new Set(portfolio.map(c => c.time));
-        const common = index.find(c => portfolioDates.has(c.time));
-        return common?.time ?? null;
-    }
-
-    const commonStart = findCommonStart(indexCandles, portfolioCandles);
-
-    function normalize(candles: Candle[]): number[] {
-        const startIdx = commonStart
-            ? candles.findIndex(c => c.time === commonStart)
-            : 0;
-        const base = parseQuantity(candles[Math.max(startIdx, 0)]?.close);
-        if (!base || isNaN(base)) return candles.map(() => 0);
-        return candles.map(c => {
-            const v = parseQuantity(c.close);
-            return isNaN(v) ? 0 : ((v - base) / Math.abs(base)) * 100;
-        });
-    }
-
-    if (indexCandles.length === 0 && portfolioCandles.length === 0) {
+    if (times.length === 0) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -479,11 +460,10 @@ function renderChart(): void {
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
-    // Canvas setup
+
     const dpr = window.devicePixelRatio || 1;
     const containerWidth = canvas.parentElement?.clientWidth || window.innerWidth;
-    const containerHeight = 180;
+    const containerHeight = 240;
     canvas.style.width = `${containerWidth}px`;
     canvas.style.height = `${containerHeight}px`;
     canvas.width = containerWidth * dpr;
@@ -494,16 +474,18 @@ function renderChart(): void {
     const chartWidth = containerWidth - padding.left - padding.right;
     const chartHeight = containerHeight - padding.top - padding.bottom;
 
-    const indexNorm = normalize(indexCandles);
-    const portfolioNorm = normalize(portfolioCandles);
+    function normalize(values: Quantity[]): number[] {
+        const base = parseQuantity(values[0]);
+        if (!base || isNaN(base)) return values.map(() => 0);
+        return values.map(q => {
+            const v = parseQuantity(q);
+            return isNaN(v) ? 0 : ((v - base) / Math.abs(base)) * 100;
+        });
+    }
 
-    const commonStartIdx = commonStart
-    ? indexCandles.findIndex(c => c.time === commonStart)
-    : 0;
-    const trimmedIndexCandles = indexCandles.slice(Math.max(commonStartIdx, 0));
-    const trimmedIndexNorm = indexNorm.slice(Math.max(commonStartIdx, 0));
+    const indexNorm = normalize(indexValues);
+    const portfolioNorm = normalize(portfolioValues);
 
-    // Y range with padding
     const allValues = [...indexNorm, ...portfolioNorm];
     const rawMin = Math.min(...allValues);
     const rawMax = Math.max(...allValues);
@@ -511,33 +493,21 @@ function renderChart(): void {
     const minVal = rawMin - range * 0.05;
     const maxVal = rawMax + range * 0.05;
 
-    // Helpers
     const toX = (i: number, total: number) =>
         padding.left + (i / (total - 1)) * chartWidth;
     const toY = (v: number) =>
         padding.top + ((maxVal - v) / (maxVal - minVal)) * chartHeight;
 
-    // Detect if dates span multiple years
-    const refCandles = trimmedIndexCandles.length >= portfolioCandles.length 
-    ? trimmedIndexCandles 
-    : portfolioCandles;
-    const firstYear = new Date(refCandles[0]?.time).getFullYear();
-    const lastYear = new Date(refCandles[refCandles.length - 1]?.time).getFullYear();
+    const firstYear = new Date(times[0]).getFullYear();
+    const lastYear = new Date(times[times.length - 1]).getFullYear();
     const multiYear = firstYear !== lastYear;
 
     function formatDate(time: string): string {
         const date = new Date(time);
         if (multiYear) {
-            return date.toLocaleDateString('ru-RU', {
-                day: '2-digit',
-                month: '2-digit',
-                year: '2-digit',
-            });
+            return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
         }
-        return date.toLocaleDateString('ru-RU', {
-            day: '2-digit',
-            month: '2-digit',
-        });
+        return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
     }
 
     ctx.clearRect(0, 0, containerWidth, containerHeight);
@@ -566,7 +536,6 @@ function renderChart(): void {
         ctx.setLineDash([]);
     }
 
-    // Draw line
     function drawLine(ctx: CanvasRenderingContext2D, values: number[], color: string): void {
         if (values.length < 2) return;
         ctx.beginPath();
@@ -584,7 +553,7 @@ function renderChart(): void {
 
     const indexColor = '#FFA500';
     const portfolioColor = '#0891B2';
-    drawLine(ctx, trimmedIndexNorm, indexColor);
+    drawLine(ctx, indexNorm, indexColor);
     drawLine(ctx, portfolioNorm, portfolioColor);
 
     // Y labels
@@ -601,19 +570,19 @@ function renderChart(): void {
     // X labels
     const dateIndices = [
         0,
-        Math.floor(refCandles.length / 4),
-        Math.floor(refCandles.length / 2),
-        Math.floor(3 * refCandles.length / 4),
-        refCandles.length - 1,
+        Math.floor(times.length / 4),
+        Math.floor(times.length / 2),
+        Math.floor(3 * times.length / 4),
+        times.length - 1,
     ];
     ctx.fillStyle = '#6b7280';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.font = '11px sans-serif';
     dateIndices.forEach(i => {
-        if (i >= refCandles.length) return;
-        const x = toX(i, refCandles.length);
-        ctx.fillText(formatDate(refCandles[i].time), x, containerHeight - padding.bottom + 8);
+        if (i >= times.length) return;
+        const x = toX(i, times.length);
+        ctx.fillText(formatDate(times[i]), x, containerHeight - padding.bottom + 8);
     });
 
     // Legend
@@ -637,13 +606,8 @@ function renderChart(): void {
     ctx.strokeStyle = '#e5e7eb';
     ctx.lineWidth = 1;
     ctx.strokeRect(padding.left, padding.top, chartWidth, chartHeight);
-
-    console.log("renderChart called, portfolio candles:", portfolioCandles.length, 
-    "first:", portfolioCandles[0]?.time,
-    "last:", portfolioCandles[portfolioCandles.length-1]?.time)
-
-    console.log("trimmedIndex:", trimmedIndexNorm.length, "portfolio:", portfolioNorm.length);
 }
+
 
 function renderAssetAllocation(): void {
     if (!assetAllocation) return;

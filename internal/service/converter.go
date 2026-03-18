@@ -68,6 +68,20 @@ func convertInstrument(raw api.Instrument) domain.Instrument {
 	}
 }
 
+func convertBond(raw api.Bond) domain.Bond {
+	return domain.Bond{
+		PositionUID: raw.Bond.PositionUID,
+		Name:        raw.Bond.Name,
+		Figi:        raw.Bond.Figi,
+		UID:         raw.Bond.UID,
+		Nominal:     domain.MoneyValue(raw.Bond.Nominal),
+		Currency:    raw.Bond.Currency,
+		AciValue:    domain.MoneyValue(raw.Bond.AciValue),
+		ClassCode:   raw.Bond.ClassCode,
+		Ticker:      raw.Bond.Ticker,
+	}
+}
+
 func convertIndicativeInstrument(raw api.IndicativeInstruments) domain.IndicativeInstruments {
 	indicatineInstruments := domain.IndicativeInstruments{}
 	for _, rawInstr := range raw.Instruments {
@@ -96,15 +110,6 @@ func convertCandles(raw api.Candles) []domain.Candle {
 				Units: rawCandle.Open.Units,
 				Nano:  rawCandle.Open.Nano,
 			},
-			High: domain.Quotation{
-				Units: rawCandle.High.Units,
-				Nano:  rawCandle.High.Nano,
-			},
-			Low: domain.Quotation{
-				Units: rawCandle.Low.Units,
-				Nano:  rawCandle.Low.Nano,
-			},
-			IsComplete: rawCandle.IsComplete,
 		}
 		candles = append(candles, candle)
 	}
@@ -135,7 +140,7 @@ func convertOperations(raw []api.UserOperations) domain.UserOperations {
 				Yield:           domain.MoneyValue(rawItem.Yield),
 				YieldRelative:   domain.Quotation(rawItem.YieldRelative),
 				AccruedInt:      domain.MoneyValue(rawItem.AccruedInt),
-				Quantity:        rawItem.Quantity,
+				Quantity:        rawItem.QuantityDone,
 			}
 			result.Items = append(result.Items, item)
 		}

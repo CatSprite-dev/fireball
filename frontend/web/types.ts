@@ -83,9 +83,11 @@ export interface Candle {
 }
 
 export interface ChartData {
-    IndexCandles: Candle[];
-    PortfolioCandles: Candle[];
+    times: string[];
+    indexCandles: Quantity[];
+    portfolioCandles: Quantity[];
 }
+
 
 declare global {
     interface Window {
