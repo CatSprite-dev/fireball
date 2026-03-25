@@ -40,7 +40,7 @@ func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chartData, err := h.portfolioService.GetChartData(token, userPortfolio, "IMOEX", time.Now().AddDate(0, -6, 0), time.Now(), pkg.CandleIntervalMonth, pkg.CandleSourceExchange)
+	chartData, err := h.portfolioService.GetChartData(token, userPortfolio, "IMOEX", time.Now().AddDate(0, -6, 0), time.Now(), pkg.CandleIntervalDay, pkg.CandleSourceExchange)
 	if err != nil {
 		log.Printf("GetChartData error: %v", err)
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)

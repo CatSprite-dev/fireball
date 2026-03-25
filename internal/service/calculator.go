@@ -265,9 +265,9 @@ func (calc *Calculator) GetChartData(
 
 	log.Printf("Время выполнения GetChartData: %.2f сек\n", time.Since(t).Seconds())
 	return domain.ChartData{
-		Times:            times,
-		IndexCandles:     indexClose,
-		PortfolioCandles: portfolioClose,
+		Times:     times,
+		Index:     indexClose,
+		Portfolio: portfolioClose,
 	}, nil
 }
 

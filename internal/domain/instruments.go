@@ -35,9 +35,9 @@ type Candle struct {
 }
 
 type ChartData struct {
-	Times            []time.Time `json:"times"`
-	IndexCandles     []Quotation `json:"indexCandles"`
-	PortfolioCandles []Quotation `json:"portfolioCandles"`
+	Times     []time.Time `json:"times"`
+	Index     []Quotation `json:"index"`
+	Portfolio []Quotation `json:"portfolio"`
 }
 
 type UserOperations struct {

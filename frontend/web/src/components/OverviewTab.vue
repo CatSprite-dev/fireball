@@ -2,11 +2,13 @@
 import type { Investment, InvestmentWithGain } from '../types'
 import { computed } from 'vue'
 import { useFormatters } from '../composables/useFormatters';
+import type { ApexAxisChartSeries } from 'apexcharts'
 
 const { formatCurrency } = useFormatters()
 
 const props = defineProps<{
     investments: Investment[]
+    chartSeries: ApexAxisChartSeries
 }>()
 
 const typeLabels: Record<string, string> = {
@@ -55,6 +57,43 @@ const topPerformers = computed<InvestmentWithGain[]>(() => {
         .sort((a,b) => b.gainPercent - a.gainPercent)
         .slice(0,5)
 })
+
+const chartOptions = {
+    stroke: {
+        width: 2.5
+    },
+    colors: ['#00aaaa', '#ffa500'],
+    chart: { 
+        type: 'line', 
+        toolbar: { show: false },
+        zoom: { enabled: false },
+        pan: { enabled: false },
+        selection: { enabled: false } 
+    },
+    xaxis: { type: 'datetime' },
+    yaxis: {
+        labels: {
+            formatter: (value: number) => {
+                if (value >= 1000000) {
+                    return (value / 1000000).toFixed(1).replace('.', ',') + ' млн'
+                }
+                if (value >= 1000) {
+                    return (value / 1000).toFixed(0) + ' тыс'
+                }
+                return value.toFixed(0)
+            }
+        }
+    },
+    tooltip: {
+        y: {
+            formatter: (value: number) => formatCurrency(value)
+        }
+    },
+    grid: {
+        borderColor: 'var(--border)',
+        strokeDashArray: 4
+    },
+}
 </script>
 
 <template>
@@ -100,7 +139,7 @@ const topPerformers = computed<InvestmentWithGain[]>(() => {
                         </div>
                         <div class="performer-gain">
                             <span :class="inv.gainPercent >= 0 ? 'positive' : 'negative'">
-                                {{ inv.gainPercent >= 0 ? '+' : '' }}{{ inv.gainPercent.toFixed(2) }}
+                                {{ inv.gainPercent >= 0 ? '+' : '' }}{{ inv.gainPercent.toFixed(2) + "%"}}
                             </span>
                             <span class="gain-abs" :class="inv.gain >= 0 ? 'positive' : 'negative'">
                                 {{ inv.gain >= 0 ? '+' : ''}}{{ formatCurrency(inv.gain) }}
@@ -110,7 +149,21 @@ const topPerformers = computed<InvestmentWithGain[]>(() => {
                 </div>
             </div>
         </div>
-
+    </div>
+    
+    <div v-if="props.chartSeries.length > 0" class="card chart-card">
+        <div class="card-header">
+            <h2>Portfolio vs Index</h2>
+            <p>Comparison with the index</p>
+        </div>
+        <div class="card-body">
+            <apexchart 
+                type="line" 
+                :series="props.chartSeries" 
+                :options="chartOptions"
+                height="300"
+            />
+        </div>
     </div>
 </template>
 

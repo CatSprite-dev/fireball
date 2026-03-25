@@ -51,6 +51,13 @@ const activeTab = ref<'overview' | 'holdings'>('overview')
                     </div>
                 </div>
             </div>
+            <div class="card chart-skeleton">
+                <div class="card-header">
+                    <SkeletonBlock width="160px" height="18px"/>
+                    <SkeletonBlock width="100px" height="12px"/>
+                </div>
+                <div style="height: 200px"></div>
+            </div>
 
             <div v-if="activeTab === 'holdings'" class="holdings-skeleton">
                 <div class="card">

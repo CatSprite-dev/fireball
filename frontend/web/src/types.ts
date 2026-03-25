@@ -45,6 +45,13 @@ export interface UserFullPortfolio {
 
 export interface AuthResponse {
   user_portfolio: UserFullPortfolio
+  chart_data: ChartData
+}
+
+export interface ChartData {
+    times: string[]
+    index: Quotation[]
+    portfolio: Quotation[]
 }
 
 export interface Investment {

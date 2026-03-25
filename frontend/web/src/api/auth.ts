@@ -1,6 +1,6 @@
-import type { AuthResponse, UserFullPortfolio } from "../types"
+import type { AuthResponse, UserFullPortfolio, ChartData } from "../types"
 
-export async function fetchPortfolio(token: string): Promise<UserFullPortfolio> {
+export async function fetchPortfolio(token: string): Promise<{ user_portfolio: UserFullPortfolio, chart_data: ChartData }> {
     const response = await fetch('/auth', {
         method: 'POST',
         headers: {
@@ -18,5 +18,5 @@ export async function fetchPortfolio(token: string): Promise<UserFullPortfolio> 
     }
 
     const data: AuthResponse = await response.json()
-    return data.user_portfolio
+    return data
 }
