@@ -438,22 +438,24 @@ function renderMetrics(): void {
 }
 
 function renderChart(): void {
-    const canvas = performanceChart;
-    if (!canvas) return;
+    const canvas = document.getElementById('performanceChart') as HTMLCanvasElement;
+    if (!canvas) return
 
     const chartData = (window as any).chartData as ChartData;
+    console.log('Chart data:', chartData);
+
     const times: string[] = chartData?.times ?? [];
     const indexValues: Quantity[] = chartData?.indexCandles ?? [];
     const portfolioValues: Quantity[] = chartData?.portfolioCandles ?? [];
 
-    if (times.length === 0) {
+    if (times.length === 0 || indexValues.length === 0 || portfolioValues.length === 0) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.font = '14px sans-serif';
             ctx.fillStyle = '#6b7280';
             ctx.textAlign = 'center';
-            ctx.fillText('No chart data', canvas.width / 2, canvas.height / 2);
+            ctx.fillText('Нет данных для графика', canvas.width / 2, canvas.height / 2);
         }
         return;
     }
@@ -464,6 +466,7 @@ function renderChart(): void {
     const dpr = window.devicePixelRatio || 1;
     const containerWidth = canvas.parentElement?.clientWidth || window.innerWidth;
     const containerHeight = 240;
+    
     canvas.style.width = `${containerWidth}px`;
     canvas.style.height = `${containerHeight}px`;
     canvas.width = containerWidth * dpr;
@@ -475,28 +478,32 @@ function renderChart(): void {
     const chartHeight = containerHeight - padding.top - padding.bottom;
 
     function normalize(values: Quantity[]): number[] {
-        const base = parseQuantity(values[0]);
-        if (!base || isNaN(base)) return values.map(() => 0);
         return values.map(q => {
             const v = parseQuantity(q);
-            return isNaN(v) ? 0 : ((v - base) / Math.abs(base)) * 100;
+            return isNaN(v) ? 0 : v;
         });
     }
 
     const indexNorm = normalize(indexValues);
     const portfolioNorm = normalize(portfolioValues);
 
-    const allValues = [...indexNorm, ...portfolioNorm];
+    const allValues = [...indexNorm, ...portfolioNorm].filter(v => !isNaN(v));
+    if (allValues.length === 0) return;
+
     const rawMin = Math.min(...allValues);
     const rawMax = Math.max(...allValues);
     const range = rawMax - rawMin || 1;
     const minVal = rawMin - range * 0.05;
     const maxVal = rawMax + range * 0.05;
 
-    const toX = (i: number, total: number) =>
-        padding.left + (i / (total - 1)) * chartWidth;
-    const toY = (v: number) =>
-        padding.top + ((maxVal - v) / (maxVal - minVal)) * chartHeight;
+    const toX = (i: number, total: number) => {
+        if (total <= 1) return padding.left;
+        return padding.left + (i / (total - 1)) * chartWidth;
+    };
+    
+    const toY = (v: number) => {
+        return padding.top + ((maxVal - v) / (maxVal - minVal)) * chartHeight;
+    };
 
     const firstYear = new Date(times[0]).getFullYear();
     const lastYear = new Date(times[times.length - 1]).getFullYear();
@@ -538,21 +545,34 @@ function renderChart(): void {
 
     function drawLine(ctx: CanvasRenderingContext2D, values: number[], color: string): void {
         if (values.length < 2) return;
+        
         ctx.beginPath();
         ctx.strokeStyle = color;
         ctx.lineWidth = 2.5;
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-        values.forEach((v, i) => {
-            i === 0
-                ? ctx.moveTo(toX(i, values.length), toY(v))
-                : ctx.lineTo(toX(i, values.length), toY(v));
-        });
+        
+        let firstPoint = true;
+        for (let i = 0; i < values.length; i++) {
+            const v = values[i];
+            if (isNaN(v)) continue;
+            
+            const x = toX(i, values.length);
+            const y = toY(v);
+            
+            if (firstPoint) {
+                ctx.moveTo(x, y);
+                firstPoint = false;
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
         ctx.stroke();
     }
 
     const indexColor = '#FFA500';
     const portfolioColor = '#0891B2';
+    
     drawLine(ctx, indexNorm, indexColor);
     drawLine(ctx, portfolioNorm, portfolioColor);
 
@@ -564,7 +584,7 @@ function renderChart(): void {
     for (let i = 0; i <= 4; i++) {
         const val = minVal + (maxVal - minVal) * (1 - i / 4);
         const y = padding.top + (i / 4) * chartHeight;
-        ctx.fillText(`${val >= 0 ? '+' : ''}${val.toFixed(1)}%`, padding.left - 8, y);
+        ctx.fillText(val.toFixed(2), padding.left - 8, y); // убрал % и знак
     }
 
     // X labels
@@ -575,10 +595,12 @@ function renderChart(): void {
         Math.floor(3 * times.length / 4),
         times.length - 1,
     ];
+    
     ctx.fillStyle = '#6b7280';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.font = '11px sans-serif';
+    
     dateIndices.forEach(i => {
         if (i >= times.length) return;
         const x = toX(i, times.length);
@@ -590,6 +612,7 @@ function renderChart(): void {
     ctx.textBaseline = 'middle';
     let legendX = padding.left;
     const legendY = padding.top - 12;
+    
     [
         { label: 'Портфель', color: portfolioColor },
         { label: 'IMOEX', color: indexColor },
@@ -607,7 +630,6 @@ function renderChart(): void {
     ctx.lineWidth = 1;
     ctx.strokeRect(padding.left, padding.top, chartWidth, chartHeight);
 }
-
 
 function renderAssetAllocation(): void {
     if (!assetAllocation) return;

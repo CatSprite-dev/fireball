@@ -2,7 +2,7 @@ package domain
 
 import "time"
 
-type UserFullPortfolio struct {
+type Portfolio struct {
 	OpenedDate            time.Time             `json:"openedDate"`
 	TotalAmountShares     MoneyValue            `json:"totalAmountShares"`
 	TotalAmountBonds      MoneyValue            `json:"totalAmountBonds"`

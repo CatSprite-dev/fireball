@@ -7,8 +7,8 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/domain"
 )
 
-func convertFullPortfolio(raw api.UserPortfolio) domain.UserFullPortfolio {
-	full := domain.UserFullPortfolio{
+func convertFullPortfolio(raw api.UserPortfolio) domain.Portfolio {
+	full := domain.Portfolio{
 		OpenedDate:            time.Time{},
 		TotalAmountShares:     domain.MoneyValue(raw.TotalAmountShares),
 		TotalAmountBonds:      domain.MoneyValue(raw.TotalAmountBonds),

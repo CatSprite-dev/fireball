@@ -25,8 +25,8 @@ func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 	startAlloc := m.Alloc
 
 	type returnVals struct {
-		UserPortfolio domain.UserFullPortfolio `json:"user_portfolio"`
-		ChartData     domain.ChartData         `json:"chart_data"`
+		UserPortfolio domain.Portfolio `json:"user_portfolio"`
+		ChartData     domain.ChartData `json:"chart_data"`
 	}
 
 	token, err := getTokenFromHeader(r.Header)
@@ -34,13 +34,13 @@ func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 		pkg.RespondWithError(w, http.StatusUnauthorized, err.Error(), err)
 		return
 	}
-	userPortfolio, err := h.portfolioService.GetFullPortfolio(token)
+	userPortfolio, err := h.portfolioService.GetPortfolio(token)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
 		return
 	}
 
-	chartData, err := h.portfolioService.GetChartData(token, userPortfolio, "IMOEX", time.Now().AddDate(-1, 0, 0), time.Now(), pkg.CandleIntervalDay, pkg.CandleSourceUnspecified)
+	chartData, err := h.portfolioService.GetChartData(token, userPortfolio, "IMOEX", time.Now().AddDate(0, -6, 0), time.Now(), pkg.CandleIntervalMonth, pkg.CandleSourceExchange)
 	if err != nil {
 		log.Printf("GetChartData error: %v", err)
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)

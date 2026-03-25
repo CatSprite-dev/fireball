@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -10,13 +11,13 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 )
 
-func enrichFullPortfolio(calc *Calculator, portfolio domain.UserFullPortfolio, token string, accountID string, openedDate time.Time) (domain.UserFullPortfolio, error) {
+func enrichFullPortfolio(calc *Calculator, portfolio domain.Portfolio, token string, accountID string, openedDate time.Time) (domain.Portfolio, error) {
 	portfolio.OpenedDate = openedDate
 
 	var err error
 	portfolio, err = enrichPortfolioMetrics(portfolio)
 	if err != nil {
-		return domain.UserFullPortfolio{}, err
+		return domain.Portfolio{}, err
 	}
 
 	dividends, err := calc.GetDividends(token, accountID, "", openedDate, time.Now().UTC())
@@ -35,19 +36,19 @@ func enrichFullPortfolio(calc *Calculator, portfolio domain.UserFullPortfolio, t
 	return portfolio, nil
 }
 
-func enrichPortfolioMetrics(portfolio domain.UserFullPortfolio) (domain.UserFullPortfolio, error) {
+func enrichPortfolioMetrics(portfolio domain.Portfolio) (domain.Portfolio, error) {
 	coeff, err := DivideMoneyValue(
 		domain.MoneyValue{Units: portfolio.ExpectedYieldRelative.Units, Nano: portfolio.ExpectedYieldRelative.Nano},
 		domain.MoneyValue{Units: "100", Nano: 0},
 	)
 	if err != nil {
-		return domain.UserFullPortfolio{}, err
+		return domain.Portfolio{}, err
 	}
 	portfolio.ExpectedYield = MultiplyMoneyValue(portfolio.TotalAmountPortfolio, coeff)
 	return portfolio, nil
 }
 
-func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token string) domain.UserFullPortfolio {
+func enrichPositions(portfolio domain.Portfolio, calc *Calculator, token string) domain.Portfolio {
 	var wg sync.WaitGroup
 	for i := range portfolio.Positions {
 		wg.Add(2)
@@ -61,9 +62,9 @@ func enrichPositions(portfolio domain.UserFullPortfolio, calc *Calculator, token
 
 func getPositionInfo(wg *sync.WaitGroup, p *domain.Position, calc *Calculator, token string) {
 	defer wg.Done()
-	instrument, err := calc.GetInstrumentInfo(token, pkg.InstrumentIdTypePositionUid, "", p.PositionUID)
+	instrument, err := calc.GetInstrument(token, pkg.InstrumentIdTypePositionUid, "", p.PositionUID)
 	if errors.Is(err, ErrNotFound) {
-		instrument, err = calc.GetInstrumentInfo(token, pkg.InstrumentIdTypeFigi, "", p.Figi)
+		instrument, err = calc.GetInstrument(token, pkg.InstrumentIdTypeFigi, "", p.Figi)
 	}
 	if err != nil {
 		log.Printf("failed to get instrument info for position %s: %s: %v\n", p.PositionUID, p.Figi, err)
@@ -73,7 +74,7 @@ func getPositionInfo(wg *sync.WaitGroup, p *domain.Position, calc *Calculator, t
 	p.Type = instrument.InstrumentType
 }
 
-func getPositionMetrics(wg *sync.WaitGroup, portfolio *domain.UserFullPortfolio, p *domain.Position) {
+func getPositionMetrics(wg *sync.WaitGroup, portfolio *domain.Portfolio, p *domain.Position) {
 	defer wg.Done()
 
 	posAmount := MultiplyMoneyValue(p.AveragePositionPrice, domain.MoneyValue{Units: p.Quantity.Units, Nano: p.Quantity.Nano})
@@ -262,9 +263,10 @@ func buildIndexPortfolioCandles(
 	indexCandles []domain.Candle,
 	portfolioCandles []domain.Candle,
 	candleInterval pkg.CandleInterval,
-) []domain.Candle {
+) ([]domain.Candle, error) {
+
 	if len(indexCandles) == 0 || len(portfolioCandles) == 0 {
-		return nil
+		return nil, fmt.Errorf("index candle not found")
 	}
 
 	candleIndex := make(map[time.Time]domain.Candle)
@@ -287,12 +289,18 @@ func buildIndexPortfolioCandles(
 	var currentQty domain.Quotation
 	var lastIndexCandle domain.Candle
 
-	// Seed initial position: buy index for the open value of the first portfolio candle
-	firstInterval := truncateToInterval(portfolioCandles[0].Time, candleInterval)
-	if firstIndexCandle, ok := candleIndex[firstInterval]; ok {
-		initialQty, err := DivideQuotation(portfolioCandles[0].Open, firstIndexCandle.Open)
-		if err == nil {
-			currentQty = initialQty
+	// Seed initial position: buy index for the value of the first portfolio candle
+	firstPortfolioClose := portfolioCandles[0].Close
+	for _, portfolioCandle := range portfolioCandles {
+		firstInterval := truncateToInterval(portfolioCandle.Time, candleInterval)
+		firstIndexCandle, ok := candleIndex[firstInterval]
+		if ok {
+			initialQty, err := DivideQuotation(firstPortfolioClose, firstIndexCandle.Close)
+			if err == nil {
+				currentQty = initialQty
+				lastIndexCandle = firstIndexCandle
+			}
+			break
 		}
 	}
 
@@ -308,25 +316,45 @@ func buildIndexPortfolioCandles(
 			continue
 		}
 
-		openVal := MultiplyQuotation(currentQty, lastIndexCandle.Open)
+		log.Println("======")
+		log.Printf("Interval: %v", interval)
+		log.Printf("Open Qty: %v", currentQty.Units)
 
+		opAmount := domain.MoneyValue{}
 		for _, item := range opsByInterval[interval] {
-			qtyChange, err := DivideQuotation(
-				domain.Quotation{Units: item.Payment.Units, Nano: item.Payment.Nano},
-				lastIndexCandle.Close,
+			itemCost := MultiplyQuotation(
+				domain.Quotation{Units: item.InstrumentPrice.Units, Nano: item.InstrumentPrice.Nano},
+				domain.Quotation{Units: item.Quantity},
 			)
+			opAmount = AddMoneyValue(opAmount, domain.MoneyValue{Units: itemCost.Units, Nano: itemCost.Nano})
+			qtyChange, err := DivideQuotation(itemCost, lastIndexCandle.Close)
 			if err != nil {
 				continue
 			}
-			currentQty = SubtractQuotations(currentQty, qtyChange)
+			log.Printf("Change Qty: %v", qtyChange.Units)
+			switch pkg.OperationType(item.Type) {
+			case pkg.OperationTypeBuy:
+				currentQty = AddQuotations(currentQty, qtyChange)
+			case pkg.OperationTypeSell:
+				currentQty = SubtractQuotations(currentQty, qtyChange)
+			}
 		}
+
+		log.Printf("Close Qty: %v", currentQty.Units)
+
+		closeVal := MultiplyQuotation(currentQty, lastIndexCandle.Close)
 
 		result = append(result, domain.Candle{
 			Time:  portfolioCandle.Time,
-			Open:  openVal,
-			Close: MultiplyQuotation(currentQty, lastIndexCandle.Close),
+			Close: closeVal,
 		})
+
+		log.Printf("Port value: %v", portfolioCandle.Close.Units)
+		log.Printf("Index close: %v", candleIndex[interval].Close.Units)
+		log.Printf("IndexPort value: %v\n", closeVal.Units)
+		log.Printf("Ops amount: %v", opAmount.Units)
+		log.Println("======")
 	}
 
-	return result
+	return result, nil
 }

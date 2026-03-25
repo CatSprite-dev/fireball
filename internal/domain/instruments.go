@@ -29,12 +29,9 @@ type IndicativeInstruments struct {
 }
 
 type Candle struct {
-	Time       time.Time `json:"time"`
-	Close      Quotation `json:"close"`
-	Open       Quotation `json:"open"`
-	High       Quotation `json:"high"`
-	Low        Quotation `json:"low"`
-	IsComplete bool      `json:"isComplete"`
+	Time  time.Time `json:"time"`
+	Close Quotation `json:"close"`
+	Open  Quotation `json:"open"`
 }
 
 type ChartData struct {
