@@ -1,7 +1,6 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
-import htmlMinifier from 'vite-plugin-html-minifier'
-import tailwindcss from '@tailwindcss/vite'
+import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   root: 'web',
@@ -12,22 +11,13 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'web/index.html'),
-        login: resolve(__dirname, 'web/login.html'),
       },
-      output: {
-        entryFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]',
-        chunkFileNames: 'assets/[name]-[hash].js',
-      }
     },
     minify: 'esbuild',
     sourcemap: true,
   },
   plugins: [
-    tailwindcss(),
-    htmlMinifier({
-      minify: true,
-    })
+    vue(),
   ],
   server: {
     port: 3000,

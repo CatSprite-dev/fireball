@@ -1,63 +1,38 @@
-@import "tailwindcss";
-
-@layer base {
 :root {
-    --background: #ffffff;
-    --foreground: #020817;
+    --background: #dbe6e6;
+    --foreground: #020817c7;
     --muted: #f1f5f9;
     --muted-foreground: #64748b;
     --primary: #0f172a;
     --primary-foreground: #f8fafc;
     --card: #ffffff;
-    --card-foreground: #020817;
+    --card-foreground: #020817c5;
     --border: #e2e8f0;
     --input: #e2e8f0;
     --ring: #020817;
+    --red: #dc2626;
+    --green: #059669;
 }
 
 :root.dark {
-    --background: #020817;
+    --background: #02172ad2;
     --foreground: #f8fafc;
     --muted: #1e293b;
     --muted-foreground: #94a3b8;
     --primary: #f8fafc;
     --primary-foreground: #0f172a;
-    --card: #0f172a;
+    --card: #182136;
     --card-foreground: #f8fafc;
     --border: #1e293b;
-    --input: #1e293b;
+    --input: #23334d;
     --ring: #cbd5e1;
+    --red: #e25050;
+    --green: #35bb91;
 }
 
 body {
     color: var(--foreground);
     background: var(--background);
-    transition: background-color 0.3s, color 0.3s;
-}
-
-.tab-btn.active {
-    background-color: var(--background);
-    color: var(--foreground);
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-}
-
-.hidden {
-    display: none;
-}
-
-.text-green-600 {
-    color: #059669;
-}
-
-.text-red-600 {
-    color: #dc2626;
-}
-
-#themeToggle {
-    color: var(--foreground);
-}
-
-#themeToggle:hover {
-    background-color: var(--muted);
-}
+    margin: 0;
+    font-family: system-ui, sans-serif;
 }

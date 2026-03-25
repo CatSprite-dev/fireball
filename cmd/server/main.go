@@ -16,7 +16,7 @@ func main() {
 	calculator := service.NewCalculator(apiClient)
 	authHandler := handlers.NewAuthHandler(calculator)
 
-	rateLimiter := handlers.NewRateLimiter(1000)
+	rateLimiter := handlers.NewRateLimiter(200)
 	limitedAuthHandler := rateLimiter.Middleware(authHandler.HandlerAuth)
 
 	mux := http.NewServeMux()
