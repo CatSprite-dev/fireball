@@ -58,42 +58,44 @@ const topPerformers = computed<InvestmentWithGain[]>(() => {
         .slice(0,5)
 })
 
-const chartOptions = {
+
+function formatYAxis(value: number): string {
+    const num = +value
+    if (num >= 1000000) {
+        return (num / 1000000).toFixed(1).replace('.', ',') + ' млн'
+    }
+    if (num >= 1000) {
+        return (num / 1000).toFixed(0) + ' тыс'
+    }
+    return num.toFixed(0)
+}
+const chartOptions = computed(() => ({
     stroke: {
-        width: 2.5
+        width: 2
     },
     colors: ['#00aaaa', '#ffa500'],
     chart: { 
         type: 'line', 
+        background: 'transparent',
+        foreColor: 'var(--foreground)',
         toolbar: { show: false },
         zoom: { enabled: false },
         pan: { enabled: false },
-        selection: { enabled: false } 
+        selection: { enabled: false }, 
     },
     xaxis: { type: 'datetime' },
     yaxis: {
-        labels: {
-            formatter: (value: number) => {
-                if (value >= 1000000) {
-                    return (value / 1000000).toFixed(1).replace('.', ',') + ' млн'
-                }
-                if (value >= 1000) {
-                    return (value / 1000).toFixed(0) + ' тыс'
-                }
-                return value.toFixed(0)
-            }
-        }
+        labels: {formatter: formatYAxis}
     },
     tooltip: {
-        y: {
-            formatter: (value: number) => formatCurrency(value)
-        }
+        theme: 'dark',
+        y: {formatter: (value: number) => formatCurrency(value)}
     },
     grid: {
         borderColor: 'var(--border)',
         strokeDashArray: 4
     },
-}
+}))
 </script>
 
 <template>
@@ -158,6 +160,7 @@ const chartOptions = {
         </div>
         <div class="card-body">
             <apexchart 
+                ref="chartRef"
                 type="line" 
                 :series="props.chartSeries" 
                 :options="chartOptions"
