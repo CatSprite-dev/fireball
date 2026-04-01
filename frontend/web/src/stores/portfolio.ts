@@ -51,6 +51,8 @@ export const usePortfolioStore = defineStore('portfolio', () => {
                 purchasePrice: parseMoney(pos.averagePositionPrice),
                 currentPrice: parseMoney(pos.currentPrice),
                 dividends: parseMoney(pos.dividends),
+                totalYield: parseMoney(pos.totalYield),
+                totalYieldRelative: parseMoney(pos.totalYieldRelative)
             }))
     })
     

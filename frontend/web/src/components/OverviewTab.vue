@@ -62,10 +62,10 @@ const topPerformers = computed<InvestmentWithGain[]>(() => {
 function formatYAxis(value: number): string {
     const num = +value
     if (num >= 1000000) {
-        return (num / 1000000).toFixed(1).replace('.', ',') + ' млн'
+        return (num / 1000000).toFixed(1).replace('.', ',') + ' m'
     }
     if (num >= 1000) {
-        return (num / 1000).toFixed(0) + ' тыс'
+        return (num / 1000).toFixed(0) + 'k'
     }
     return num.toFixed(0)
 }

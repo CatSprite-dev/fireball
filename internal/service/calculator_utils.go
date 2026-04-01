@@ -316,10 +316,6 @@ func buildIndexPortfolioCandles(
 			continue
 		}
 
-		log.Println("======")
-		log.Printf("Interval: %v", interval)
-		log.Printf("Open Qty: %v", currentQty.Units)
-
 		opAmount := domain.MoneyValue{}
 		for _, item := range opsByInterval[interval] {
 			itemCost := MultiplyQuotation(
@@ -331,7 +327,6 @@ func buildIndexPortfolioCandles(
 			if err != nil {
 				continue
 			}
-			log.Printf("Change Qty: %v", qtyChange.Units)
 			switch pkg.OperationType(item.Type) {
 			case pkg.OperationTypeBuy:
 				currentQty = AddQuotations(currentQty, qtyChange)
@@ -340,20 +335,12 @@ func buildIndexPortfolioCandles(
 			}
 		}
 
-		log.Printf("Close Qty: %v", currentQty.Units)
-
 		closeVal := MultiplyQuotation(currentQty, lastIndexCandle.Close)
 
 		result = append(result, domain.Candle{
 			Time:  portfolioCandle.Time,
 			Close: closeVal,
 		})
-
-		log.Printf("Port value: %v", portfolioCandle.Close.Units)
-		log.Printf("Index close: %v", candleIndex[interval].Close.Units)
-		log.Printf("IndexPort value: %v\n", closeVal.Units)
-		log.Printf("Ops amount: %v", opAmount.Units)
-		log.Println("======")
 	}
 
 	return result, nil

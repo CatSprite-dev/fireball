@@ -14,7 +14,7 @@ export interface Position {
     name: string
     ticker: string
     instrumentType: string
-    quantity: MoneyValue
+    quantity: Quotation
     averagePositionPrice: MoneyValue
     currentPrice: MoneyValue
     expectedYield: MoneyValue
@@ -23,6 +23,8 @@ export interface Position {
     blocked: boolean
     figi: string
     instrumentUid: string
+    totalYield: MoneyValue
+    totalYieldRelative: Quotation
 }
 
 export interface UserFullPortfolio {
@@ -63,6 +65,8 @@ export interface Investment {
     purchasePrice: number
     currentPrice: number
     dividends: number
+    totalYield: number
+    totalYieldRelative: number
 }
 
 export interface InvestmentWithGain extends Investment {
