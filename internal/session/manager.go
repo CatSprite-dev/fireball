@@ -1,6 +1,17 @@
 package session
 
-/*
+import (
+	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"io"
+
+	"github.com/google/uuid"
+)
+
 type Manager struct {
 	store  *Store
 	secret []byte
@@ -11,49 +22,52 @@ func NewManager(store *Store, secret string) (*Manager, error) {
 	if err != nil || len(key) != 32 {
 		return nil, fmt.Errorf("SESSION_SECRET must be a 32-byte hex-encoded string")
 	}
-	return &Manager{store: store, secret: key}, nil
+	return &Manager{
+		store:  store,
+		secret: key,
+	}, nil
 }
 
 func (m *Manager) encrypt(plaintext string) (string, error) {
 	block, err := aes.NewCipher(m.secret)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
-	gcm, err := cipher.NewGCM(block)
+	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
-	nonce := make([]byte, gcm.NonceSize())
+	nonce := make([]byte, aesgcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return "", nil
 	}
-	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
+
+	ciphertext := aesgcm.Seal(nonce, nonce, []byte(plaintext), nil)
 	return hex.EncodeToString(ciphertext), nil
 }
 
-func (m *Manager) decrypt(ciphertextHex string) (string, error) {
-	data, err := hex.DecodeString(ciphertextHex)
+func (m *Manager) decrypt(cyphertextHex string) (string, error) {
+	data, err := hex.DecodeString(cyphertextHex)
 	if err != nil {
 		return "", err
 	}
 	block, err := aes.NewCipher(m.secret)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
-	gcm, err := cipher.NewGCM(block)
+	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
-	nonceSize := gcm.NonceSize()
+	nonceSize := aesgcm.NonceSize()
 	if len(data) < nonceSize {
 		return "", fmt.Errorf("ciphertext too short")
 	}
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	plaintext, err := aesgcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to decrypt: %w", err)
 	}
-
 	return string(plaintext), nil
 }
 
@@ -64,19 +78,19 @@ func (m *Manager) CreateSession(ctx context.Context, token string) (string, erro
 	}
 
 	sessionID := uuid.New().String()
-	if err := m.store.Set(ctx, sessionID, encrypted); err != nil {
-		return "", fmt.Errorf("failed to store session: %w", err)
+	if err := m.store.Set(ctx, "session:"+sessionID, encrypted); err != nil {
+		return "", fmt.Errorf("failed to encrypt token: %w", err)
 	}
 
 	return sessionID, nil
 }
 
 func (m *Manager) DeleteSession(ctx context.Context, sessionID string) error {
-	return m.store.Delete(ctx, sessionID)
+	return m.store.Delete(ctx, "session:"+sessionID)
 }
 
 func (m *Manager) GetToken(ctx context.Context, sessionID string) (string, error) {
-	encrypted, err := m.store.Get(ctx, sessionID)
+	encrypted, err := m.store.Get(ctx, "session:"+sessionID)
 	if err != nil {
 		return "", err
 	}
@@ -86,4 +100,3 @@ func (m *Manager) GetToken(ctx context.Context, sessionID string) (string, error
 	}
 	return token, nil
 }
-*/

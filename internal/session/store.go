@@ -1,44 +1,56 @@
 package session
 
-/*
-const sessionTTL = 24 * time.Hour
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/redis/go-redis/v9"
+)
 
 type Store struct {
-	client *redis.Client
+	redisClient *redis.Client
+	sessionTTL  time.Duration
 }
 
-func NewStore(redisURL string) (*Store, error) {
+func NewRedisStore(redisURL string, sessionTTL time.Duration) (*Store, error) {
 	opts, err := redis.ParseURL(redisURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse redis URL: %w", err)
+		return nil, fmt.Errorf("error during parsing of redis url: %w", err)
 	}
-	client := redis.NewClient(opts)
+
+	rdbClient := redis.NewClient(opts)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("failed to connect to redis: %w", err)
+
+	err = rdbClient.Ping(ctx).Err()
+	if err != nil {
+		return nil, fmt.Errorf("failed connection to redis: %w", err)
 	}
 
-	return &Store{client: client}, nil
+	return &Store{
+		redisClient: rdbClient,
+		sessionTTL:  sessionTTL,
+	}, nil
 }
 
-func (s *Store) Set(ctx context.Context, sessionID string, encryptedToken string) error {
-	return s.client.Set(ctx, "session:"+sessionID, encryptedToken, sessionTTL).Err()
+func (s *Store) Set(ctx context.Context, key string, value any) error {
+	return s.redisClient.Set(ctx, key, value, s.sessionTTL).Err()
 }
 
-func (s *Store) Get(ctx context.Context, sessionID string) (string, error) {
-	val, err := s.client.Get(ctx, "session:"+sessionID).Result()
+func (s *Store) Get(ctx context.Context, key string) (string, error) {
+	val, err := s.redisClient.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return "", fmt.Errorf("session not found")
 	}
 	if err != nil {
-		return "", fmt.Errorf("failde to get session: %w", err)
+		return "", fmt.Errorf("failed to get session: %w", err)
 	}
+
 	return val, nil
 }
 
-func (s *Store) Delete(ctx context.Context, sessionID string) error {
-	return s.client.Del(ctx, "session:"+sessionID).Err()
+func (s *Store) Delete(ctx context.Context, key string) error {
+	return s.redisClient.Del(ctx, key).Err()
 }
-*/
