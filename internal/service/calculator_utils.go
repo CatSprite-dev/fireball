@@ -29,7 +29,7 @@ func enrichFullPortfolio(calc *Calculator, portfolio domain.Portfolio, token str
 
 	portfolio = enrichPositions(portfolio, calc, token)
 
-	portfolio.TotalReturn, err = calc.GetTotalReturn(token, portfolio, accountID, openedDate)
+	portfolio.TotalReturn, portfolio.TotalReturnRelative, err = calc.GetTotalReturn(token, portfolio, accountID, openedDate)
 	if err != nil {
 		log.Printf("failed to calculate TotalReturn: %v", err)
 	}

@@ -43,6 +43,8 @@ export interface UserFullPortfolio {
     positions: Position[]
     accountId: string
     allDividends: Record<string, MoneyValue>
+    totalReturn: MoneyValue
+    totalReturnRelative: Quotation
 }
 
 export interface AuthResponse {

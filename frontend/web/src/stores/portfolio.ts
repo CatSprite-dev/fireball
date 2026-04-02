@@ -71,8 +71,8 @@ export const usePortfolioStore = defineStore('portfolio', () => {
             (sum, inv) => sum + inv.quantity * inv.purchasePrice, 0
         )
         const currentValue = parseMoney(portfolio.value.totalAmountPortfolio)
-        const totalGain = parseMoney(portfolio.value.expectedYield)
-        const totalGainPercent = totalInvested > 0 ? (totalGain / totalInvested) * 100 : 0
+        const totalGain = parseMoney(portfolio.value.totalReturn)
+        const totalGainPercent = parseMoney(portfolio.value.totalReturnRelative)
         const dailyYield = parseMoney(portfolio.value.dailyYield)
         const dailyYieldRelative = parseMoney(portfolio.value.dailyYieldRelative)
 
