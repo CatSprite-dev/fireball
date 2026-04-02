@@ -36,13 +36,13 @@ func (client *Client) GetAccounts(token string, accountStatus pkg.AccountStatus)
 func (client *Client) GetInfo(token string) (UserInfo, error) {
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.UsersService/GetInfo"
 
-	payload := `{}`
+	payload := struct{}{}
 
 	client.usersLimiter.Wait(context.Background())
 
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
-		return UserInfo{}, err
+		return UserInfo{}, fmt.Errorf("do request error (api.GetInfo): %w", err)
 	}
 
 	var user UserInfo
@@ -140,6 +140,41 @@ func (client *Client) GetUserOperationsByCursor(
 	return allOperations, nil
 }
 
+func (client *Client) BondBy(token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (Bond, error) {
+	type InstrumentRequest struct {
+		IDType    pkg.InstrumentIdType `json:"idType"`
+		ClassCode pkg.ClassCode        `json:"classCode,omitempty"`
+		ID        string               `json:"id"`
+	}
+
+	if idType == pkg.InstrumentIdTypeTicker && classCode == pkg.ClassCodeUnspecified {
+		return Bond{}, fmt.Errorf("classCode is required when idType is TICKER")
+	}
+
+	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/BondBy"
+
+	payload := InstrumentRequest{
+		IDType:    idType,
+		ClassCode: classCode,
+		ID:        id,
+	}
+
+	client.instrumentsLimiter.Wait(context.Background())
+
+	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+	if err != nil {
+		return Bond{}, fmt.Errorf("do request error (BondsBy): %w", err)
+	}
+
+	var bond Bond
+	err = json.Unmarshal(data, &bond)
+	if err != nil {
+		return Bond{}, fmt.Errorf("unmarshal error (BondsBy): %w", err)
+	}
+
+	return bond, nil
+}
+
 func (client *Client) GetInstrumentBy(token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (Instrument, error) {
 	type InstrumentRequest struct {
 		IDType    pkg.InstrumentIdType `json:"idType"`
@@ -178,19 +213,62 @@ func (client *Client) GetInstrumentBy(token string, idType pkg.InstrumentIdType,
 func (client *Client) Indicatives(token string) (IndicativeInstruments, error) {
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Indicatives"
 
-	payload := `{}`
+	payload := struct{}{}
 
-	client.instrumentsLimiter.Wait(context.Background())
+	client.operationsLimiter.Wait(context.Background())
 
 	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
-		return IndicativeInstruments{}, err
+		return IndicativeInstruments{}, fmt.Errorf("do request error (api.Indicatives): %w", err)
 	}
-
 	var indicativeInstruments IndicativeInstruments
 	err = json.Unmarshal(data, &indicativeInstruments)
 	if err != nil {
 		return IndicativeInstruments{}, fmt.Errorf("unmarshal error (api.Indicatives): %w", err)
 	}
 	return indicativeInstruments, nil
+}
+
+func (client *Client) GetCandles(token string,
+	from *time.Time,
+	to *time.Time,
+	interval pkg.CandleInterval,
+	instrumentId string,
+	candleSourceType pkg.CandleSource,
+	limit int) (Candles, error) {
+
+	type GetCandlesRequest struct {
+		From             *time.Time         `json:"from"`
+		To               *time.Time         `json:"to"`
+		Interval         pkg.CandleInterval `json:"interval"`
+		InstrumentID     string             `json:"instrumentId"`
+		CandleSourceType pkg.CandleSource   `json:"candleSourceType,omitempty"`
+		Limit            int                `json:"limit,omitempty"`
+	}
+
+	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles"
+
+	payload := GetCandlesRequest{
+		From:             from,
+		To:               to,
+		Interval:         interval,
+		InstrumentID:     instrumentId,
+		CandleSourceType: candleSourceType,
+		Limit:            limit,
+	}
+
+	client.operationsLimiter.Wait(context.Background())
+
+	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+	if err != nil {
+		return Candles{}, fmt.Errorf("do request error (GetCandles): %w", err)
+	}
+
+	var candles Candles
+	err = json.Unmarshal(data, &candles)
+	if err != nil {
+		return Candles{}, fmt.Errorf("unmarshal error (GetCandles): %w", err)
+	}
+
+	return candles, nil
 }

@@ -278,3 +278,25 @@ func TestDivideQuotations(t *testing.T) {
 		t.Errorf("DivideQuotation(%v, %v) expected error %v; got %v", a3, b3, expectedErr, err)
 	}
 }
+
+func TestMultiplyQuotations_NegativeSmall(t *testing.T) {
+	a := domain.Quotation{Units: "-0", Nano: -83500000}         // -0.0835
+	b := domain.Quotation{Units: "100", Nano: 0}                // 100
+	expected := domain.Quotation{Units: "-8", Nano: -350000000} // -8.35
+	result := MultiplyQuotation(a, b)
+
+	if result.Units != expected.Units || result.Nano != expected.Nano {
+		t.Errorf("MultiplyQuotation(%v, %v) = %v; expected %v", a, b, result, expected)
+	}
+}
+
+func TestMultiplyQuotations_NegativeSmall2(t *testing.T) {
+	a := domain.Quotation{Units: "-0", Nano: -123456789}         // -0.123456789
+	b := domain.Quotation{Units: "100", Nano: 0}                 // 100
+	expected := domain.Quotation{Units: "-12", Nano: -345678900} // -12.3456789
+	result := MultiplyQuotation(a, b)
+
+	if result.Units != expected.Units || result.Nano != expected.Nano {
+		t.Errorf("MultiplyQuotation(%v, %v) = %v; expected %v", a, b, result, expected)
+	}
+}

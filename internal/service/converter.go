@@ -1,12 +1,15 @@
 package service
 
 import (
+	"time"
+
 	"github.com/CatSprite-dev/fireball/internal/api"
 	"github.com/CatSprite-dev/fireball/internal/domain"
 )
 
-func convertFullPortfolio(raw api.UserPortfolio) domain.UserFullPortfolio {
-	full := domain.UserFullPortfolio{
+func convertFullPortfolio(raw api.UserPortfolio) domain.Portfolio {
+	full := domain.Portfolio{
+		OpenedDate:            time.Time{},
 		TotalAmountShares:     domain.MoneyValue(raw.TotalAmountShares),
 		TotalAmountBonds:      domain.MoneyValue(raw.TotalAmountBonds),
 		TotalAmountEtf:        domain.MoneyValue(raw.TotalAmountEtf),
@@ -65,6 +68,20 @@ func convertInstrument(raw api.Instrument) domain.Instrument {
 	}
 }
 
+func convertBond(raw api.Bond) domain.Bond {
+	return domain.Bond{
+		PositionUID: raw.Bond.PositionUID,
+		Name:        raw.Bond.Name,
+		Figi:        raw.Bond.Figi,
+		UID:         raw.Bond.UID,
+		Nominal:     domain.MoneyValue(raw.Bond.Nominal),
+		Currency:    raw.Bond.Currency,
+		AciValue:    domain.MoneyValue(raw.Bond.AciValue),
+		ClassCode:   raw.Bond.ClassCode,
+		Ticker:      raw.Bond.Ticker,
+	}
+}
+
 func convertIndicativeInstrument(raw api.IndicativeInstruments) domain.IndicativeInstruments {
 	indicatineInstruments := domain.IndicativeInstruments{}
 	for _, rawInstr := range raw.Instruments {
@@ -78,4 +95,55 @@ func convertIndicativeInstrument(raw api.IndicativeInstruments) domain.Indicativ
 		indicatineInstruments.Instruments = append(indicatineInstruments.Instruments, instr)
 	}
 	return indicatineInstruments
+}
+
+func convertCandles(raw api.Candles) []domain.Candle {
+	candles := []domain.Candle{}
+	for _, rawCandle := range raw.Candles {
+		candle := domain.Candle{
+			Time: rawCandle.Time,
+			Close: domain.Quotation{
+				Units: rawCandle.Close.Units,
+				Nano:  rawCandle.Close.Nano,
+			},
+			Open: domain.Quotation{
+				Units: rawCandle.Open.Units,
+				Nano:  rawCandle.Open.Nano,
+			},
+		}
+		candles = append(candles, candle)
+	}
+	return candles
+}
+
+func convertOperations(raw []api.UserOperations) domain.UserOperations {
+	result := domain.UserOperations{}
+	for _, block := range raw {
+		for _, rawItem := range block.Items {
+			item := domain.Item{
+				BrokerAccountID: rawItem.BrokerAccountID,
+				ID:              rawItem.ID,
+				InstrumentName:  rawItem.Name,
+				Date:            rawItem.Date,
+				Type:            rawItem.Type,
+				Description:     rawItem.Description,
+				State:           rawItem.State,
+				InstrumentUID:   rawItem.InstrumentUID,
+				Figi:            rawItem.Figi,
+				InstrumentType:  rawItem.InstrumentKind,
+				PositionUID:     rawItem.PositionUID,
+				Ticker:          rawItem.Ticker,
+				ClassCode:       rawItem.ClassCode,
+				Payment:         domain.MoneyValue(rawItem.Payment),
+				InstrumentPrice: domain.MoneyValue(rawItem.Price),
+				Commission:      domain.MoneyValue(rawItem.Commission),
+				Yield:           domain.MoneyValue(rawItem.Yield),
+				YieldRelative:   domain.Quotation(rawItem.YieldRelative),
+				AccruedInt:      domain.MoneyValue(rawItem.AccruedInt),
+				Quantity:        rawItem.QuantityDone,
+			}
+			result.Items = append(result.Items, item)
+		}
+	}
+	return result
 }

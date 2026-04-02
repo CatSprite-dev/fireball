@@ -73,7 +73,7 @@ onMounted(() => {
           </button>
         </div>
 
-        <OverviewTab v-if="activeTab==='overview'" :investments="portfolio.investments"/>
+        <OverviewTab v-if="activeTab==='overview'" :investments="portfolio.investments" :chartSeries="portfolio.chartSeries"/>
         <HoldingsTab v-if="activeTab==='holdings'" :investments="portfolio.investments"/>
       </div>
     </template>

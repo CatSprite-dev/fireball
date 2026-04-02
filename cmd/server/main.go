@@ -22,7 +22,7 @@ func main() {
 	mux := http.NewServeMux()
 	fileServer := http.FileServer(http.Dir("frontend/dist"))
 
-	mux.HandleFunc("/auth", limitedAuthHandler)
+	mux.HandleFunc("POST /auth", limitedAuthHandler)
 
 	mux.Handle("/", fileServer)
 

@@ -41,6 +41,7 @@ const rows = computed(() =>
                         <th class="right">Value</th>
                         <th class="right">Gain/Loss</th>
                         <th class="center">Dividends</th>
+                        <th class="center">Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -68,6 +69,15 @@ const rows = computed(() =>
                                 <span class="percent">
                                     (+{{ row.dividendsPercent.toFixed(2) }}%)
                                 </span>
+                            </template>
+                        </td>
+                        <td class="center" :class="row.totalYield >= 0 ? 'positive' : 'negative'">
+                            <template v-if="row.totalYield === 0">-</template>
+                            <template v-else>
+                                {{ formatCurrency(row.totalYield) }}
+                                <span class="percent">
+                                ({{ row.totalYieldRelative >= 0 ? '+' : '' }}{{ row.totalYieldRelative.toFixed(2) }}%)
+                            </span>
                             </template>
                         </td>
                     </tr>
