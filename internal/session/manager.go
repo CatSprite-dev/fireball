@@ -6,6 +6,8 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
@@ -15,6 +17,11 @@ import (
 type Manager struct {
 	store  *Store
 	secret []byte
+}
+
+type SessionData struct {
+	EncryptedToken string `json:"encrypted_token"`
+	AccountID      string `json:"account_id"`
 }
 
 func NewManager(store *Store, secret string) (*Manager, error) {
@@ -39,7 +46,7 @@ func (m *Manager) encrypt(plaintext string) (string, error) {
 	}
 	nonce := make([]byte, aesgcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return "", nil
+		return "", err
 	}
 
 	ciphertext := aesgcm.Seal(nonce, nonce, []byte(plaintext), nil)
@@ -71,15 +78,24 @@ func (m *Manager) decrypt(cyphertextHex string) (string, error) {
 	return string(plaintext), nil
 }
 
-func (m *Manager) CreateSession(ctx context.Context, token string) (string, error) {
+func (m *Manager) CreateSession(ctx context.Context, token string, accountID string) (string, error) {
 	encrypted, err := m.encrypt(token)
 	if err != nil {
 		return "", fmt.Errorf("failed to encrypt token: %w", err)
 	}
 
+	session := SessionData{
+		EncryptedToken: encrypted,
+		AccountID:      accountID,
+	}
+	sessionJSON, err := json.Marshal(session)
+	if err != nil {
+		return "", err
+	}
+
 	sessionID := uuid.New().String()
-	if err := m.store.Set(ctx, "session:"+sessionID, encrypted); err != nil {
-		return "", fmt.Errorf("failed to encrypt token: %w", err)
+	if err := m.store.Set(ctx, "session:"+sessionID, sessionJSON); err != nil {
+		return "", fmt.Errorf("failed to store session: %w", err)
 	}
 
 	return sessionID, nil
@@ -89,14 +105,28 @@ func (m *Manager) DeleteSession(ctx context.Context, sessionID string) error {
 	return m.store.Delete(ctx, "session:"+sessionID)
 }
 
-func (m *Manager) GetToken(ctx context.Context, sessionID string) (string, error) {
-	encrypted, err := m.store.Get(ctx, "session:"+sessionID)
+func (m *Manager) GetSession(ctx context.Context, sessionID string) (SessionData, error) {
+	sessionJSON, err := m.store.Get(ctx, "session:"+sessionID)
 	if err != nil {
-		return "", err
+		return SessionData{}, err
 	}
-	token, err := m.decrypt(encrypted)
+
+	sessionBytes, ok := sessionJSON.([]byte)
+	if !ok {
+		return SessionData{}, errors.New("wroong type of session data")
+	}
+
+	session := SessionData{}
+	err = json.Unmarshal(sessionBytes, &session)
 	if err != nil {
-		return "", err
+		return SessionData{}, err
 	}
-	return token, nil
+
+	token, err := m.decrypt(session.EncryptedToken)
+	if err != nil {
+		return SessionData{}, err
+	}
+	session.EncryptedToken = token
+
+	return session, nil
 }
