@@ -23,7 +23,17 @@ export default defineConfig({
     port: 3000,
     open: true,
     proxy: {
-        '/auth': {
+        '/portfolio': {
+            target: 'http://localhost:8080',
+            changeOrigin: true,
+            rewrite: (path) => path,
+            configure: (proxy) => {
+                proxy.on('proxyReq', (proxyReq, req, res) => {
+                    console.log(`---> Proxy: ${req.method} ${req.url} -> 8080${req.url}`);
+                })
+            }
+        },
+        '/chart': {
             target: 'http://localhost:8080',
             changeOrigin: true,
             rewrite: (path) => path,
@@ -34,5 +44,5 @@ export default defineConfig({
             }
         }
     }
-  }
+}
 })

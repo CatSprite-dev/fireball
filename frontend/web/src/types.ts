@@ -48,11 +48,6 @@ export interface UserFullPortfolio {
     totalInvested: MoneyValue
 }
 
-export interface AuthResponse {
-  user_portfolio: UserFullPortfolio
-  chart_data: ChartData
-}
-
 export interface ChartData {
     times: string[]
     index: Quotation[]

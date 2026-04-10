@@ -21,7 +21,7 @@ async function submit() {
     error.value = ''
 
     try {
-        const response = await fetch('/auth', {
+        const response = await fetch('/portfolio', {
             method: 'POST',
             headers: {
                 'T-Token': token.value.trim(),

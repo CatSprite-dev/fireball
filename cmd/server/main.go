@@ -14,15 +14,18 @@ func main() {
 	cfg := config.NewConfig()
 	apiClient := api.NewClient(cfg.BaseURL)
 	calculator := service.NewCalculator(apiClient)
-	authHandler := handlers.NewAuthHandler(calculator)
+	authHandler := handlers.NewPortfolioHandler(calculator)
+	chartHandler := handlers.NewChartHandler(calculator)
 
 	rateLimiter := handlers.NewRateLimiter(200)
-	limitedAuthHandler := rateLimiter.Middleware(authHandler.HandlerAuth)
+	limitedPortfolioHandler := rateLimiter.Middleware(authHandler.HandlerPortfolio)
+	limitedChartHandler := rateLimiter.Middleware(chartHandler.HandlerChart)
 
 	mux := http.NewServeMux()
 	fileServer := http.FileServer(http.Dir("frontend/dist"))
 
-	mux.HandleFunc("POST /auth", limitedAuthHandler)
+	mux.HandleFunc("POST /portfolio", limitedPortfolioHandler)
+	mux.HandleFunc("POST /chart", limitedChartHandler)
 
 	mux.Handle("/", fileServer)
 
