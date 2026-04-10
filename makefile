@@ -20,3 +20,9 @@ run-server:
 dev:
 	@echo "Rolling up vite..."
 	@bash -c 'source ~/.nvm/nvm.sh && cd frontend && nvm use && npm run dev'
+
+start-deps:
+	@docker compose up -d
+
+stop-deps:
+	@docker compose down

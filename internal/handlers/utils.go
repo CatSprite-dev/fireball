@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -17,7 +18,7 @@ func setSessionCookie(w http.ResponseWriter, sessionID string, setToDelete bool)
 		Value:    sessionID,
 		Expires:  expiration,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   os.Getenv("ENV") == "production",
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   maxAge,
 	}

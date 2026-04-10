@@ -1,7 +1,7 @@
 import type { AuthResponse, UserFullPortfolio } from "../types"
 
 export async function fetchPortfolio(): Promise<UserFullPortfolio> {
-    const response = await fetch('/auth', {
+    const response = await fetch('/api/auth', {
         method: 'POST',
     })
 
@@ -18,7 +18,7 @@ export async function fetchPortfolio(): Promise<UserFullPortfolio> {
 }
 
 export async function login(token: string) {
-    const response = await fetch('/login', {
+    const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

@@ -25,6 +25,7 @@ func NewLoginHandler(sm *session.SessionManager, client *api.Client) *LoginHandl
 }
 
 func (h *LoginHandler) HandlerLogin(w http.ResponseWriter, r *http.Request) {
+	log.Printf("HandlerLogin called, method: %s", r.Method)
 	type loginRequest struct {
 		Token string `json:"token"`
 	}
