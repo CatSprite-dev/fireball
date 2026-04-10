@@ -39,7 +39,7 @@ func (s *Store) Set(ctx context.Context, key string, value any) error {
 	return s.redisClient.Set(ctx, key, value, s.sessionTTL).Err()
 }
 
-func (s *Store) Get(ctx context.Context, key string) (any, error) {
+func (s *Store) Get(ctx context.Context, key string) (string, error) {
 	val, err := s.redisClient.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return "", fmt.Errorf("session not found")

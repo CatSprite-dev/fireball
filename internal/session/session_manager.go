@@ -7,35 +7,36 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/google/uuid"
 )
 
-type Manager struct {
+type SessionManager struct {
 	store  *Store
 	secret []byte
 }
 
 type SessionData struct {
-	EncryptedToken string `json:"encrypted_token"`
-	AccountID      string `json:"account_id"`
+	EncryptedToken string    `json:"encrypted_token"`
+	AccountID      string    `json:"account_id"`
+	OpenedDate     time.Time `json:"opened_date"`
 }
 
-func NewManager(store *Store, secret string) (*Manager, error) {
+func NewManager(store *Store, secret string) (*SessionManager, error) {
 	key, err := hex.DecodeString(secret)
 	if err != nil || len(key) != 32 {
 		return nil, fmt.Errorf("SESSION_SECRET must be a 32-byte hex-encoded string")
 	}
-	return &Manager{
+	return &SessionManager{
 		store:  store,
 		secret: key,
 	}, nil
 }
 
-func (m *Manager) encrypt(plaintext string) (string, error) {
+func (m *SessionManager) encrypt(plaintext string) (string, error) {
 	block, err := aes.NewCipher(m.secret)
 	if err != nil {
 		return "", err
@@ -53,7 +54,7 @@ func (m *Manager) encrypt(plaintext string) (string, error) {
 	return hex.EncodeToString(ciphertext), nil
 }
 
-func (m *Manager) decrypt(cyphertextHex string) (string, error) {
+func (m *SessionManager) decrypt(cyphertextHex string) (string, error) {
 	data, err := hex.DecodeString(cyphertextHex)
 	if err != nil {
 		return "", err
@@ -78,7 +79,7 @@ func (m *Manager) decrypt(cyphertextHex string) (string, error) {
 	return string(plaintext), nil
 }
 
-func (m *Manager) CreateSession(ctx context.Context, token string, accountID string) (string, error) {
+func (m *SessionManager) CreateSession(ctx context.Context, token string, accountID string, openedDate time.Time) (string, error) {
 	encrypted, err := m.encrypt(token)
 	if err != nil {
 		return "", fmt.Errorf("failed to encrypt token: %w", err)
@@ -87,6 +88,7 @@ func (m *Manager) CreateSession(ctx context.Context, token string, accountID str
 	session := SessionData{
 		EncryptedToken: encrypted,
 		AccountID:      accountID,
+		OpenedDate:     openedDate,
 	}
 	sessionJSON, err := json.Marshal(session)
 	if err != nil {
@@ -101,23 +103,18 @@ func (m *Manager) CreateSession(ctx context.Context, token string, accountID str
 	return sessionID, nil
 }
 
-func (m *Manager) DeleteSession(ctx context.Context, sessionID string) error {
+func (m *SessionManager) DeleteSession(ctx context.Context, sessionID string) error {
 	return m.store.Delete(ctx, "session:"+sessionID)
 }
 
-func (m *Manager) GetSession(ctx context.Context, sessionID string) (SessionData, error) {
+func (m *SessionManager) GetSession(ctx context.Context, sessionID string) (SessionData, error) {
 	sessionJSON, err := m.store.Get(ctx, "session:"+sessionID)
 	if err != nil {
 		return SessionData{}, err
 	}
 
-	sessionBytes, ok := sessionJSON.([]byte)
-	if !ok {
-		return SessionData{}, errors.New("wroong type of session data")
-	}
-
 	session := SessionData{}
-	err = json.Unmarshal(sessionBytes, &session)
+	err = json.Unmarshal([]byte(sessionJSON), &session)
 	if err != nil {
 		return SessionData{}, err
 	}
