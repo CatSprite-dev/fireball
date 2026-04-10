@@ -19,11 +19,12 @@ func getTokenFromHeader(headers http.Header) (string, error) {
 }
 
 func setSessionCookie(w http.ResponseWriter, sessionID string, setToDelete bool) {
+	expiration := time.Now().Add(24 * time.Hour)
 	maxAge := 0
 	if setToDelete {
 		maxAge = -1
+		expiration = time.Unix(0, 0)
 	}
-	expiration := time.Now().Add(24 * time.Hour)
 	cookie := http.Cookie{
 		Name:     "session_token",
 		Value:    sessionID,

@@ -110,6 +110,6 @@ func NewConfig() *Config {
 	}
 }
 
-func (c *Config) getSecret() string {
+func (c *Config) GetSecret() string {
 	return c.sessionSecret
 }

@@ -1,7 +1,6 @@
 package service
 
 import (
-	"errors"
 	"log"
 	"time"
 
@@ -9,6 +8,12 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/domain"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 )
+
+type PortfolioRequest struct {
+	Token      string
+	AccountID  string
+	OpenedDate time.Time
+}
 
 type Calculator struct {
 	apiClient *api.Client
@@ -18,26 +23,15 @@ func NewCalculator(apiClient *api.Client) *Calculator {
 	return &Calculator{apiClient: apiClient}
 }
 
-func (calc *Calculator) GetFullPortfolio(token string) (domain.UserFullPortfolio, error) {
+func (calc *Calculator) GetFullPortfolio(session PortfolioRequest) (domain.UserFullPortfolio, error) {
 	t := time.Now()
 
-	userAccounts, err := calc.apiClient.GetAccounts(token, pkg.AccountStatusOpen)
-	if err != nil {
-		return domain.UserFullPortfolio{}, err
-	}
-	if len(userAccounts.Accounts) == 0 {
-		return domain.UserFullPortfolio{}, errors.New("found no accounts")
-	}
-
-	accountID := userAccounts.Accounts[0].ID
-	openedDate := userAccounts.Accounts[0].OpenedDate
-
-	rawPortfolio, err := calc.apiClient.GetPortfolio(token, accountID)
+	rawPortfolio, err := calc.apiClient.GetPortfolio(session.Token, session.AccountID)
 	if err != nil {
 		return domain.UserFullPortfolio{}, err
 	}
 	fullEmptyPortfolio := convertFullPortfolio(rawPortfolio)
-	enrichedFullPortfolio, err := enrichFullPortfolio(calc, fullEmptyPortfolio, token, accountID, openedDate)
+	enrichedFullPortfolio, err := enrichFullPortfolio(calc, fullEmptyPortfolio, session.Token, session.AccountID, session.OpenedDate)
 	if err != nil {
 		return domain.UserFullPortfolio{}, err
 	}

@@ -20,9 +20,9 @@ type SessionManager struct {
 }
 
 type SessionData struct {
-	EncryptedToken string    `json:"encrypted_token"`
-	AccountID      string    `json:"account_id"`
-	OpenedDate     time.Time `json:"opened_date"`
+	Token      string    `json:"token"`
+	AccountID  string    `json:"account_id"`
+	OpenedDate time.Time `json:"opened_date"`
 }
 
 func NewManager(store *Store, secret string) (*SessionManager, error) {
@@ -86,9 +86,9 @@ func (m *SessionManager) CreateSession(ctx context.Context, token string, accoun
 	}
 
 	session := SessionData{
-		EncryptedToken: encrypted,
-		AccountID:      accountID,
-		OpenedDate:     openedDate,
+		Token:      encrypted,
+		AccountID:  accountID,
+		OpenedDate: openedDate,
 	}
 	sessionJSON, err := json.Marshal(session)
 	if err != nil {
@@ -119,11 +119,11 @@ func (m *SessionManager) GetSession(ctx context.Context, sessionID string) (Sess
 		return SessionData{}, err
 	}
 
-	token, err := m.decrypt(session.EncryptedToken)
+	token, err := m.decrypt(session.Token)
 	if err != nil {
 		return SessionData{}, err
 	}
-	session.EncryptedToken = token
+	session.Token = token
 
 	return session, nil
 }

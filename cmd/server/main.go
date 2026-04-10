@@ -8,21 +8,37 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/config"
 	"github.com/CatSprite-dev/fireball/internal/handlers"
 	"github.com/CatSprite-dev/fireball/internal/service"
+	"github.com/CatSprite-dev/fireball/internal/session"
 )
 
 func main() {
 	cfg := config.NewConfig()
+
+	store, err := session.NewRedisStore(cfg.RedisURL, cfg.RedisTTL)
+	if err != nil {
+		log.Fatalf("%v\n", err)
+	}
+
+	sessionManager, err := session.NewManager(store, cfg.GetSecret())
+	if err != nil {
+		log.Fatalf("%v\n", err)
+	}
+
 	apiClient := api.NewClient(cfg.BaseURL)
 	calculator := service.NewCalculator(apiClient)
-	authHandler := handlers.NewAuthHandler(calculator)
 
-	rateLimiter := handlers.NewRateLimiter(200)
-	limitedAuthHandler := rateLimiter.Middleware(authHandler.HandlerAuth)
+	loginHandler := handlers.NewLoginHandler(sessionManager, apiClient)
+	authHandler := handlers.NewAuthHandler(sessionManager, calculator)
+
+	loginRateLimiter := handlers.NewRateLimiter(10)
+	authRateLimiter := handlers.NewRateLimiter(200)
 
 	mux := http.NewServeMux()
 	fileServer := http.FileServer(http.Dir("frontend/dist"))
 
-	mux.HandleFunc("/auth", limitedAuthHandler)
+	mux.HandleFunc("/login", loginRateLimiter.Middleware(loginHandler.HandlerLogin))
+	mux.HandleFunc("/logout", loginRateLimiter.Middleware(loginHandler.HandlerLogout))
+	mux.HandleFunc("/auth", authRateLimiter.Middleware(authHandler.HandlerAuth))
 
 	mux.Handle("/", fileServer)
 
