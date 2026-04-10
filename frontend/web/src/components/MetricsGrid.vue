@@ -21,7 +21,7 @@ defineProps<{
                     <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
                 </svg>
             </div>
-            <div class="card-value">{{ formatCurrency(metrics.totalInvested) }}</div>
+            <div class="card-value">{{ formatCurrency(metrics.totalInvestedOfHoldings) }}</div>
             <div class="card-sub">
                 Across {{ metrics.portfolioSize }}
                 {{ metrics.portfolioSize === 1 ? 'position' : 'positions' }}
@@ -38,7 +38,7 @@ defineProps<{
                 </svg>
             </div>
             <div class="card-value">{{ formatCurrency(metrics.currentValue) }}</div>
-            <div class="card-sub">Market value of holdings</div>
+            <div class="card-sub">{{formatCurrency(metrics.totalInvested)}} invested</div>
         </div>
 
         <div class="card">

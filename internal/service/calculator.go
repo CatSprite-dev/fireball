@@ -104,7 +104,7 @@ func (calc *Calculator) GetTotalReturn(
 	portfolio domain.Portfolio,
 	accountID string,
 	openedDate time.Time,
-) (domain.MoneyValue, domain.Quotation, error) {
+) (domain.MoneyValue, domain.Quotation, domain.MoneyValue, error) {
 	now := time.Now()
 	operations, err := calc.ApiClient.GetUserOperationsByCursor(
 		token, accountID, "", &openedDate, &now,
@@ -117,7 +117,7 @@ func (calc *Calculator) GetTotalReturn(
 		pkg.OperationStateExecuted, true,
 	)
 	if err != nil {
-		return domain.MoneyValue{}, domain.Quotation{}, err
+		return domain.MoneyValue{}, domain.Quotation{}, domain.MoneyValue{}, err
 	}
 
 	var totalInvested domain.MoneyValue
@@ -130,11 +130,11 @@ func (calc *Calculator) GetTotalReturn(
 	totalReturn := SubtractMoneyValue(portfolio.TotalAmountPortfolio, totalInvested)
 	coef, err := DivideMoneyValueToQuotation(totalReturn, totalInvested)
 	if err != nil {
-		return domain.MoneyValue{}, domain.Quotation{}, err
+		return domain.MoneyValue{}, domain.Quotation{}, domain.MoneyValue{}, err
 	}
 	totalReturnRelative := MultiplyQuotation(coef, domain.Quotation{Units: "100"})
 
-	return totalReturn, totalReturnRelative, nil
+	return totalReturn, totalReturnRelative, totalInvested, nil
 }
 
 func (calc *Calculator) GetInstrument(token string, instrumentIdType pkg.InstrumentIdType, classCode pkg.ClassCode, instrumentId string) (domain.Instrument, error) {

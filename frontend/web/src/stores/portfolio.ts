@@ -58,6 +58,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     
     const metrics = computed<Metrics>(() => {
         if (!portfolio.value) return {
+            totalInvestedOfHoldings: 0,
             totalInvested: 0,
             currentValue: 0,
             totalGain: 0,
@@ -67,9 +68,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
             portfolioSize: 0,
         }
 
-        const totalInvested = investments.value.reduce(
+        const totalInvestedOfHoldings = investments.value.reduce(
             (sum, inv) => sum + inv.quantity * inv.purchasePrice, 0
         )
+        const totalInvested = parseMoney(portfolio.value.totalInvested)
         const currentValue = parseMoney(portfolio.value.totalAmountPortfolio)
         const totalGain = parseMoney(portfolio.value.totalReturn)
         const totalGainPercent = parseMoney(portfolio.value.totalReturnRelative)
@@ -77,6 +79,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         const dailyYieldRelative = parseMoney(portfolio.value.dailyYieldRelative)
 
         return {
+            totalInvestedOfHoldings,
             totalInvested,
             currentValue,
             totalGain,

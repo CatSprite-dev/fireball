@@ -45,6 +45,7 @@ export interface UserFullPortfolio {
     allDividends: Record<string, MoneyValue>
     totalReturn: MoneyValue
     totalReturnRelative: Quotation
+    totalInvested: MoneyValue
 }
 
 export interface AuthResponse {
@@ -77,6 +78,7 @@ export interface InvestmentWithGain extends Investment {
 }
 
 export interface Metrics {
+    totalInvestedOfHoldings: number
     totalInvested: number
     currentValue: number
     totalGain: number
