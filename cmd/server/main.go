@@ -36,10 +36,10 @@ func main() {
 	mux := http.NewServeMux()
 	fileServer := http.FileServer(http.Dir("frontend/dist"))
 
-	mux.HandleFunc("/ping", authRateLimiter.Middleware(authHandler.HandlerPing))
-	mux.HandleFunc("/login", loginRateLimiter.Middleware(loginHandler.HandlerLogin))
-	mux.HandleFunc("/logout", loginRateLimiter.Middleware(loginHandler.HandlerLogout))
-	mux.HandleFunc("/auth", authRateLimiter.Middleware(authHandler.HandlerAuth))
+	mux.HandleFunc("GET /ping", authRateLimiter.Middleware(authHandler.HandlerPing))
+	mux.HandleFunc("POST /login", loginRateLimiter.Middleware(loginHandler.HandlerLogin))
+	mux.HandleFunc("POST /logout", loginRateLimiter.Middleware(loginHandler.HandlerLogout))
+	mux.HandleFunc("POST /auth", authRateLimiter.Middleware(authHandler.HandlerAuth))
 
 	mux.Handle("/", fileServer)
 

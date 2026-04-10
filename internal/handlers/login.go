@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -24,13 +25,21 @@ func NewLoginHandler(sm *session.SessionManager, client *api.Client) *LoginHandl
 }
 
 func (h *LoginHandler) HandlerLogin(w http.ResponseWriter, r *http.Request) {
-	token, err := getTokenFromHeader(r.Header)
-	if err != nil {
-		pkg.RespondWithError(w, http.StatusUnauthorized, err.Error(), err)
+	type loginRequest struct {
+		Token string `json:"token"`
+	}
+
+	var req loginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		pkg.RespondWithError(w, http.StatusBadRequest, "invalid request body", err)
+		return
+	}
+	if req.Token == "" {
+		pkg.RespondWithError(w, http.StatusBadRequest, "token is required", nil)
 		return
 	}
 
-	userAccounts, err := h.apiClient.GetAccounts(token, pkg.AccountStatusOpen)
+	userAccounts, err := h.apiClient.GetAccounts(req.Token, pkg.AccountStatusOpen)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusUnauthorized, err.Error(), err)
 		return
@@ -42,7 +51,7 @@ func (h *LoginHandler) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 	accountID := userAccounts.Accounts[0].ID
 	openedDate := userAccounts.Accounts[0].OpenedDate
 
-	sessionID, err := h.sessionManager.CreateSession(context.Background(), token, accountID, openedDate)
+	sessionID, err := h.sessionManager.CreateSession(context.Background(), req.Token, accountID, openedDate)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
 		return

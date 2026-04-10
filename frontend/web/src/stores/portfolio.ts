@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
 import { fetchPortfolio } from '../api/auth'
 import type { UserFullPortfolio, Investment, Metrics } from '../types'
+import router from '../router'
 
 function parseMoney(m: { units: string; nano: number } | undefined): number {
     if (!m) return 0
@@ -65,18 +66,16 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     })
 
     async function load() {
-        const auth = useAuthStore()
-        if (!auth.token) return
-
         isLoading.value = true
         error.value = ''
 
         try {
-            raw.value = await fetchPortfolio(auth.token)
+            raw.value = await fetchPortfolio()
         } catch (e) {
             if (e instanceof Error && e.message === 'UNAUTHORIZED') {
-                auth.logout()
-                error.value = 'Session expired, please log in again'
+                const auth = useAuthStore()
+                auth.isLoggedIn = false
+                router.push('/login')
             } else {
                 error.value = 'Failed to load portfolio'
             }

@@ -3,19 +3,17 @@ import { tokenToString } from 'typescript'
 import { ref, computed } from 'vue'
 
 export const useAuthStore = defineStore('auth', () => {
-    const token = ref(localStorage.getItem('token') ?? '')
+    const isLoggedIn = ref(false)
 
-    const isLoggedIn = computed(() => !!token.value)
-
-    function setToken(newToken: string) {
-        token.value = newToken
-        localStorage.setItem('token', newToken)
+    async function checkAuth() {
+        const response = await fetch('/ping')
+        isLoggedIn.value = response.ok
     }
 
-    function logout() {
-        token.value = ''
-        localStorage.removeItem('token')
+    async function logout() {
+        const response = await fetch('/logout', { method: 'POST' })
+        isLoggedIn.value = false
     }
 
-    return { token, isLoggedIn, setToken, logout }
+    return { isLoggedIn, checkAuth, logout }
 })

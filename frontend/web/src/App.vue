@@ -1,8 +1,15 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import { useTheme } from '../src/composables/useTheme'
+import { useAuthStore } from './stores/auth'
 
 const { isDark, toggleTheme } = useTheme()
+const auth = useAuthStore()
+
+onMounted(async () => {
+  await auth.checkAuth()
+})
 </script>
 
 <template>
