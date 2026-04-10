@@ -36,17 +36,17 @@ func NewConfig() *Config {
 		os.Exit(1)
 	}
 	redisURL := os.Getenv("REDIS_URL")
-	if investURL == "" {
+	if redisURL == "" {
 		log.Println("REDIS_URL variable is not found in environment")
 		os.Exit(1)
 	}
 	redisTTLStr := os.Getenv("REDIS_TTL")
-	if investURL == "" {
+	if redisTTLStr == "" {
 		log.Println("REDIS_TTL variable is not found in environment\nSetting default 24h")
 		redisTTLStr = "24"
 	}
 	secret := os.Getenv("SESSION_SECRET")
-	if investURL == "" {
+	if secret == "" {
 		log.Println("SESSION_SECRET variable is not found in environment")
 		os.Exit(1)
 	}
@@ -56,17 +56,17 @@ func NewConfig() *Config {
 		serverPort = "8080"
 	}
 	readTimeoutStr := os.Getenv("READ_TIMEOUT")
-	if serverPort == "" {
+	if readTimeoutStr == "" {
 		log.Println("READ_TIMEOUT variable is not found in environment\nSetting default 10s")
 		readTimeoutStr = "10"
 	}
 	writeTimeoutStr := os.Getenv("WRITE_TIMEOUT")
-	if serverPort == "" {
+	if writeTimeoutStr == "" {
 		log.Println("WRITE_TIMEOUT variable is not found in environment\nSetting default 10s")
 		writeTimeoutStr = "10"
 	}
 	idleTimeoutStr := os.Getenv("IDLE_TIMEOUT")
-	if serverPort == "" {
+	if idleTimeoutStr == "" {
 		log.Println("IDLE_TIMEOUT variable is not found in environment\nSetting default 30s")
 		idleTimeoutStr = "30"
 	}

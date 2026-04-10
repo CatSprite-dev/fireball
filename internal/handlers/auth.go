@@ -21,6 +21,22 @@ func NewAuthHandler(sm *session.SessionManager, calc *service.Calculator) *AuthH
 	}
 }
 
+func (h *AuthHandler) HandlerPing(w http.ResponseWriter, r *http.Request) {
+	sessionID, err := getSessionFromCookie(r)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	_, err = h.sessionManager.GetSession(r.Context(), sessionID)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 	type returnVals struct {
 		UserPortfolio domain.UserFullPortfolio `json:"user_portfolio"`
