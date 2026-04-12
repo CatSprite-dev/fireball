@@ -8,8 +8,8 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 )
 
-func setSessionCookie(w http.ResponseWriter, sessionID string, setToDelete bool) {
-	expiration := time.Now().Add(24 * time.Hour)
+func setSessionCookie(w http.ResponseWriter, sessionID string, expireIn time.Duration, setToDelete bool) {
+	expiration := time.Now().Add(time.Duration(expireIn) * time.Hour)
 	maxAge := 0
 	if setToDelete {
 		maxAge = -1

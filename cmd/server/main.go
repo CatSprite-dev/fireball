@@ -10,18 +10,21 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/config"
 	"github.com/CatSprite-dev/fireball/internal/handlers"
 	"github.com/CatSprite-dev/fireball/internal/service"
-	"github.com/CatSprite-dev/fireball/internal/session"
+	"github.com/CatSprite-dev/fireball/internal/storage"
 )
 
 func main() {
-	cfg := config.NewConfig()
+	cfg, err := config.NewConfig()
+	if err != nil {
+		os.Exit(1)
+	}
 
-	store, err := session.NewRedisStore(cfg.RedisURL, cfg.RedisTTL)
+	store, err := storage.NewRedisStore(cfg.RedisURL)
 	if err != nil {
 		log.Fatalf("%v\n", err)
 	}
 
-	sessionManager, err := session.NewManager(store, cfg.GetSecret())
+	sessionManager, err := storage.NewManager(store, cfg.GetSecret(), cfg.RedisTTL)
 	if err != nil {
 		log.Fatalf("%v\n", err)
 	}

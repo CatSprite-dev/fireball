@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -9,15 +8,15 @@ import (
 
 	"github.com/CatSprite-dev/fireball/internal/api"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
-	"github.com/CatSprite-dev/fireball/internal/session"
+	"github.com/CatSprite-dev/fireball/internal/storage"
 )
 
 type LoginHandler struct {
-	sessionManager *session.SessionManager
+	sessionManager *storage.SessionManager
 	apiClient      *api.Client
 }
 
-func NewLoginHandler(sm *session.SessionManager, client *api.Client) *LoginHandler {
+func NewLoginHandler(sm *storage.SessionManager, client *api.Client) *LoginHandler {
 	return &LoginHandler{
 		sessionManager: sm,
 		apiClient:      client,
@@ -52,13 +51,13 @@ func (h *LoginHandler) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 	accountID := userAccounts.Accounts[0].ID
 	openedDate := userAccounts.Accounts[0].OpenedDate
 
-	sessionID, err := h.sessionManager.CreateSession(context.Background(), req.Token, accountID, openedDate)
+	sessionID, err := h.sessionManager.CreateSession(r.Context(), req.Token, accountID, openedDate)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
 		return
 	}
 
-	setSessionCookie(w, sessionID, false)
+	setSessionCookie(w, sessionID, h.sessionManager.RedisTTL, false)
 	log.Printf("Cookie for %s is set, session: %s\n", accountID, sessionID)
 	pkg.RespondWithJSON(w, http.StatusOK, struct{}{})
 }
@@ -70,12 +69,12 @@ func (h *LoginHandler) HandlerLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.sessionManager.DeleteSession(context.Background(), sessionID)
+	err = h.sessionManager.DeleteSession(r.Context(), sessionID)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
 		return
 	}
-	setSessionCookie(w, sessionID, true)
+	setSessionCookie(w, sessionID, h.sessionManager.RedisTTL, true)
 	log.Printf("Cookie for %s is deleted\n", sessionID)
 	pkg.RespondWithJSON(w, http.StatusOK, struct{}{})
 }

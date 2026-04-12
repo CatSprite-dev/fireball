@@ -8,15 +8,15 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/domain"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 	"github.com/CatSprite-dev/fireball/internal/service"
-	"github.com/CatSprite-dev/fireball/internal/session"
+	"github.com/CatSprite-dev/fireball/internal/storage"
 )
 
 type ChartHandler struct {
 	portfolioService *service.Calculator
-	sessionManager   *session.SessionManager
+	sessionManager   *storage.SessionManager
 }
 
-func NewChartHandler(sm *session.SessionManager, calc *service.Calculator) *ChartHandler {
+func NewChartHandler(sm *storage.SessionManager, calc *service.Calculator) *ChartHandler {
 	return &ChartHandler{
 		portfolioService: calc,
 		sessionManager:   sm,
@@ -59,6 +59,6 @@ func (h *ChartHandler) HandlerChart(w http.ResponseWriter, r *http.Request) {
 
 	pkg.RespondWithJSON(w, http.StatusOK, chartData)
 
-	log.Printf("Число запросов HandlerChart = %d", h.portfolioService.ApiClient.RequestCount())
+	log.Printf("Requrests number of HandlerChart = %d", h.portfolioService.ApiClient.RequestCount())
 	h.portfolioService.ApiClient.ResetRequestCount()
 }

@@ -1,4 +1,4 @@
-package session
+package storage
 
 import (
 	"context"
@@ -10,10 +10,9 @@ import (
 
 type Store struct {
 	redisClient *redis.Client
-	sessionTTL  time.Duration
 }
 
-func NewRedisStore(redisURL string, sessionTTL time.Duration) (*Store, error) {
+func NewRedisStore(redisURL string) (*Store, error) {
 	opts, err := redis.ParseURL(redisURL)
 	if err != nil {
 		return nil, fmt.Errorf("error during parsing of redis url: %w", err)
@@ -31,12 +30,11 @@ func NewRedisStore(redisURL string, sessionTTL time.Duration) (*Store, error) {
 
 	return &Store{
 		redisClient: rdbClient,
-		sessionTTL:  sessionTTL,
 	}, nil
 }
 
-func (s *Store) Set(ctx context.Context, key string, value any) error {
-	return s.redisClient.Set(ctx, key, value, s.sessionTTL).Err()
+func (s *Store) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
+	return s.redisClient.Set(ctx, key, value, ttl).Err()
 }
 
 func (s *Store) Get(ctx context.Context, key string) (string, error) {

@@ -6,15 +6,15 @@ import (
 
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 	"github.com/CatSprite-dev/fireball/internal/service"
-	"github.com/CatSprite-dev/fireball/internal/session"
+	"github.com/CatSprite-dev/fireball/internal/storage"
 )
 
 type PortfolioHandler struct {
 	portfolioService *service.Calculator
-	sessionManager   *session.SessionManager
+	sessionManager   *storage.SessionManager
 }
 
-func NewPortfolioHandler(sm *session.SessionManager, calc *service.Calculator) *PortfolioHandler {
+func NewPortfolioHandler(sm *storage.SessionManager, calc *service.Calculator) *PortfolioHandler {
 	return &PortfolioHandler{
 		portfolioService: calc,
 		sessionManager:   sm,
@@ -64,6 +64,6 @@ func (h *PortfolioHandler) HandlerPortfolio(w http.ResponseWriter, r *http.Reque
 
 	pkg.RespondWithJSON(w, http.StatusOK, userPortfolio)
 
-	log.Printf("Число запросов HandlerPortfolio = %d", h.portfolioService.ApiClient.RequestCount())
+	log.Printf("Requests number of HandlerPortfolio = %d", h.portfolioService.ApiClient.RequestCount())
 	h.portfolioService.ApiClient.ResetRequestCount()
 }

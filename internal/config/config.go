@@ -10,8 +10,7 @@ import (
 )
 
 type Config struct {
-	BaseURL   string
-	InvestURL string
+	BaseURL string
 
 	RedisURL string
 	RedisTTL time.Duration
@@ -24,21 +23,21 @@ type Config struct {
 	sessionSecret string
 }
 
-func NewConfig() *Config {
+func NewConfig() (*Config, error) {
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Printf("failed loading .env file: %v\n", err)
-		os.Exit(1)
+		return nil, err
 	}
 	investURL := os.Getenv("T_INVEST_URL")
 	if investURL == "" {
 		log.Println("T_INVEST_URL variable is not found in environment")
-		os.Exit(1)
+		return nil, err
 	}
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
 		log.Println("REDIS_URL variable is not found in environment")
-		os.Exit(1)
+		return nil, err
 	}
 	redisTTLStr := os.Getenv("REDIS_TTL")
 	if redisTTLStr == "" {
@@ -48,7 +47,7 @@ func NewConfig() *Config {
 	secret := os.Getenv("SESSION_SECRET")
 	if secret == "" {
 		log.Println("SESSION_SECRET variable is not found in environment")
-		os.Exit(1)
+		return nil, err
 	}
 	serverPort := os.Getenv("PORT")
 	if serverPort == "" {
@@ -92,11 +91,8 @@ func NewConfig() *Config {
 		idleTimeout = 30
 	}
 
-	baseURL := investURL
-
 	return &Config{
-		BaseURL:   baseURL,
-		InvestURL: investURL,
+		BaseURL: investURL,
 
 		RedisURL: redisURL,
 		RedisTTL: time.Duration(redisTTL) * time.Hour,
@@ -107,7 +103,7 @@ func NewConfig() *Config {
 		IdleTimeout:  time.Duration(idleTimeout) * time.Second,
 
 		sessionSecret: secret,
-	}
+	}, nil
 }
 
 func (c *Config) GetSecret() string {
