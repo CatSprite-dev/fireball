@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { login } from '../api/auth'
+import { login } from '../api/login'
 
 const router = useRouter()
 const auth = useAuthStore()

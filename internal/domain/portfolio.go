@@ -1,6 +1,9 @@
 package domain
 
-type UserFullPortfolio struct {
+import "time"
+
+type Portfolio struct {
+	OpenedDate            time.Time             `json:"openedDate"`
 	TotalAmountShares     MoneyValue            `json:"totalAmountShares"`
 	TotalAmountBonds      MoneyValue            `json:"totalAmountBonds"`
 	TotalAmountEtf        MoneyValue            `json:"totalAmountEtf"`
@@ -16,6 +19,9 @@ type UserFullPortfolio struct {
 	DailyYield            MoneyValue            `json:"dailyYield"`
 	DailyYieldRelative    Quotation             `json:"dailyYieldRelative"`
 	AllDividends          map[string]MoneyValue `json:"allDividends"`
+	TotalReturn           MoneyValue            `json:"totalReturn"`
+	TotalReturnRelative   Quotation             `json:"totalReturnRelative"`
+	TotalInvested         MoneyValue            `json:"totalInvested"`
 }
 
 type Position struct {

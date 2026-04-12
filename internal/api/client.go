@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -17,6 +18,7 @@ type Client struct {
 	usersLimiter       *rate.Limiter
 	operationsLimiter  *rate.Limiter
 	instrumentsLimiter *rate.Limiter
+	requestCount       atomic.Int64
 }
 
 func NewClient(baseURL string) *Client {
@@ -31,15 +33,26 @@ func NewClient(baseURL string) *Client {
 	}
 }
 
+type RequestError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e RequestError) Error() string {
+	return e.Message
+}
+
 func (client *Client) DoRequest(url string, httpMethod string, token string, payload interface{}) ([]byte, error) {
+	client.requestCount.Add(1)
+
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("payload marshal error:  %w", err)
+		return nil, fmt.Errorf("payload marshal error: %w", err)
 	}
 
 	req, err := http.NewRequest(httpMethod, url, bytes.NewBuffer(body))
 	if err != nil {
-		return nil, fmt.Errorf("request error: %w", err)
+		return nil, fmt.Errorf("request creation error: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
@@ -47,19 +60,26 @@ func (client *Client) DoRequest(url string, httpMethod string, token string, pay
 
 	res, err := client.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("response error: %w", err)
+		return nil, fmt.Errorf("request error: %w", err)
 	}
-
 	defer res.Body.Close()
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, fmt.Errorf("upstream HTTP code %d: %s", res.StatusCode, url)
+		return nil, RequestError{StatusCode: res.StatusCode, Message: fmt.Sprintf("unexpected status code: %d", res.StatusCode)}
 	}
 
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read error: %w", err)
+		return nil, fmt.Errorf("response read error: %w", err)
 	}
 
 	return data, nil
+}
+
+func (client *Client) RequestCount() int64 {
+	return client.requestCount.Load()
+}
+
+func (client *Client) ResetRequestCount() {
+	client.requestCount.Store(0)
 }

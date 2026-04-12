@@ -1,26 +1,19 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
-import { fetchPortfolio } from '../api/auth'
+import { fetchPortfolio } from '../api/fetch_portfolio'
+import { parseMoney} from '../composables/useFormatters'
 import type { UserFullPortfolio, Investment, Metrics } from '../types'
 import router from '../router'
 
-function parseMoney(m: { units: string; nano: number } | undefined): number {
-    if (!m) return 0
-    const units = parseFloat(m.units || '0') || 0
-    const nanos = (m.nano || 0) / 1e9
-    return units + nanos
-}
-
 export const usePortfolioStore = defineStore('portfolio', () => {
-    const raw = ref<UserFullPortfolio | null>(null)
+    const portfolio = ref<UserFullPortfolio | null>(null)
     const isLoading = ref(false)
     const error = ref('')
 
     const investments = computed<Investment[]>(() => {
-        if (!raw.value) return []
-
-        return raw.value.positions
+        if (!portfolio.value) return []
+        return portfolio.value.positions
             .filter(pos => pos.instrumentType?.toLowerCase() !== 'currency')
             .map(pos => ({
                 id: pos.positionUid,
@@ -31,11 +24,14 @@ export const usePortfolioStore = defineStore('portfolio', () => {
                 purchasePrice: parseMoney(pos.averagePositionPrice),
                 currentPrice: parseMoney(pos.currentPrice),
                 dividends: parseMoney(pos.dividends),
+                totalYield: parseMoney(pos.totalYield),
+                totalYieldRelative: parseMoney(pos.totalYieldRelative),
             }))
     })
-    
+
     const metrics = computed<Metrics>(() => {
-        if (!raw.value) return {
+        if (!portfolio.value) return {
+            totalInvestedOfHoldings: 0,
             totalInvested: 0,
             currentValue: 0,
             totalGain: 0,
@@ -45,22 +41,24 @@ export const usePortfolioStore = defineStore('portfolio', () => {
             portfolioSize: 0,
         }
 
-        const totalInvested = investments.value.reduce(
+        const totalInvestedOfHoldings = investments.value.reduce(
             (sum, inv) => sum + inv.quantity * inv.purchasePrice, 0
         )
-        const currentValue = parseMoney(raw.value.totalAmountPortfolio)
-        const totalGain = parseMoney(raw.value.expectedYield)
-        const totalGainPercent = totalInvested > 0 ? (totalGain / totalInvested) * 100 : 0
-        const dailyYield = parseMoney(raw.value.dailyYield)
-        const dailyYieldRelative = parseMoney(raw.value.dailyYieldRelative)
+        const totalInvested = parseMoney(portfolio.value.totalInvested)
+        const currentValue = parseMoney(portfolio.value.totalAmountPortfolio)
+        const totalGain = parseMoney(portfolio.value.totalReturn)
+        const totalGainPercent = parseMoney(portfolio.value.totalReturnRelative)
+        const dailyYield = parseMoney(portfolio.value.dailyYield)
+        const dailyYieldRelative = parseMoney(portfolio.value.dailyYieldRelative)
 
         return {
+            totalInvestedOfHoldings,
             totalInvested,
             currentValue,
             totalGain,
-            totalGainPercent,
-            dailyYield,
-            dailyYieldRelative,
+            totalGainPercent: totalInvested > 0 ? (totalGain / totalInvested) * 100 : 0,
+            dailyYield: parseMoney(portfolio.value.dailyYield),
+            dailyYieldRelative: parseMoney(portfolio.value.dailyYieldRelative),
             portfolioSize: investments.value.length,
         }
     })
@@ -68,9 +66,8 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     async function load() {
         isLoading.value = true
         error.value = ''
-
         try {
-            raw.value = await fetchPortfolio()
+            portfolio.value = await fetchPortfolio()
         } catch (e) {
             if (e instanceof Error && e.message === 'UNAUTHORIZED') {
                 const auth = useAuthStore()
@@ -84,5 +81,5 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         }
     }
 
-    return { raw, investments, metrics, isLoading, error, load }
+    return { raw: portfolio, investments, metrics, isLoading, error, load }
 })

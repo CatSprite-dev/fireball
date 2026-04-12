@@ -14,7 +14,7 @@ export interface Position {
     name: string
     ticker: string
     instrumentType: string
-    quantity: MoneyValue
+    quantity: Quotation
     averagePositionPrice: MoneyValue
     currentPrice: MoneyValue
     expectedYield: MoneyValue
@@ -23,6 +23,8 @@ export interface Position {
     blocked: boolean
     figi: string
     instrumentUid: string
+    totalYield: MoneyValue
+    totalYieldRelative: Quotation
 }
 
 export interface UserFullPortfolio {
@@ -41,10 +43,15 @@ export interface UserFullPortfolio {
     positions: Position[]
     accountId: string
     allDividends: Record<string, MoneyValue>
+    totalReturn: MoneyValue
+    totalReturnRelative: Quotation
+    totalInvested: MoneyValue
 }
 
-export interface AuthResponse {
-  user_portfolio: UserFullPortfolio
+export interface ChartData {
+    times: string[]
+    index: Quotation[]
+    portfolio: Quotation[]
 }
 
 export interface Investment {
@@ -56,6 +63,8 @@ export interface Investment {
     purchasePrice: number
     currentPrice: number
     dividends: number
+    totalYield: number
+    totalYieldRelative: number
 }
 
 export interface InvestmentWithGain extends Investment {
@@ -64,6 +73,7 @@ export interface InvestmentWithGain extends Investment {
 }
 
 export interface Metrics {
+    totalInvestedOfHoldings: number
     totalInvested: number
     currentValue: number
     totalGain: number

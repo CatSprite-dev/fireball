@@ -56,7 +56,9 @@ func SubtractMoneyValue(a, b domain.MoneyValue) domain.MoneyValue {
 
 func MultiplyMoneyValue(a, b domain.MoneyValue) domain.MoneyValue {
 	result := parseDecimal(a.Units, a.Nano).Mul(parseDecimal(b.Units, b.Nano))
+
 	units, nano := splitDecimal(result)
+
 	return domain.MoneyValue{Currency: a.Currency, Units: unitsStr(units, nano), Nano: int(nano)}
 }
 
@@ -68,6 +70,16 @@ func DivideMoneyValue(a, b domain.MoneyValue) (domain.MoneyValue, error) {
 	result := parseDecimal(a.Units, a.Nano).Div(divisor)
 	units, nano := splitDecimal(result)
 	return domain.MoneyValue{Currency: a.Currency, Units: unitsStr(units, nano), Nano: int(nano)}, nil
+}
+
+func DivideMoneyValueToQuotation(a, b domain.MoneyValue) (domain.Quotation, error) {
+	divisor := parseDecimal(b.Units, b.Nano)
+	if divisor.IsZero() {
+		return domain.Quotation{}, fmt.Errorf("division by zero")
+	}
+	result := parseDecimal(a.Units, a.Nano).Div(divisor)
+	units, nano := splitDecimal(result)
+	return domain.Quotation{Units: unitsStr(units, nano), Nano: int(nano)}, nil
 }
 
 func AddQuotations(a, b domain.Quotation) domain.Quotation {
@@ -86,7 +98,9 @@ func SubtractQuotations(a, b domain.Quotation) domain.Quotation {
 
 func MultiplyQuotation(a, b domain.Quotation) domain.Quotation {
 	result := parseDecimal(a.Units, a.Nano).Mul(parseDecimal(b.Units, b.Nano))
+
 	units, nano := splitDecimal(result)
+
 	return domain.Quotation{Units: unitsStr(units, nano), Nano: int(nano)}
 }
 

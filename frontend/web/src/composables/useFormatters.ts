@@ -10,3 +10,8 @@ export function useFormatters() {
 
     return { formatCurrency }
 }
+
+export function parseMoney(m: { units: string; nano: number } | undefined): number {
+    if (!m) return 0
+    return (parseFloat(m.units || '0') || 0) + (m.nano || 0) / 1e9
+}

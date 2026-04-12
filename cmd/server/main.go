@@ -30,18 +30,20 @@ func main() {
 	calculator := service.NewCalculator(apiClient)
 
 	loginHandler := handlers.NewLoginHandler(sessionManager, apiClient)
-	authHandler := handlers.NewAuthHandler(sessionManager, calculator)
 
 	loginRateLimiter := handlers.NewRateLimiter(10)
 	authRateLimiter := handlers.NewRateLimiter(200)
+	portfolioHandler := handlers.NewPortfolioHandler(sessionManager, calculator)
+	chartHandler := handlers.NewChartHandler(sessionManager, calculator)
 
 	mux := http.NewServeMux()
 	fileServer := http.FileServer(http.Dir("frontend/dist"))
 
-	mux.HandleFunc("GET /api/ping", authRateLimiter.Middleware(authHandler.HandlerPing))
+	mux.HandleFunc("GET /api/ping", authRateLimiter.Middleware(portfolioHandler.HandlerPing))
 	mux.HandleFunc("POST /api/login", loginRateLimiter.Middleware(loginHandler.HandlerLogin))
 	mux.HandleFunc("POST /api/logout", loginRateLimiter.Middleware(loginHandler.HandlerLogout))
-	mux.HandleFunc("POST /api/auth", authRateLimiter.Middleware(authHandler.HandlerAuth))
+	mux.HandleFunc("POST /api/portfolio", authRateLimiter.Middleware(portfolioHandler.HandlerPortfolio))
+	mux.HandleFunc("POST /api/chart", authRateLimiter.Middleware(chartHandler.HandlerChart))
 
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Catch-all hit: %s %s", r.Method, r.URL.Path)

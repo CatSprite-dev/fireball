@@ -1,27 +1,27 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 
-	"github.com/CatSprite-dev/fireball/internal/domain"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 	"github.com/CatSprite-dev/fireball/internal/service"
 	"github.com/CatSprite-dev/fireball/internal/session"
 )
 
-type AuthHandler struct {
+type PortfolioHandler struct {
 	portfolioService *service.Calculator
 	sessionManager   *session.SessionManager
 }
 
-func NewAuthHandler(sm *session.SessionManager, calc *service.Calculator) *AuthHandler {
-	return &AuthHandler{
+func NewPortfolioHandler(sm *session.SessionManager, calc *service.Calculator) *PortfolioHandler {
+	return &PortfolioHandler{
 		portfolioService: calc,
 		sessionManager:   sm,
 	}
 }
 
-func (h *AuthHandler) HandlerPing(w http.ResponseWriter, r *http.Request) {
+func (h *PortfolioHandler) HandlerPing(w http.ResponseWriter, r *http.Request) {
 	sessionID, err := getSessionFromCookie(r)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -37,11 +37,7 @@ func (h *AuthHandler) HandlerPing(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
-	type returnVals struct {
-		UserPortfolio domain.UserFullPortfolio `json:"user_portfolio"`
-	}
-
+func (h *PortfolioHandler) HandlerPortfolio(w http.ResponseWriter, r *http.Request) {
 	sessionID, err := getSessionFromCookie(r)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusBadRequest, err.Error(), err)
@@ -66,7 +62,8 @@ func (h *AuthHandler) HandlerAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pkg.RespondWithJSON(w, http.StatusOK, returnVals{
-		UserPortfolio: userPortfolio,
-	})
+	pkg.RespondWithJSON(w, http.StatusOK, userPortfolio)
+
+	log.Printf("Число запросов HandlerPortfolio = %d", h.portfolioService.ApiClient.RequestCount())
+	h.portfolioService.ApiClient.ResetRequestCount()
 }

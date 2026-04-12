@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
-import { tokenToString } from 'typescript'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
 export const useAuthStore = defineStore('auth', () => {
     const isLoggedIn = ref(false)
