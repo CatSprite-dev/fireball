@@ -18,7 +18,7 @@ READ_TIMEOUT="10"
 WRITE_TIMEOUT="10"
 IDLE_TIMEOUT="30"
 ```
-* Don't forget to paste correct redis-url and generate and paste 32 bytes secret. You can use `openssl rand -hex 64`
+* Don't forget to paste correct redis-url and generate and paste 32 bytes secret. You can use `openssl rand -hex 32`
 * Download dependencies using command `make setup-environment` from the root of the repo
 * Type and enter `make build-frontend` to build required assets for frontend
     * For deploying web resources **Vite** is used. It runs on 20s version of Node
