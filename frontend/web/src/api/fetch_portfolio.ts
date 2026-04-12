@@ -1,12 +1,8 @@
 import type { UserFullPortfolio } from "../types"
 
-export async function fetchPortfolio(token: string): Promise <UserFullPortfolio> {
-    const response = await fetch('/portfolio', {
+export async function fetchPortfolio(): Promise <UserFullPortfolio> {
+    const response = await fetch('/api/portfolio', {
         method: 'POST',
-        headers: {
-            'T-Token': token,
-            'Content-Type': 'application/json',
-        },
     })
 
     if (response.status === 401) {

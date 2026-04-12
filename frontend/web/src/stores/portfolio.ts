@@ -4,6 +4,7 @@ import { useAuthStore } from './auth'
 import { fetchPortfolio } from '../api/fetch_portfolio'
 import { parseMoney} from '../composables/useFormatters'
 import type { UserFullPortfolio, Investment, Metrics } from '../types'
+import router from '../router'
 
 export const usePortfolioStore = defineStore('portfolio', () => {
     const portfolio = ref<UserFullPortfolio | null>(null)
@@ -63,16 +64,15 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     })
 
     async function load() {
-        const auth = useAuthStore()
-        if (!auth.token) return
         isLoading.value = true
         error.value = ''
         try {
-            portfolio.value = await fetchPortfolio(auth.token)
+            portfolio.value = await fetchPortfolio()
         } catch (e) {
             if (e instanceof Error && e.message === 'UNAUTHORIZED') {
-                auth.logout()
-                error.value = 'Session expired, please log in again'
+                const auth = useAuthStore()
+                auth.isLoggedIn = false
+                router.push('/login')
             } else {
                 error.value = 'Failed to load portfolio'
             }

@@ -8,22 +8,35 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/domain"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 	"github.com/CatSprite-dev/fireball/internal/service"
+	"github.com/CatSprite-dev/fireball/internal/session"
 )
 
 type ChartHandler struct {
 	portfolioService *service.Calculator
+	sessionManager   *session.SessionManager
 }
 
-func NewChartHandler(calc *service.Calculator) *ChartHandler {
-	return &ChartHandler{portfolioService: calc}
+func NewChartHandler(sm *session.SessionManager, calc *service.Calculator) *ChartHandler {
+	return &ChartHandler{
+		portfolioService: calc,
+		sessionManager:   sm,
+	}
 }
 
 func (h *ChartHandler) HandlerChart(w http.ResponseWriter, r *http.Request) {
-	token, err := getTokenFromHeader(r.Header)
+	sessionID, err := getSessionFromCookie(r)
 	if err != nil {
-		pkg.RespondWithError(w, http.StatusUnauthorized, err.Error(), err)
+		pkg.RespondWithError(w, http.StatusBadRequest, err.Error(), err)
 		return
 	}
+
+	sessionData, err := h.sessionManager.GetSession(r.Context(), sessionID)
+	if err != nil {
+		pkg.RespondWithError(w, http.StatusUnauthorized, "invalid session", err)
+		return
+	}
+
+	token := sessionData.Token
 
 	var userPortfolio domain.Portfolio
 	err = json.NewDecoder(r.Body).Decode(&userPortfolio)

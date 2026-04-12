@@ -5,6 +5,10 @@ const router = createRouter({
     history: createWebHistory(),
     routes: [
         {
+            path: '/:pathMatch(.*)*',
+            redirect: '/',
+        },
+        {
             path: '/login',
             component: () => import('../views/LoginView.vue'),
         },
@@ -16,15 +20,19 @@ const router = createRouter({
     ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
     const auth = useAuthStore()
+
+    if (!auth.isReady) {
+        await auth.checkAuth()
+    }
 
     if (to.meta.requiresAuth && !auth.isLoggedIn) {
         return '/login'
     }
 
     if (to.path === '/login' && auth.isLoggedIn) {
-        return '/portfolio'
+        return '/'
     }
 })
 

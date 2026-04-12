@@ -15,12 +15,12 @@ export const useChartStore = defineStore('chart', () => {
     async function load(period: string = '6m', index: string = 'IMOEX') {
         const auth = useAuthStore()
         const portfolioStore = usePortfolioStore()
-        if (!auth.token || !portfolioStore.raw) return
+        if (!auth.isLoggedIn || !portfolioStore.raw) return
 
         isLoading.value = true
         error.value = ''
         try {
-            chartData.value = await fetchChart(auth.token, portfolioStore.raw, period, index)
+            chartData.value = await fetchChart(portfolioStore.raw, period, index)
         } catch (e) {
             if (e instanceof Error && e.message === 'UNAUTHORIZED') {
                 auth.logout()

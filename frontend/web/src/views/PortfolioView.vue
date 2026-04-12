@@ -15,8 +15,8 @@ const auth = useAuthStore()
 const chart = useChartStore()
 const activeTab = ref<'overview' | 'holdings'>('overview')
 
-function logout() {
-  auth.logout()
+async function logout() {
+  await auth.logout()
   router.push('/login')
 }
 

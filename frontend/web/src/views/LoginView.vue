@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { usePortfolioStore } from '../stores/portfolio'
+import { login } from '../api/login'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -21,28 +21,15 @@ async function submit() {
     error.value = ''
 
     try {
-        const response = await fetch('/portfolio', {
-            method: 'POST',
-            headers: {
-                'T-Token': token.value.trim(),
-                'Content-Type': 'application/json',
-            },
-        })
-
-        if (response.status === 401) {
-            error.value = 'Token is invalid or expired'
-            return
-        }
-
-        if (!response.ok) {
-            error.value = 'Something went wrong, try again'
-            return
-        }
-
-        const portfolio = usePortfolioStore()
-        auth.setToken(token.value.trim())
-        await portfolio.load()
+        await login(token.value.trim())
+        auth.isLoggedIn = true
         router.push('/')
+    } catch (e) {
+        if (e instanceof Error && e.message === 'UNAUTHORIZED') {
+            error.value = 'Token is invalid or expired'
+        } else {
+            error.value = 'Something went wrong, try again'
+        }
     } finally {
         isLoading.value = false
     }
@@ -105,7 +92,7 @@ async function submit() {
 .login-header {
     padding: 24px;
     padding-bottom: 12px;
-    border-bottom: 1px solid var (--border);
+    border-bottom: 1px solid var(--border);
 
 }
 
@@ -137,7 +124,7 @@ label {
 input {
     height: 40px;
     width: 100%;
-    border: 1 px solid var(--input);
+    border: 1px solid var(--input);
     border-radius: 6px;
     background: var(--input);
     padding: 0 12px;

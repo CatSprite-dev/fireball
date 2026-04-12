@@ -3,8 +3,7 @@ import { resolve } from 'path'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
-  root: 'web',
-  publicDir: 'assets',     
+  root: 'web',    
   build: {
     outDir: '../dist',
     emptyOutDir: true,
@@ -22,27 +21,12 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
+    historyApiFallback: true,
     proxy: {
-        '/portfolio': {
+        '/api': {
             target: 'http://localhost:8080',
             changeOrigin: true,
-            rewrite: (path) => path,
-            configure: (proxy) => {
-                proxy.on('proxyReq', (proxyReq, req, res) => {
-                    console.log(`---> Proxy: ${req.method} ${req.url} -> 8080${req.url}`);
-                })
-            }
         },
-        '/chart': {
-            target: 'http://localhost:8080',
-            changeOrigin: true,
-            rewrite: (path) => path,
-            configure: (proxy) => {
-                proxy.on('proxyReq', (proxyReq, req, res) => {
-                    console.log(`---> Proxy: ${req.method} ${req.url} -> 8080${req.url}`);
-                })
-            }
-        }
     }
 }
 })

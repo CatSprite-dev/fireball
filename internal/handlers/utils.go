@@ -1,23 +1,38 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
-	"strings"
+	"os"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 )
 
-func getTokenFromHeader(headers http.Header) (string, error) {
-	token := headers.Get("T-Token")
-	if token == "" {
-		return "", errors.New("token is not provided")
+func setSessionCookie(w http.ResponseWriter, sessionID string, setToDelete bool) {
+	expiration := time.Now().Add(24 * time.Hour)
+	maxAge := 0
+	if setToDelete {
+		maxAge = -1
+		expiration = time.Unix(0, 0)
 	}
-	if len(token) < 10 || !strings.HasPrefix(token, "t.") {
-		return "", errors.New("invalid token")
+	cookie := http.Cookie{
+		Name:     "session_token",
+		Value:    sessionID,
+		Expires:  expiration,
+		HttpOnly: true,
+		Secure:   os.Getenv("ENV") == "production",
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   maxAge,
 	}
-	return token, nil
+	http.SetCookie(w, &cookie)
+}
+
+func getSessionFromCookie(r *http.Request) (string, error) {
+	cookie, err := r.Cookie("session_token")
+	if err != nil {
+		return "", err
+	}
+	return cookie.Value, nil
 }
 
 func PeriodToParams(period string) (time.Time, time.Time, pkg.CandleInterval) {
