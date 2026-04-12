@@ -9,6 +9,7 @@ const { formatCurrency } = useFormatters()
 const props = defineProps<{
     investments: Investment[]
     chartSeries: ApexAxisChartSeries
+    isChartLoading: boolean
 }>()
 
 const typeLabels: Record<string, string> = {
@@ -153,13 +154,15 @@ const chartOptions = computed(() => ({
         </div>
     </div>
     
-    <div v-if="props.chartSeries.length > 0" class="card chart-card">
+    <div class="card chart-card">
         <div class="card-header">
             <h2>Portfolio vs Index</h2>
-            <p>Comparison with the index</p>
+            <p>{{ isChartLoading ? 'Loading chart...' : 'Comparison with the index' }}</p>
         </div>
-        <div class="card-body">
-            <apexchart 
+        <div class="card-body" style="min-height: 300px;">
+            <div v-if="isChartLoading" class="skeleton-chart"></div>
+            <apexchart
+                v-else
                 ref="chartRef"
                 type="line" 
                 :series="props.chartSeries" 

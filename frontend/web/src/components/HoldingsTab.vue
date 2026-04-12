@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Investment } from '../types'
-import { computed, initCustomFormatter } from 'vue'
+import { computed } from 'vue'
 import { useFormatters } from '../composables/useFormatters'
 
 const { formatCurrency } = useFormatters()

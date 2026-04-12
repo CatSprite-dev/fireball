@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import { useAuthStore } from '../stores/auth'
+import { useChartStore } from '../stores/chart' 
 import MetricsGrid from '../components/MetricsGrid.vue'
 import OverviewTab from '../components/OverviewTab.vue'
 import HoldingsTab from '../components/HoldingsTab.vue'
@@ -11,19 +12,18 @@ import PortfolioSkeleton from '../components/PortfolioSkeleton.vue'
 const router = useRouter()
 const portfolio = usePortfolioStore()
 const auth = useAuthStore()
-
+const chart = useChartStore()
 const activeTab = ref<'overview' | 'holdings'>('overview')
-
-
 
 function logout() {
   auth.logout()
   router.push('/login')
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (!portfolio.raw) {
-    portfolio.load()
+    await portfolio.load()
+    chart.load()
   }
 })
 </script>
@@ -73,7 +73,7 @@ onMounted(() => {
           </button>
         </div>
 
-        <OverviewTab v-if="activeTab==='overview'" :investments="portfolio.investments" :chartSeries="portfolio.chartSeries"/>
+        <OverviewTab v-if="activeTab==='overview'" :investments="portfolio.investments" :chartSeries="chart.chartSeries" :isChartLoading="chart.isLoading"/>
         <HoldingsTab v-if="activeTab==='holdings'" :investments="portfolio.investments"/>
       </div>
     </template>
