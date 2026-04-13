@@ -1,4 +1,4 @@
-package session
+package storage
 
 import (
 	"context"
@@ -15,8 +15,9 @@ import (
 )
 
 type SessionManager struct {
-	store  *Store
-	secret []byte
+	store    *Store
+	secret   []byte
+	RedisTTL time.Duration
 }
 
 type SessionData struct {
@@ -25,14 +26,15 @@ type SessionData struct {
 	OpenedDate time.Time `json:"opened_date"`
 }
 
-func NewManager(store *Store, secret string) (*SessionManager, error) {
+func NewSessionManager(store *Store, secret string, redisTTL time.Duration) (*SessionManager, error) {
 	key, err := hex.DecodeString(secret)
 	if err != nil || len(key) != 32 {
 		return nil, fmt.Errorf("SESSION_SECRET must be a 32-byte hex-encoded string")
 	}
 	return &SessionManager{
-		store:  store,
-		secret: key,
+		store:    store,
+		secret:   key,
+		RedisTTL: redisTTL,
 	}, nil
 }
 
@@ -96,7 +98,7 @@ func (m *SessionManager) CreateSession(ctx context.Context, token string, accoun
 	}
 
 	sessionID := uuid.New().String()
-	if err := m.store.Set(ctx, "session:"+sessionID, sessionJSON); err != nil {
+	if err := m.store.Set(ctx, "session:"+sessionID, sessionJSON, m.RedisTTL); err != nil {
 		return "", fmt.Errorf("failed to store session: %w", err)
 	}
 

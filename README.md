@@ -24,7 +24,8 @@ IDLE_TIMEOUT="30"
     * For deploying web resources **Vite** is used. It runs on 20s version of Node
 * Enter `make start-deps` for building required docker containers
 * Run `make run-server` to wind up the backend. App will be served on `http://localhost:8080/`
-* If you need a development media for real-time edit of frontend code, use `make dev`. Vite will serve app on `http://localhost:3000/`. Don't forget run the server in the previous step, if you want not only frontend page, but fully functional app 
+* If you need a development media for real-time edit of frontend code, use `make dev`. Vite will serve app on `http://localhost:3000/`. Don't forget run the server in the previous step, if you want not only frontend page, but fully functional app
+* Enter `make stop-deps` for stopping containers
 
 Contact us, authors, for possible suggestions or complaints: 
 * [CatSprite](https://github.com/CatSprite-dev)

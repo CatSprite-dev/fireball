@@ -20,7 +20,7 @@ export const useChartStore = defineStore('chart', () => {
         isLoading.value = true
         error.value = ''
         try {
-            chartData.value = await fetchChart(portfolioStore.raw, period, index)
+            chartData.value = await fetchChart(period, index)
         } catch (e) {
             if (e instanceof Error && e.message === 'UNAUTHORIZED') {
                 auth.logout()

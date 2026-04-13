@@ -10,31 +10,37 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/config"
 	"github.com/CatSprite-dev/fireball/internal/handlers"
 	"github.com/CatSprite-dev/fireball/internal/service"
-	"github.com/CatSprite-dev/fireball/internal/session"
+	"github.com/CatSprite-dev/fireball/internal/storage"
 )
 
 func main() {
-	cfg := config.NewConfig()
+	cfg, err := config.NewConfig()
+	if err != nil {
+		os.Exit(1)
+	}
 
-	store, err := session.NewRedisStore(cfg.RedisURL, cfg.RedisTTL)
+	store, err := storage.NewRedisStore(cfg.RedisURL)
 	if err != nil {
 		log.Fatalf("%v\n", err)
 	}
 
-	sessionManager, err := session.NewManager(store, cfg.GetSecret())
+	sessionManager, err := storage.NewSessionManager(store, cfg.GetSecret(), cfg.RedisTTL)
 	if err != nil {
 		log.Fatalf("%v\n", err)
 	}
+	cacheManager := storage.NewCacheManager(store, cfg.CacheTTL)
 
 	apiClient := api.NewClient(cfg.BaseURL)
 	calculator := service.NewCalculator(apiClient)
+
+	portfolioService := service.NewPortfolioService(calculator, cacheManager)
 
 	loginHandler := handlers.NewLoginHandler(sessionManager, apiClient)
 
 	loginRateLimiter := handlers.NewRateLimiter(10)
 	authRateLimiter := handlers.NewRateLimiter(200)
-	portfolioHandler := handlers.NewPortfolioHandler(sessionManager, calculator)
-	chartHandler := handlers.NewChartHandler(sessionManager, calculator)
+	portfolioHandler := handlers.NewPortfolioHandler(sessionManager, portfolioService)
+	chartHandler := handlers.NewChartHandler(sessionManager, portfolioService)
 
 	mux := http.NewServeMux()
 	fileServer := http.FileServer(http.Dir("frontend/dist"))
@@ -43,7 +49,7 @@ func main() {
 	mux.HandleFunc("POST /api/login", loginRateLimiter.Middleware(loginHandler.HandlerLogin))
 	mux.HandleFunc("POST /api/logout", loginRateLimiter.Middleware(loginHandler.HandlerLogout))
 	mux.HandleFunc("POST /api/portfolio", authRateLimiter.Middleware(portfolioHandler.HandlerPortfolio))
-	mux.HandleFunc("POST /api/chart", authRateLimiter.Middleware(chartHandler.HandlerChart))
+	mux.HandleFunc("GET /api/chart", authRateLimiter.Middleware(chartHandler.HandlerChart))
 
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Catch-all hit: %s %s", r.Method, r.URL.Path)

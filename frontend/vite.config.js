@@ -11,6 +11,12 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'web/index.html'),
       },
+      output: {
+        manualChunks: {
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          'apexcharts-vendor': ['apexcharts', 'vue3-apexcharts'],
+        },
+      },
     },
     minify: 'esbuild',
     sourcemap: true,

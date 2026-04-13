@@ -10,11 +10,11 @@ import (
 )
 
 type Config struct {
-	BaseURL   string
-	InvestURL string
+	BaseURL string
 
 	RedisURL string
 	RedisTTL time.Duration
+	CacheTTL time.Duration
 
 	ServerPort   string
 	ReadTimeout  time.Duration
@@ -24,31 +24,36 @@ type Config struct {
 	sessionSecret string
 }
 
-func NewConfig() *Config {
+func NewConfig() (*Config, error) {
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Printf("failed loading .env file: %v\n", err)
-		os.Exit(1)
+		return nil, err
 	}
 	investURL := os.Getenv("T_INVEST_URL")
 	if investURL == "" {
 		log.Println("T_INVEST_URL variable is not found in environment")
-		os.Exit(1)
+		return nil, err
 	}
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
 		log.Println("REDIS_URL variable is not found in environment")
-		os.Exit(1)
+		return nil, err
 	}
 	redisTTLStr := os.Getenv("REDIS_TTL")
 	if redisTTLStr == "" {
 		log.Println("REDIS_TTL variable is not found in environment\nSetting default 24h")
 		redisTTLStr = "24"
 	}
+	cacheTTLStr := os.Getenv("CACHE_TTL")
+	if cacheTTLStr == "" {
+		log.Println("CACHE_TTL variable is not found in environment\nSetting default 3m")
+		cacheTTLStr = "3"
+	}
 	secret := os.Getenv("SESSION_SECRET")
 	if secret == "" {
 		log.Println("SESSION_SECRET variable is not found in environment")
-		os.Exit(1)
+		return nil, err
 	}
 	serverPort := os.Getenv("PORT")
 	if serverPort == "" {
@@ -76,6 +81,11 @@ func NewConfig() *Config {
 		log.Println("Wrong format of REDIS_TTL\nSetting default 24h")
 		redisTTL = 24
 	}
+	cacheTTL, err := strconv.Atoi(cacheTTLStr)
+	if err != nil {
+		log.Println("Wrong format of CACHE_TTL\nSetting default 3m")
+		cacheTTL = 3
+	}
 	readTimeout, err := strconv.Atoi(readTimeoutStr)
 	if err != nil {
 		log.Println("Wrong format of READ_TIMEOUT\nSetting default 10s")
@@ -92,14 +102,12 @@ func NewConfig() *Config {
 		idleTimeout = 30
 	}
 
-	baseURL := investURL
-
 	return &Config{
-		BaseURL:   baseURL,
-		InvestURL: investURL,
+		BaseURL: investURL,
 
 		RedisURL: redisURL,
 		RedisTTL: time.Duration(redisTTL) * time.Hour,
+		CacheTTL: time.Duration(cacheTTL) * time.Minute,
 
 		ServerPort:   serverPort,
 		ReadTimeout:  time.Duration(readTimeout) * time.Second,
@@ -107,7 +115,7 @@ func NewConfig() *Config {
 		IdleTimeout:  time.Duration(idleTimeout) * time.Second,
 
 		sessionSecret: secret,
-	}
+	}, nil
 }
 
 func (c *Config) GetSecret() string {
