@@ -26,7 +26,7 @@ type SessionData struct {
 	OpenedDate time.Time `json:"opened_date"`
 }
 
-func NewManager(store *Store, secret string, redisTTL time.Duration) (*SessionManager, error) {
+func NewSessionManager(store *Store, secret string, redisTTL time.Duration) (*SessionManager, error) {
 	key, err := hex.DecodeString(secret)
 	if err != nil || len(key) != 32 {
 		return nil, fmt.Errorf("SESSION_SECRET must be a 32-byte hex-encoded string")

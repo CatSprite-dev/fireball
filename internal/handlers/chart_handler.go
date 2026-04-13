@@ -1,24 +1,22 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 
-	"github.com/CatSprite-dev/fireball/internal/domain"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 	"github.com/CatSprite-dev/fireball/internal/service"
 	"github.com/CatSprite-dev/fireball/internal/storage"
 )
 
 type ChartHandler struct {
-	portfolioService *service.Calculator
+	portfolioService *service.PortfolioService
 	sessionManager   *storage.SessionManager
 }
 
-func NewChartHandler(sm *storage.SessionManager, calc *service.Calculator) *ChartHandler {
+func NewChartHandler(sm *storage.SessionManager, ps *service.PortfolioService) *ChartHandler {
 	return &ChartHandler{
-		portfolioService: calc,
+		portfolioService: ps,
 		sessionManager:   sm,
 	}
 }
@@ -36,12 +34,15 @@ func (h *ChartHandler) HandlerChart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := sessionData.Token
+	request := service.PortfolioRequest{
+		Token:      sessionData.Token,
+		AccountID:  sessionData.AccountID,
+		OpenedDate: sessionData.OpenedDate,
+	}
 
-	var userPortfolio domain.Portfolio
-	err = json.NewDecoder(r.Body).Decode(&userPortfolio)
+	userPortfolio, err := h.portfolioService.GetOrFetchPortfolio(r.Context(), sessionID, request)
 	if err != nil {
-		pkg.RespondWithError(w, http.StatusBadRequest, "Invalid request body", err)
+		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
 		return
 	}
 
@@ -50,7 +51,7 @@ func (h *ChartHandler) HandlerChart(w http.ResponseWriter, r *http.Request) {
 
 	from, to, interval := PeriodToParams(period)
 
-	chartData, err := h.portfolioService.GetChartData(token, userPortfolio, index, from, to, interval, pkg.CandleSourceExchange)
+	chartData, err := h.portfolioService.GetChartData(request.Token, userPortfolio, index, from, to, interval, pkg.CandleSourceExchange)
 	if err != nil {
 		log.Printf("GetChartData error: %v", err)
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
@@ -58,7 +59,4 @@ func (h *ChartHandler) HandlerChart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pkg.RespondWithJSON(w, http.StatusOK, chartData)
-
-	log.Printf("Requrests number of HandlerChart = %d", h.portfolioService.ApiClient.RequestCount())
-	h.portfolioService.ApiClient.ResetRequestCount()
 }

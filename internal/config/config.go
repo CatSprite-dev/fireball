@@ -14,6 +14,7 @@ type Config struct {
 
 	RedisURL string
 	RedisTTL time.Duration
+	CacheTTL time.Duration
 
 	ServerPort   string
 	ReadTimeout  time.Duration
@@ -43,6 +44,11 @@ func NewConfig() (*Config, error) {
 	if redisTTLStr == "" {
 		log.Println("REDIS_TTL variable is not found in environment\nSetting default 24h")
 		redisTTLStr = "24"
+	}
+	cacheTTLStr := os.Getenv("CACHE_TTL")
+	if cacheTTLStr == "" {
+		log.Println("CACHE_TTL variable is not found in environment\nSetting default 3m")
+		cacheTTLStr = "3"
 	}
 	secret := os.Getenv("SESSION_SECRET")
 	if secret == "" {
@@ -75,6 +81,11 @@ func NewConfig() (*Config, error) {
 		log.Println("Wrong format of REDIS_TTL\nSetting default 24h")
 		redisTTL = 24
 	}
+	cacheTTL, err := strconv.Atoi(cacheTTLStr)
+	if err != nil {
+		log.Println("Wrong format of CACHE_TTL\nSetting default 3m")
+		cacheTTL = 3
+	}
 	readTimeout, err := strconv.Atoi(readTimeoutStr)
 	if err != nil {
 		log.Println("Wrong format of READ_TIMEOUT\nSetting default 10s")
@@ -96,6 +107,7 @@ func NewConfig() (*Config, error) {
 
 		RedisURL: redisURL,
 		RedisTTL: time.Duration(redisTTL) * time.Hour,
+		CacheTTL: time.Duration(cacheTTL) * time.Minute,
 
 		ServerPort:   serverPort,
 		ReadTimeout:  time.Duration(readTimeout) * time.Second,

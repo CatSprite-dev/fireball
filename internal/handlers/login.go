@@ -13,12 +13,14 @@ import (
 
 type LoginHandler struct {
 	sessionManager *storage.SessionManager
+	cacheManager   *storage.CacheManager
 	apiClient      *api.Client
 }
 
-func NewLoginHandler(sm *storage.SessionManager, client *api.Client) *LoginHandler {
+func NewLoginHandler(sm *storage.SessionManager, cm *storage.CacheManager, client *api.Client) *LoginHandler {
 	return &LoginHandler{
 		sessionManager: sm,
+		cacheManager:   cm,
 		apiClient:      client,
 	}
 }
@@ -69,12 +71,19 @@ func (h *LoginHandler) HandlerLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = h.cacheManager.Delete(r.Context(), sessionID)
+	if err != nil {
+		log.Printf("couldn't delete cache for %s: %v", sessionID, err)
+	}
+
 	err = h.sessionManager.DeleteSession(r.Context(), sessionID)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
 		return
 	}
 	setSessionCookie(w, sessionID, h.sessionManager.RedisTTL, true)
+
 	log.Printf("Cookie for %s is deleted\n", sessionID)
+
 	pkg.RespondWithJSON(w, http.StatusOK, struct{}{})
 }
