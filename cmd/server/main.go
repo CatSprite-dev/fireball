@@ -32,10 +32,9 @@ func main() {
 
 	apiClient := api.NewClient(cfg.BaseURL)
 	calculator := service.NewCalculator(apiClient)
-
 	portfolioService := service.NewPortfolioService(calculator, cacheManager)
 
-	loginHandler := handlers.NewLoginHandler(sessionManager, apiClient)
+	loginHandler := handlers.NewLoginHandler(sessionManager, cacheManager, apiClient)
 
 	loginRateLimiter := handlers.NewRateLimiter(10)
 	authRateLimiter := handlers.NewRateLimiter(200)

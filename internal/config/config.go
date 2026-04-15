@@ -25,11 +25,13 @@ type Config struct {
 }
 
 func NewConfig() (*Config, error) {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Printf("failed loading .env file: %v\n", err)
-		return nil, err
+	_, err := os.Stat(".env")
+	if err == nil {
+		if err := godotenv.Load(); err != nil {
+			log.Printf("Warning: .env file exists but failed to load: %v", err)
+		}
 	}
+
 	investURL := os.Getenv("T_INVEST_URL")
 	if investURL == "" {
 		log.Println("T_INVEST_URL variable is not found in environment")
