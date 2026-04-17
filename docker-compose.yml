@@ -1,25 +1,47 @@
 services:
-  app:
-    image: fireball
+  caddy:
+    image: caddy:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - static_files:/srv 
+      - caddy_data:/data
+    depends_on:
+      - web
+      - server
+
+  web:
     build: 
       context: .
+      dockerfile: ./frontend/Dockerfile
+    volumes:
+      - static_files:/srv
+
+  server:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    deploy:
+      replicas: 1
+    expose:
+      - "8080"
     depends_on:
       redis:
         condition: service_healthy
     env_file:
       - .env
-    ports:
-      - "8080:8080"
+
   redis:
     image: redis:7-alpine
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 3s
     volumes:
       - redis_storage:/data
 
 volumes:
   redis_storage:
+  static_files:
+  caddy_data:

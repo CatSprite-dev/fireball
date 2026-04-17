@@ -4,7 +4,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/CatSprite-dev/fireball/internal/api"
 	"github.com/CatSprite-dev/fireball/internal/config"
@@ -42,26 +41,12 @@ func main() {
 	chartHandler := handlers.NewChartHandler(sessionManager, portfolioService)
 
 	mux := http.NewServeMux()
-	fileServer := http.FileServer(http.Dir("frontend/dist"))
 
 	mux.HandleFunc("GET /api/ping", authRateLimiter.Middleware(portfolioHandler.HandlerPing))
 	mux.HandleFunc("POST /api/login", loginRateLimiter.Middleware(loginHandler.HandlerLogin))
 	mux.HandleFunc("POST /api/logout", loginRateLimiter.Middleware(loginHandler.HandlerLogout))
 	mux.HandleFunc("POST /api/portfolio", authRateLimiter.Middleware(portfolioHandler.HandlerPortfolio))
 	mux.HandleFunc("GET /api/chart", authRateLimiter.Middleware(chartHandler.HandlerChart))
-
-	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Catch-all hit: %s %s", r.Method, r.URL.Path)
-		path := filepath.Join("frontend/dist", r.URL.Path)
-		log.Printf("Serving path: %s", path)
-		_, err := os.Stat(path)
-		if os.IsNotExist(err) {
-			log.Printf("Not found, serving index.html")
-			http.ServeFile(w, r, "frontend/dist/index.html")
-			return
-		}
-		fileServer.ServeHTTP(w, r)
-	}))
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.ServerPort,

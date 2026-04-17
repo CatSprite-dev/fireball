@@ -1,0 +1,17 @@
+:80 {
+    root * /srv
+    file_server
+
+    handle /api/* {
+        reverse_proxy server:8080 {
+            # Заставляет Caddy опрашивать Docker DNS чаще 
+            # и распределять запросы по кругу
+            lb_policy round_robin
+        }
+    }
+
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
+}
