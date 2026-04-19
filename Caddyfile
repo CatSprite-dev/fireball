@@ -3,9 +3,7 @@
     file_server
 
     handle /api/* {
-        reverse_proxy server:8080 {
-            lb_policy round_robin
-        }
+        reverse_proxy server:8080
     }
 
     handle {

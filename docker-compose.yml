@@ -9,9 +9,11 @@ services:
       - static_files:/srv 
       - caddy_data:/data
     depends_on:
-      - web
-      - server
-
+      web:
+        condition: service_completed_successfully
+      server: 
+        condition: service_started
+    restart: unless-stopped
   web:
     build: 
       context: .
@@ -23,8 +25,6 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
-    deploy:
-      replicas: 1
     expose:
       - "8080"
     depends_on:
@@ -32,14 +32,19 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 3s
     volumes:
       - redis_storage:/data
+    restart: unless-stopped
 
 volumes:
   redis_storage:
