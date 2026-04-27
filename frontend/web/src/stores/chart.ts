@@ -13,13 +13,14 @@ export const useChartStore = defineStore('chart', () => {
     const error = ref('')
 
     async function load(period: string = '6m', index: string = 'IMOEX') {
+        console.log('in load chart')
         const auth = useAuthStore()
-        const portfolioStore = usePortfolioStore()
-        if (!auth.isLoggedIn || !portfolioStore.raw) return
+        if (!auth.isLoggedIn) return
 
         isLoading.value = true
         error.value = ''
         try {
+            console.log('fetching chart data')
             chartData.value = await fetchChart(period, index)
         } catch (e) {
             if (e instanceof Error && e.message === 'UNAUTHORIZED') {
@@ -34,22 +35,22 @@ export const useChartStore = defineStore('chart', () => {
     }
 
     const chartSeries = computed(() => {
-    if (!chartData.value) return []
+        if (!chartData.value) return []
 
-    return [    
-        { name: 'Portfolio', 
-            data: chartData.value.times
-            .map((time, i) => ({
-                x: time,
-                y: parseMoney(chartData.value?.portfolio[i])
-                    }))},
-        { name: 'Index',   
-            data: chartData.value.times
-            .map((time, i) => ({
-                x: time,
-                y: parseMoney(chartData.value?.index[i])
-                    }))},
-        ]
+        return [    
+            { name: 'Portfolio', 
+                data: chartData.value.times
+                .map((time, i) => ({
+                    x: time,
+                    y: parseMoney(chartData.value?.portfolio[i])
+                        }))},
+            { name: 'Index',   
+                data: chartData.value.times
+                .map((time, i) => ({
+                    x: time,
+                    y: parseMoney(chartData.value?.index[i])
+                        }))},
+            ]
     })
 
     return { chartSeries, isLoading, error, load }

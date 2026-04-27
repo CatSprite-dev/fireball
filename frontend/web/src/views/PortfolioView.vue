@@ -23,7 +23,7 @@ async function logout() {
 onMounted(async () => {
   if (!portfolio.raw) {
     await portfolio.load()
-    chart.load()
+    await chart.load()
   }
 })
 </script>

@@ -6,10 +6,18 @@ export const useAuthStore = defineStore('auth', () => {
     const isReady = ref(false)
     const error = ref('')
 
+    let authPromise: Promise<void> | null = null
+
     async function checkAuth() {
-        const response = await fetch('/api/ping', { method: 'GET' })
-        isLoggedIn.value = response.ok
-        isReady.value = true
+        if (authPromise) return authPromise
+        authPromise = fetch('/api/ping', { method: 'GET' })
+            .then(response => {
+                isLoggedIn.value = response.ok
+                isReady.value = true
+            })
+            .finally(() => {
+                authPromise = null
+            })
     }
 
     async function logout() {

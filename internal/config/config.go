@@ -12,9 +12,10 @@ import (
 type Config struct {
 	BaseURL string
 
-	RedisURL string
-	RedisTTL time.Duration
-	CacheTTL time.Duration
+	RedisURL          string
+	RedisTTL          time.Duration
+	PortfolioCacheTTL time.Duration
+	ChartDataCacheTTL time.Duration
 
 	ServerPort   string
 	ReadTimeout  time.Duration
@@ -45,10 +46,15 @@ func NewConfig() (*Config, error) {
 		log.Println("REDIS_TTL variable is not found in environment\nSetting default 24h")
 		redisTTLStr = "24"
 	}
-	cacheTTLStr := os.Getenv("CACHE_TTL")
-	if cacheTTLStr == "" {
+	portfolioCacheTTLStr := os.Getenv("PORTFOLIO_CACHE_TTL")
+	if portfolioCacheTTLStr == "" {
 		log.Println("CACHE_TTL variable is not found in environment\nSetting default 3m")
-		cacheTTLStr = "3"
+		portfolioCacheTTLStr = "3"
+	}
+	chartDataCacheTTLStr := os.Getenv("CHART_DATA_CACHE_TTL")
+	if chartDataCacheTTLStr == "" {
+		log.Println("CACHE_TTL variable is not found in environment\nSetting default 30m")
+		chartDataCacheTTLStr = "30"
 	}
 	secret := os.Getenv("SESSION_SECRET")
 	if secret == "" {
@@ -81,10 +87,15 @@ func NewConfig() (*Config, error) {
 		log.Println("Wrong format of REDIS_TTL\nSetting default 24h")
 		redisTTL = 24
 	}
-	cacheTTL, err := strconv.Atoi(cacheTTLStr)
+	portfolioCacheTTL, err := strconv.Atoi(portfolioCacheTTLStr)
 	if err != nil {
-		log.Println("Wrong format of CACHE_TTL\nSetting default 3m")
-		cacheTTL = 3
+		log.Println("Wrong format of PORTFOLIO_CACHE_TTL\nSetting default 3m")
+		portfolioCacheTTL = 3
+	}
+	chartDataCacheTTL, err := strconv.Atoi(chartDataCacheTTLStr)
+	if err != nil {
+		log.Println("Wrong format of CHART_DATA_CACHE_TTL\nSetting default 3m")
+		chartDataCacheTTL = 3
 	}
 	readTimeout, err := strconv.Atoi(readTimeoutStr)
 	if err != nil {
@@ -105,9 +116,10 @@ func NewConfig() (*Config, error) {
 	return &Config{
 		BaseURL: investURL,
 
-		RedisURL: redisURL,
-		RedisTTL: time.Duration(redisTTL) * time.Hour,
-		CacheTTL: time.Duration(cacheTTL) * time.Minute,
+		RedisURL:          redisURL,
+		RedisTTL:          time.Duration(redisTTL) * time.Hour,
+		PortfolioCacheTTL: time.Duration(portfolioCacheTTL) * time.Minute,
+		ChartDataCacheTTL: time.Duration(chartDataCacheTTL) * time.Minute,
 
 		ServerPort:   serverPort,
 		ReadTimeout:  time.Duration(readTimeout) * time.Second,

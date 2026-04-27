@@ -1,4 +1,4 @@
-import type { UserFullPortfolio, ChartData } from '../types'
+import type { ChartData } from '../types'
 
 export async function fetchChart(
     period: string = '1y',

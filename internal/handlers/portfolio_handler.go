@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/CatSprite-dev/fireball/internal/pkg"
@@ -21,6 +22,7 @@ func NewPortfolioHandler(sm *storage.SessionManager, ps *service.PortfolioServic
 }
 
 func (h *PortfolioHandler) HandlerPing(w http.ResponseWriter, r *http.Request) {
+	log.Println("serving ping handler")
 	sessionID, err := getSessionFromCookie(r)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)

@@ -71,7 +71,11 @@ func (h *LoginHandler) HandlerLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.cacheManager.Delete(r.Context(), sessionID)
+	err = h.cacheManager.DeletePortfolio(r.Context(), sessionID)
+	if err != nil {
+		log.Printf("couldn't delete cache for %s: %v", sessionID, err)
+	}
+	err = h.cacheManager.DeleteChartCache(r.Context(), sessionID)
 	if err != nil {
 		log.Printf("couldn't delete cache for %s: %v", sessionID, err)
 	}
