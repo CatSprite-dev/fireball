@@ -17,6 +17,8 @@ type Config struct {
 	PortfolioCacheTTL time.Duration
 	ChartDataCacheTTL time.Duration
 
+	PostgresURL string
+
 	ServerPort   string
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
@@ -48,17 +50,22 @@ func NewConfig() (*Config, error) {
 	}
 	portfolioCacheTTLStr := os.Getenv("PORTFOLIO_CACHE_TTL")
 	if portfolioCacheTTLStr == "" {
-		log.Println("CACHE_TTL variable is not found in environment\nSetting default 3m")
+		log.Println("PORTFOLIO_CACHE_TTL variable is not found in environment\nSetting default 3m")
 		portfolioCacheTTLStr = "3"
 	}
 	chartDataCacheTTLStr := os.Getenv("CHART_DATA_CACHE_TTL")
 	if chartDataCacheTTLStr == "" {
-		log.Println("CACHE_TTL variable is not found in environment\nSetting default 30m")
+		log.Println("CHART_DATA_CACHE_TTL variable is not found in environment\nSetting default 30m")
 		chartDataCacheTTLStr = "30"
 	}
 	secret := os.Getenv("SESSION_SECRET")
 	if secret == "" {
 		log.Println("SESSION_SECRET variable is not found in environment")
+		return nil, err
+	}
+	postgresURL := os.Getenv("POSTGRES_URL")
+	if postgresURL == "" {
+		log.Println("POSTGRES_URL variable is not found in environment")
 		return nil, err
 	}
 	serverPort := os.Getenv("PORT")
@@ -120,6 +127,8 @@ func NewConfig() (*Config, error) {
 		RedisTTL:          time.Duration(redisTTL) * time.Hour,
 		PortfolioCacheTTL: time.Duration(portfolioCacheTTL) * time.Minute,
 		ChartDataCacheTTL: time.Duration(chartDataCacheTTL) * time.Minute,
+
+		PostgresURL: postgresURL,
 
 		ServerPort:   serverPort,
 		ReadTimeout:  time.Duration(readTimeout) * time.Second,
