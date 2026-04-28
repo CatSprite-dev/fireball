@@ -36,6 +36,10 @@ func NewRedisStore(redisURL string) (*Store, error) {
 	}, nil
 }
 
+func (s *Store) Close() error {
+	return s.redisClient.Close()
+}
+
 func (s *Store) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
 	return s.redisClient.Set(ctx, key, value, ttl).Err()
 }
