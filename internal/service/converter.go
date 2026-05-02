@@ -63,8 +63,8 @@ func convertFullPortfolio(raw api.UserPortfolio) domain.Portfolio {
 
 func convertInstrument(raw api.Instrument) domain.Instrument {
 	return domain.Instrument{
-		Name:           raw.Instrument.Name,
-		InstrumentType: raw.Instrument.InstrumentType,
+		Name:           raw.Name,
+		InstrumentType: raw.InstrumentType,
 	}
 }
 

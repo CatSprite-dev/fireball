@@ -78,7 +78,7 @@ func (client *Client) GetPortfolio(ctx context.Context, token string, accountID 
 	return userPortfolio, nil
 }
 
-func (client *Client) GetUserOperationsByCursor(
+func (client *Client) GetOperationsByCursor(
 	ctx context.Context,
 	token string,
 	accountId string,

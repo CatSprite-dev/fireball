@@ -35,12 +35,12 @@ var allOperationTypes = []pkg.OperationType{
 }
 
 type Calculator struct {
-	ApiClient           *api.Client
+	ApiClient           APIClient
 	CandleRepository    *storage.CandleRepository
 	OperationRepository *storage.OperationRepository
 }
 
-func NewCalculator(apiClient *api.Client, candleRepo *storage.CandleRepository, operationsRepo *storage.OperationRepository) *Calculator {
+func NewCalculator(apiClient APIClient, candleRepo *storage.CandleRepository, operationsRepo *storage.OperationRepository) *Calculator {
 	return &Calculator{
 		ApiClient:           apiClient,
 		CandleRepository:    candleRepo,
@@ -76,7 +76,7 @@ func (calc *Calculator) fetchOperations(
 	operationState pkg.OperationState,
 	withoutCommissions bool,
 ) (domain.UserOperations, error) {
-	operations, err := calc.ApiClient.GetUserOperationsByCursor(
+	operations, err := calc.ApiClient.GetOperationsByCursor(
 		ctx, token, accountId, instrumentId, from, to,
 		operationTypes, operationState, withoutCommissions,
 	)
@@ -409,6 +409,8 @@ func (calc *Calculator) GetChartData(
 		[]pkg.OperationType{
 			pkg.OperationTypeBuy,
 			pkg.OperationTypeSell,
+			pkg.OperationTypeBondRepaymentFull,
+			pkg.OperationTypeBondRepayment,
 			pkg.OperationTypeDividend,
 			pkg.OperationTypeCoupon,
 		},
@@ -479,7 +481,7 @@ func (calc *Calculator) GetCandlesForPortfolio(
 	}
 
 	// Reconstruct historical qty per instrument per interval
-	historicalHoldings, err := calc.CalculateHistoricalHoldings(operations, portfolio, from, to, candleInterval)
+	historicalHoldings, err := calc.CalculateHistoricalHoldings(operations, portfolio.Positions, from, to, candleInterval)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get historical holdings: %w", err)
 	}
@@ -570,27 +572,39 @@ func (calc *Calculator) GetCandlesForPortfolio(
 // by walking backwards from `to` and reversing buy/sell operations.
 func (calc *Calculator) CalculateHistoricalHoldings(
 	operations domain.UserOperations,
-	portfolio domain.Portfolio,
+	positions []domain.Position,
 	from time.Time,
 	to time.Time,
 	candleInterval pkg.CandleInterval,
 ) (map[time.Time]map[string]domain.Quotation, error) {
-	start := truncateToInterval(to, candleInterval)
-	end := truncateToInterval(from, candleInterval)
 
-	positionsQuantity := make(map[time.Time]map[string]domain.Quotation)
-	positionsQuantity[start] = make(map[string]domain.Quotation)
+	opsByInterval := make(map[time.Time][]domain.Item)
+	for _, item := range operations.Items {
+		switch pkg.OperationType(item.Type) {
+		case pkg.OperationTypeBuy, pkg.OperationTypeSell, pkg.OperationTypeBondRepaymentFull:
+			if !isInvestmentInstrument(item.InstrumentType) {
+				continue
+			}
+			interval := truncateToInterval(item.Date, candleInterval)
+			opsByInterval[interval] = append(opsByInterval[interval], item)
+		}
+	}
 
-	// Seed with current positions
-	for _, pos := range portfolio.Positions {
+	start := truncateToInterval(from, candleInterval)
+	end := truncateToInterval(to, candleInterval)
+
+	holdings := make(map[time.Time]map[string]domain.Quotation)
+	holdings[end] = make(map[string]domain.Quotation)
+
+	for _, pos := range positions {
 		if !isInvestmentInstrument(pos.InstrumentType) {
 			continue
 		}
-		positionsQuantity[start][pos.Figi] = pos.Quantity
+		holdings[end][pos.Figi] = pos.Quantity
 	}
 
-	currentTime := start
-	for currentTime.After(end) {
+	currentTime := end
+	for currentTime.After(start) {
 		var prevTime time.Time
 		switch candleInterval {
 		case pkg.CandleIntervalWeek:
@@ -601,31 +615,21 @@ func (calc *Calculator) CalculateHistoricalHoldings(
 			prevTime = currentTime.Add(-candleIntervalDuration(candleInterval))
 		}
 
-		// Copy forward positions, then reverse operations that fall in this interval
-		positionsQuantity[prevTime] = make(map[string]domain.Quotation)
-		for figi, qty := range positionsQuantity[currentTime] {
-			positionsQuantity[prevTime][figi] = qty
+		holdings[prevTime] = make(map[string]domain.Quotation)
+		for figi, qty := range holdings[currentTime] {
+			holdings[prevTime][figi] = qty
 		}
 
-		for _, item := range operations.Items {
-			if !truncateToInterval(item.Date, candleInterval).Equal(currentTime) {
-				continue
-			}
+		for _, item := range opsByInterval[currentTime] {
 			switch pkg.OperationType(item.Type) {
 			case pkg.OperationTypeBuy:
-				if !isInvestmentInstrument(item.InstrumentType) {
-					continue
-				}
-				positionsQuantity[prevTime][item.Figi] = SubtractQuotations(
-					positionsQuantity[prevTime][item.Figi],
+				holdings[prevTime][item.Figi] = SubtractQuotations(
+					holdings[prevTime][item.Figi],
 					domain.Quotation{Units: item.Quantity},
 				)
-			case pkg.OperationTypeSell:
-				if !isInvestmentInstrument(item.InstrumentType) {
-					continue
-				}
-				positionsQuantity[prevTime][item.Figi] = AddQuotations(
-					positionsQuantity[prevTime][item.Figi],
+			case pkg.OperationTypeSell, pkg.OperationTypeBondRepaymentFull:
+				holdings[prevTime][item.Figi] = AddQuotations(
+					holdings[prevTime][item.Figi],
 					domain.Quotation{Units: item.Quantity},
 				)
 			}
@@ -634,7 +638,7 @@ func (calc *Calculator) CalculateHistoricalHoldings(
 		currentTime = prevTime
 	}
 
-	return positionsQuantity, nil
+	return holdings, nil
 }
 
 // FetchHistoricalCandlesForPortfolio fetches candles for all figis in parallel.
