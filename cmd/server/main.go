@@ -67,12 +67,12 @@ func main() {
 	mux.HandleFunc("GET /api/chart", authRateLimiter.Middleware(chartHandler.HandlerChart))
 
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Catch-all hit: %s %s", r.Method, r.URL.Path)
+		//log.Printf("Catch-all hit: %s %s", r.Method, r.URL.Path)
 		path := filepath.Join("frontend/dist", r.URL.Path)
-		log.Printf("Serving path: %s", path)
+		//log.Printf("Serving path: %s", path)
 		_, err := os.Stat(path)
 		if os.IsNotExist(err) {
-			log.Printf("Not found, serving index.html")
+			//log.Printf("Not found, serving index.html")
 			http.ServeFile(w, r, "frontend/dist/index.html")
 			return
 		}
