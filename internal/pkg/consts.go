@@ -1,13 +1,5 @@
 package pkg
 
-const (
-	HTTPMethodGet    = "GET"
-	HTTPMethodPost   = "POST"
-	HTTPMethodPut    = "PUT"
-	HTTPMethodDelete = "DELETE"
-	HTTPMethodPatch  = "PATCH"
-)
-
 type OperationType string
 
 const (

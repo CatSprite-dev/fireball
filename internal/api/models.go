@@ -39,39 +39,41 @@ type UserAccounts struct {
 type UserOperations struct {
 	HasNext    bool   `json:"hasNext"`
 	NextCursor string `json:"nextCursor"`
-	Items      []struct {
-		Cursor            string     `json:"cursor"`
-		BrokerAccountID   string     `json:"brokerAccountId"`
-		ID                string     `json:"id"`
-		ParentOperationID string     `json:"parentOperationId"`
-		Name              string     `json:"name"`
-		Date              time.Time  `json:"date"`
-		Type              string     `json:"type"`
-		Description       string     `json:"description"`
-		State             string     `json:"state"`
-		InstrumentUID     string     `json:"instrumentUid"`
-		Figi              string     `json:"figi"`
-		InstrumentType    string     `json:"instrumentType"`
-		InstrumentKind    string     `json:"instrumentKind"`
-		PositionUID       string     `json:"positionUid"`
-		Ticker            string     `json:"ticker"`
-		ClassCode         string     `json:"classCode"`
-		Payment           MoneyValue `json:"payment"`
-		Price             MoneyValue `json:"price"`
-		Commission        MoneyValue `json:"commission"`
-		Yield             MoneyValue `json:"yield"`
-		YieldRelative     Quotation  `json:"yieldRelative"`
-		AccruedInt        MoneyValue `json:"accruedInt"`
-		Quantity          string     `json:"quantity"`
-		QuantityRest      string     `json:"quantityRest"`
-		QuantityDone      string     `json:"quantityDone"`
-		CancelReason      string     `json:"cancelReason"`
-		AssetUID          string     `json:"assetUid"`
-		ChildOperations   []struct {
-			InstrumentUID string     `json:"instrumentUid"`
-			Payment       MoneyValue `json:"payment"`
-		} `json:"childOperations"`
-	} `json:"items"`
+	Items      []Item `json:"items"`
+}
+
+type Item struct {
+	Cursor            string     `json:"cursor"`
+	BrokerAccountID   string     `json:"brokerAccountId"`
+	ID                string     `json:"id"`
+	ParentOperationID string     `json:"parentOperationId"`
+	Name              string     `json:"name"`
+	Date              time.Time  `json:"date"`
+	Type              string     `json:"type"`
+	Description       string     `json:"description"`
+	State             string     `json:"state"`
+	InstrumentUID     string     `json:"instrumentUid"`
+	Figi              string     `json:"figi"`
+	InstrumentType    string     `json:"instrumentType"`
+	InstrumentKind    string     `json:"instrumentKind"`
+	PositionUID       string     `json:"positionUid"`
+	Ticker            string     `json:"ticker"`
+	ClassCode         string     `json:"classCode"`
+	Payment           MoneyValue `json:"payment"`
+	Price             MoneyValue `json:"price"`
+	Commission        MoneyValue `json:"commission"`
+	Yield             MoneyValue `json:"yield"`
+	YieldRelative     Quotation  `json:"yieldRelative"`
+	AccruedInt        MoneyValue `json:"accruedInt"`
+	Quantity          string     `json:"quantity"`
+	QuantityRest      string     `json:"quantityRest"`
+	QuantityDone      string     `json:"quantityDone"`
+	CancelReason      string     `json:"cancelReason"`
+	AssetUID          string     `json:"assetUid"`
+	ChildOperations   []struct {
+		InstrumentUID string     `json:"instrumentUid"`
+		Payment       MoneyValue `json:"payment"`
+	} `json:"childOperations"`
 }
 
 type UserPortfolio struct {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/pkg"
@@ -20,7 +21,7 @@ func (client *Client) GetAccounts(ctx context.Context, token string, accountStat
 
 	client.usersLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		return UserAccounts{}, fmt.Errorf("do request error (api.GetAccounts): %w", err)
 	}
@@ -40,7 +41,7 @@ func (client *Client) GetInfo(ctx context.Context, token string) (UserInfo, erro
 
 	client.usersLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		return UserInfo{}, fmt.Errorf("do request error (api.GetInfo): %w", err)
 	}
@@ -64,7 +65,7 @@ func (client *Client) GetPortfolio(ctx context.Context, token string, accountID 
 
 	client.operationsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		return UserPortfolio{}, fmt.Errorf("do request error (GetPortfolio): %w", err)
 	}
@@ -121,7 +122,7 @@ func (client *Client) GetOperationsByCursor(
 
 		client.operationsLimiter.Wait(context.Background())
 
-		data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+		data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 		if err != nil {
 			return []UserOperations{}, fmt.Errorf("do request error (GetOperationsByCursor): %w", err)
 		}
@@ -162,7 +163,7 @@ func (client *Client) BondBy(ctx context.Context, token string, idType pkg.Instr
 
 	client.instrumentsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		return Bond{}, fmt.Errorf("do request error (BondsBy): %w", err)
 	}
@@ -197,7 +198,7 @@ func (client *Client) GetInstrumentBy(ctx context.Context, token string, idType 
 
 	client.instrumentsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		return Instrument{}, fmt.Errorf("do request error (GetInstrumentBy): %w", err)
 	}
@@ -218,7 +219,7 @@ func (client *Client) Indicatives(ctx context.Context, token string) (Indicative
 
 	client.operationsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		return IndicativeInstruments{}, fmt.Errorf("do request error (api.Indicatives): %w", err)
 	}
@@ -261,7 +262,7 @@ func (client *Client) GetCandles(ctx context.Context,
 
 	client.operationsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		return Candles{}, fmt.Errorf("do request error (GetCandles): %w", err)
 	}
