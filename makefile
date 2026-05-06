@@ -26,3 +26,6 @@ start-deps:
 
 stop-deps:
 	@docker compose down
+
+migrate:
+	@export POSTGRES_URL=$$(grep POSTGRES_URL .env | cut -d '=' -f2 | tr -d '"') && goose -dir migrations postgres "$$POSTGRES_URL" up
