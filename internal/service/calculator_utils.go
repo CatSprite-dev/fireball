@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -11,7 +12,14 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 )
 
-func enrichFullPortfolio(calc *Calculator, portfolio domain.Portfolio, token string, accountID string, openedDate time.Time) (domain.Portfolio, error) {
+func enrichFullPortfolio(
+	ctx context.Context,
+	calc *Calculator,
+	portfolio domain.Portfolio,
+	token string,
+	accountID string,
+	openedDate time.Time,
+) (domain.Portfolio, error) {
 	portfolio.OpenedDate = openedDate
 
 	var err error
@@ -20,16 +28,16 @@ func enrichFullPortfolio(calc *Calculator, portfolio domain.Portfolio, token str
 		return domain.Portfolio{}, err
 	}
 
-	dividends, err := calc.GetDividends(token, accountID, "", openedDate, time.Now().UTC())
+	dividends, err := calc.GetDividends(ctx, token, accountID, "", openedDate, time.Now().UTC())
 	if err != nil {
 		log.Printf("failed to get dividends: %v", err)
 	} else {
 		portfolio.AllDividends = dividends
 	}
 
-	portfolio = enrichPositions(portfolio, calc, token)
+	portfolio = enrichPositions(ctx, portfolio, calc, token)
 
-	portfolio.TotalReturn, portfolio.TotalReturnRelative, portfolio.TotalInvested, err = calc.GetTotalReturn(token, portfolio, accountID, openedDate)
+	portfolio.TotalReturn, portfolio.TotalReturnRelative, portfolio.TotalInvested, err = calc.GetTotalReturn(ctx, token, portfolio, accountID, openedDate)
 	if err != nil {
 		log.Printf("failed to calculate TotalReturn: %v", err)
 	}
@@ -48,23 +56,23 @@ func enrichPortfolioMetrics(portfolio domain.Portfolio) (domain.Portfolio, error
 	return portfolio, nil
 }
 
-func enrichPositions(portfolio domain.Portfolio, calc *Calculator, token string) domain.Portfolio {
+func enrichPositions(ctx context.Context, portfolio domain.Portfolio, calc *Calculator, token string) domain.Portfolio {
 	var wg sync.WaitGroup
 	for i := range portfolio.Positions {
 		wg.Add(2)
 		pos := &portfolio.Positions[i]
-		go getPositionInfo(&wg, pos, calc, token)
+		go getPositionInfo(ctx, &wg, pos, calc, token)
 		go getPositionMetrics(&wg, &portfolio, pos)
 	}
 	wg.Wait()
 	return portfolio
 }
 
-func getPositionInfo(wg *sync.WaitGroup, p *domain.Position, calc *Calculator, token string) {
+func getPositionInfo(ctx context.Context, wg *sync.WaitGroup, p *domain.Position, calc *Calculator, token string) {
 	defer wg.Done()
-	instrument, err := calc.GetInstrument(token, pkg.InstrumentIdTypePositionUid, "", p.PositionUID)
+	instrument, err := calc.GetInstrument(ctx, token, pkg.InstrumentIdTypePositionUid, "", p.PositionUID)
 	if errors.Is(err, ErrNotFound) {
-		instrument, err = calc.GetInstrument(token, pkg.InstrumentIdTypeFigi, "", p.Figi)
+		instrument, err = calc.GetInstrument(ctx, token, pkg.InstrumentIdTypeFigi, "", p.Figi)
 	}
 	if err != nil {
 		log.Printf("failed to get instrument info for position %s: %s: %v\n", p.PositionUID, p.Figi, err)

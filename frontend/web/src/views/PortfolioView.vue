@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import { useAuthStore } from '../stores/auth'
@@ -25,6 +25,11 @@ onMounted(async () => {
     await portfolio.load()
     await chart.load()
   }
+})
+
+onUnmounted(() => {
+  portfolio.abort()
+  chart.abort()
 })
 </script>
 

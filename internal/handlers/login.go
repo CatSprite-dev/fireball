@@ -41,7 +41,7 @@ func (h *LoginHandler) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userAccounts, err := h.apiClient.GetAccounts(req.Token, pkg.AccountStatusOpen)
+	userAccounts, err := h.apiClient.GetAccounts(r.Context(), req.Token, pkg.AccountStatusOpen)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusUnauthorized, err.Error(), err)
 		return

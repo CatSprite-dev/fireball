@@ -26,7 +26,7 @@ func NewPortfolioService(calc *Calculator, cm *storage.CacheManager) *PortfolioS
 func (s *PortfolioService) GetOrFetchPortfolio(ctx context.Context, sessionID string, request PortfolioRequest) (domain.Portfolio, error) {
 	portfolio, err := s.cacheManager.GetPortfolio(ctx, sessionID)
 	if errors.Is(err, storage.ErrNotFound) {
-		portfolio, err = s.calculator.GetFullPortfolio(request)
+		portfolio, err = s.calculator.GetFullPortfolio(ctx, request)
 		if err != nil {
 			return domain.Portfolio{}, err
 		}
