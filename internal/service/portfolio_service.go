@@ -53,7 +53,7 @@ func (s *PortfolioService) GetOrFetchChartData(
 	chartData, err := s.cacheManager.GetChart(ctx, sessionID, period, indexTicker)
 	if errors.Is(err, storage.ErrNotFound) {
 		from, to, candleInterval := PeriodToParams(period)
-		chartData, err = s.calculator.GetChartData(token, portfolio, indexTicker, from, to, candleInterval, candleSource)
+		chartData, err = s.calculator.GetChartData(ctx, token, portfolio, indexTicker, from, to, candleInterval, candleSource)
 		if err != nil {
 			return domain.ChartData{}, err
 		}

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -11,6 +12,7 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/api"
 	"github.com/CatSprite-dev/fireball/internal/domain"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
+	"github.com/CatSprite-dev/fireball/internal/storage"
 )
 
 type PortfolioRequest struct {
@@ -22,11 +24,15 @@ type PortfolioRequest struct {
 var ErrNotFound = errors.New("not found")
 
 type Calculator struct {
-	ApiClient *api.Client
+	ApiClient        *api.Client
+	CandleRepository *storage.CandleRepository
 }
 
-func NewCalculator(apiClient *api.Client) *Calculator {
-	return &Calculator{ApiClient: apiClient}
+func NewCalculator(apiClient *api.Client, candleRepo *storage.CandleRepository) *Calculator {
+	return &Calculator{
+		ApiClient:        apiClient,
+		CandleRepository: candleRepo,
+	}
 }
 
 func (calc *Calculator) GetFullPortfolio(session PortfolioRequest) (domain.Portfolio, error) {
@@ -179,9 +185,70 @@ func (calc *Calculator) GetIndexByTicker(token string, ticker string) (domain.In
 	return domain.Instrument{}, nil
 }
 
-func (calc *Calculator) GetCandles(
+func (calc *Calculator) fetchAndStore(
+	ctx context.Context,
+	token, figi string,
+	from, to time.Time,
+	candleInterval pkg.CandleInterval,
+	candleSourceType pkg.CandleSource,
+) ([]domain.Candle, error) {
+	candles, err := calc.FetchCandles(ctx, token, figi, from, to, candleInterval, candleSourceType)
+	if err != nil {
+		return nil, err
+	}
+	if len(candles) > 1 {
+		err = calc.CandleRepository.PutCandles(ctx, figi, string(candleInterval), candles[:len(candles)-1])
+		if err != nil {
+			log.Printf("error putting fetched candles: %v", err)
+		}
+	}
+	return candles, nil
+}
+
+func (calc *Calculator) GetOrFetchCandles(
+	ctx context.Context,
 	token string,
-	instrumentId string,
+	figi string,
+	from time.Time,
+	to time.Time,
+	candleInterval pkg.CandleInterval,
+	candleSourceType pkg.CandleSource,
+) ([]domain.Candle, error) {
+	if calc.CandleRepository == nil {
+		return calc.FetchCandles(ctx, token, figi, from, to, candleInterval, candleSourceType)
+	}
+
+	candles, err := calc.CandleRepository.GetCandles(ctx, figi, string(candleInterval), from, to)
+
+	if err != nil {
+		if !errors.Is(err, storage.ErrCandlesNotFound) {
+			log.Printf("%v\n", err)
+		}
+		return calc.fetchAndStore(ctx, token, figi, from, to, candleInterval, candleSourceType)
+	}
+
+	if truncateToInterval(candles[len(candles)-1].Time, candleInterval).Before(truncateToInterval(time.Now(), candleInterval)) {
+		from = truncateToInterval(candles[len(candles)-1].Time, candleInterval).Add(candleIntervalDuration(candleInterval))
+		restOfCandles, err := calc.FetchCandles(ctx, token, figi, from, time.Now(), candleInterval, candleSourceType)
+		if err != nil {
+			return nil, err
+		}
+		candles = append(candles, restOfCandles...)
+		if len(restOfCandles) > 1 {
+			err = calc.CandleRepository.PutCandles(ctx, figi, string(candleInterval), restOfCandles[:len(restOfCandles)-1])
+			if err != nil {
+				log.Printf("error putting fetched candles: %v", err)
+			}
+		}
+		return candles, nil
+	}
+	return candles, nil
+}
+
+func (calc *Calculator) FetchCandles(
+	ctx context.Context,
+	token string,
+	figi string,
 	from time.Time,
 	to time.Time,
 	candleInterval pkg.CandleInterval,
@@ -195,7 +262,7 @@ func (calc *Calculator) GetCandles(
 		if chunkTo.After(to) {
 			chunkTo = to
 		}
-		rawCandles, err := calc.ApiClient.GetCandles(token, &chunkFrom, &chunkTo, candleInterval, instrumentId, candleSourceType, 0)
+		rawCandles, err := calc.ApiClient.GetCandles(token, &chunkFrom, &chunkTo, candleInterval, figi, candleSourceType, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -207,6 +274,7 @@ func (calc *Calculator) GetCandles(
 }
 
 func (calc *Calculator) GetChartData(
+	ctx context.Context,
 	token string,
 	portfolio domain.Portfolio,
 	indexTicker string,
@@ -235,13 +303,13 @@ func (calc *Calculator) GetChartData(
 		return domain.ChartData{}, err
 	}
 
-	portfolioCandles, err := calc.GetCandlesForPortfolio(token, portfolio, operations, from, to, candleInterval, candleSource)
+	portfolioCandles, err := calc.GetCandlesForPortfolio(ctx, token, portfolio, operations, from, to, candleInterval, candleSource)
 	if err != nil {
 		log.Printf("failed to get portfolio candles: %v", err)
 		portfolioCandles = []domain.Candle{}
 	}
 
-	indexCandles, err := calc.GetCandles(token, index.UID, from, to, candleInterval, candleSource)
+	indexCandles, err := calc.GetOrFetchCandles(ctx, token, index.Figi, from, to, candleInterval, candleSource)
 	if err != nil {
 		log.Printf("failed to get index candles: %v", err)
 		indexCandles = []domain.Candle{}
@@ -277,6 +345,7 @@ func (calc *Calculator) GetChartData(
 // Close = sum(qty * price) for each interval + dividends/coupons received that interval
 // Bond prices are converted from % of face value using a multiplier
 func (calc *Calculator) GetCandlesForPortfolio(
+	ctx context.Context,
 	token string,
 	portfolio domain.Portfolio,
 	operations domain.UserOperations,
@@ -297,7 +366,7 @@ func (calc *Calculator) GetCandlesForPortfolio(
 
 	figis := extractUniqueFigis(historicalHoldings)
 
-	historicalCandles, err := calc.FetchHistoricalCandlesForPortfolio(token, figis, from, to, candleInterval, candleSource)
+	historicalCandles, err := calc.FetchHistoricalCandlesForPortfolio(ctx, token, figis, from, to, candleInterval, candleSource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch candles: %w", err)
 	}
@@ -450,6 +519,7 @@ func (calc *Calculator) CalculateHistoricalHoldings(
 
 // FetchHistoricalCandlesForPortfolio fetches candles for all figis in parallel.
 func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
+	ctx context.Context,
 	token string,
 	figis []string,
 	from time.Time,
@@ -467,7 +537,7 @@ func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
 	resultCh := make(chan candleResult, len(figis))
 	for _, figi := range figis {
 		go func(f string) {
-			candles, err := calc.GetCandles(token, f, from.AddDate(0, 0, -10), to, candleInterval, candleSource)
+			candles, err := calc.GetOrFetchCandles(ctx, token, f, from.AddDate(0, 0, -10), to, candleInterval, candleSource)
 			resultCh <- candleResult{figi: f, candles: candles, err: err}
 		}(figi)
 	}

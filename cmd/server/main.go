@@ -36,6 +36,8 @@ func main() {
 		log.Fatalf("failed to connect to postgres: %v\n", err)
 	}
 
+	candleRepository := storage.NewCandleRepository(pool)
+
 	sessionManager, err := storage.NewSessionManager(store, cfg.GetSecret(), cfg.RedisTTL)
 	if err != nil {
 		log.Fatalf("%v\n", err)
@@ -43,7 +45,7 @@ func main() {
 	cacheManager := storage.NewCacheManager(store, cfg.PortfolioCacheTTL, cfg.ChartDataCacheTTL)
 
 	apiClient := api.NewClient(cfg.BaseURL)
-	calculator := service.NewCalculator(apiClient)
+	calculator := service.NewCalculator(apiClient, candleRepository)
 
 	portfolioService := service.NewPortfolioService(calculator, cacheManager)
 
