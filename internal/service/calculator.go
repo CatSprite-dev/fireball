@@ -416,6 +416,7 @@ func (calc *Calculator) GetChartData(
 		},
 		pkg.OperationStateExecuted, false,
 	)
+
 	if err != nil {
 		return domain.ChartData{}, fmt.Errorf("failed to get operations: %w", err)
 	}
@@ -480,8 +481,15 @@ func (calc *Calculator) GetCandlesForPortfolio(
 		from = portfolio.OpenedDate
 	}
 
+	paymentsByInterval, err := getPaymentsByInterval(operations, candleInterval)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get payments by interval: %w", err)
+	}
+
+	opsByInterval := opsByInterval(operations, candleInterval)
+
 	// Reconstruct historical qty per instrument per interval
-	historicalHoldings, err := calc.CalculateHistoricalHoldings(operations, portfolio.Positions, from, to, candleInterval)
+	historicalHoldings, err := calculateHistoricalHoldings(opsByInterval, portfolio.Positions, from, to, candleInterval)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get historical holdings: %w", err)
 	}
@@ -493,13 +501,8 @@ func (calc *Calculator) GetCandlesForPortfolio(
 		return nil, fmt.Errorf("failed to fetch candles: %w", err)
 	}
 
-	paymentsByInterval, err := getPaymentsByInterval(operations, candleInterval)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get payments by interval: %w", err)
-	}
-
 	// Bond price multiplier
-	figiToMultiplier := calc.FetchBondMultipliers(ctx, token, portfolio.Positions, operations)
+	figiToMultiplier := calc.FetchBondMultipliers(ctx, token, portfolio.Positions, opsByInterval)
 
 	// Index candles by truncated interval time for O(1) lookup
 	candleIndex := make(map[string]map[time.Time]domain.Candle)
@@ -568,79 +571,6 @@ func (calc *Calculator) GetCandlesForPortfolio(
 	return result, nil
 }
 
-// CalculateHistoricalHoldings reconstructs portfolio positions for each interval
-// by walking backwards from `to` and reversing buy/sell operations.
-func (calc *Calculator) CalculateHistoricalHoldings(
-	operations domain.UserOperations,
-	positions []domain.Position,
-	from time.Time,
-	to time.Time,
-	candleInterval pkg.CandleInterval,
-) (map[time.Time]map[string]domain.Quotation, error) {
-
-	opsByInterval := make(map[time.Time][]domain.Item)
-	for _, item := range operations.Items {
-		switch pkg.OperationType(item.Type) {
-		case pkg.OperationTypeBuy, pkg.OperationTypeSell, pkg.OperationTypeBondRepaymentFull:
-			if !isInvestmentInstrument(item.InstrumentType) {
-				continue
-			}
-			interval := truncateToInterval(item.Date, candleInterval)
-			opsByInterval[interval] = append(opsByInterval[interval], item)
-		}
-	}
-
-	start := truncateToInterval(from, candleInterval)
-	end := truncateToInterval(to, candleInterval)
-
-	holdings := make(map[time.Time]map[string]domain.Quotation)
-	holdings[end] = make(map[string]domain.Quotation)
-
-	for _, pos := range positions {
-		if !isInvestmentInstrument(pos.InstrumentType) {
-			continue
-		}
-		holdings[end][pos.Figi] = pos.Quantity
-	}
-
-	currentTime := end
-	for currentTime.After(start) {
-		var prevTime time.Time
-		switch candleInterval {
-		case pkg.CandleIntervalWeek:
-			prevTime = currentTime.AddDate(0, 0, -7)
-		case pkg.CandleIntervalMonth:
-			prevTime = currentTime.AddDate(0, -1, 0)
-		default:
-			prevTime = currentTime.Add(-candleIntervalDuration(candleInterval))
-		}
-
-		holdings[prevTime] = make(map[string]domain.Quotation)
-		for figi, qty := range holdings[currentTime] {
-			holdings[prevTime][figi] = qty
-		}
-
-		for _, item := range opsByInterval[currentTime] {
-			switch pkg.OperationType(item.Type) {
-			case pkg.OperationTypeBuy:
-				holdings[prevTime][item.Figi] = SubtractQuotations(
-					holdings[prevTime][item.Figi],
-					domain.Quotation{Units: item.Quantity},
-				)
-			case pkg.OperationTypeSell, pkg.OperationTypeBondRepaymentFull:
-				holdings[prevTime][item.Figi] = AddQuotations(
-					holdings[prevTime][item.Figi],
-					domain.Quotation{Units: item.Quantity},
-				)
-			}
-		}
-
-		currentTime = prevTime
-	}
-
-	return holdings, nil
-}
-
 // FetchHistoricalCandlesForPortfolio fetches candles for all figis in parallel.
 func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
 	ctx context.Context,
@@ -661,7 +591,7 @@ func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
 	resultCh := make(chan candleResult, len(figis))
 	for _, figi := range figis {
 		go func(f string) {
-			candles, err := calc.GetOrFetchCandles(ctx, token, f, from.AddDate(0, 0, -10), to, candleInterval, candleSource)
+			candles, err := calc.GetOrFetchCandles(ctx, token, f, from.AddDate(0, 0, pkg.CandleFetchBufferDays), to, candleInterval, candleSource)
 			resultCh <- candleResult{figi: f, candles: candles, err: err}
 		}(figi)
 	}
@@ -685,21 +615,24 @@ func (calc *Calculator) FetchBondMultipliers(
 	ctx context.Context,
 	token string,
 	positions []domain.Position,
-	operations domain.UserOperations,
+	operations map[time.Time][]domain.Item,
 ) map[string]domain.Quotation {
 	// Collect unique bond figis
 	bondFigis := make(map[string]struct{})
 
 	for _, pos := range positions {
-		if isBond(pos.InstrumentType) && pos.Figi != "" {
+		if isBond(pos.InstrumentType) {
 			bondFigis[pos.Figi] = struct{}{}
 		}
 	}
 
-	for _, item := range operations.Items {
-		if isBond(item.InstrumentType) && item.Figi != "" {
-			bondFigis[item.Figi] = struct{}{}
+	for _, items := range operations {
+		for _, item := range items {
+			if isBond(item.InstrumentType) && item.Figi != "" {
+				bondFigis[item.Figi] = struct{}{}
+			}
 		}
+
 	}
 
 	type bondResult struct {
@@ -718,6 +651,7 @@ func (calc *Calculator) FetchBondMultipliers(
 			}
 			multiplier, err := DivideMoneyValue(bond.Nominal, domain.MoneyValue{Units: "100", Nano: 0})
 			if err != nil {
+				log.Printf("failed to calculate multiplier for %s, using default: %v", f, err)
 				resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: "10", Nano: 0}}
 				return
 			}

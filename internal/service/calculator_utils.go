@@ -63,7 +63,7 @@ func enrichPositions(ctx context.Context, portfolio domain.Portfolio, calc *Calc
 		wg.Add(2)
 		pos := &portfolio.Positions[i]
 		go getPositionInfo(ctx, &wg, pos, calc, token)
-		go getPositionMetrics(&wg, &portfolio, pos)
+		go getPositionMetrics(&wg, portfolio.AllDividends, pos)
 	}
 	wg.Wait()
 	return portfolio
@@ -83,34 +83,33 @@ func getPositionInfo(ctx context.Context, wg *sync.WaitGroup, p *domain.Position
 	p.Type = instrument.InstrumentType
 }
 
-func getPositionMetrics(wg *sync.WaitGroup, portfolio *domain.Portfolio, p *domain.Position) {
+func getPositionMetrics(wg *sync.WaitGroup, allDividends map[string]domain.MoneyValue, pos *domain.Position) {
 	defer wg.Done()
 
-	posAmount := MultiplyMoneyValue(p.AveragePositionPrice, domain.MoneyValue{Units: p.Quantity.Units, Nano: p.Quantity.Nano})
+	posAmount := MultiplyMoneyValue(pos.AveragePositionPrice, domain.MoneyValue{Units: pos.Quantity.Units, Nano: pos.Quantity.Nano})
 
 	var err error
-	p.ExpectedYieldRelative, err = DivideQuotation(
-		domain.Quotation{Units: p.ExpectedYield.Units, Nano: p.ExpectedYield.Nano},
+	pos.ExpectedYieldRelative, err = DivideQuotation(
+		domain.Quotation{Units: pos.ExpectedYield.Units, Nano: pos.ExpectedYield.Nano},
 		domain.Quotation{Units: posAmount.Units, Nano: posAmount.Nano},
 	)
 	if err != nil {
-		log.Printf("failed to calculate ExpectedYieldRelative for position %s: %v\n", p.PositionUID, err)
+		log.Printf("failed to calculate ExpectedYieldRelative for position %s: %v\n", pos.PositionUID, err)
 		return
 	}
-	p.ExpectedYieldRelative = MultiplyQuotation(p.ExpectedYieldRelative, domain.Quotation{Units: "100", Nano: 0})
+	pos.ExpectedYieldRelative = MultiplyQuotation(pos.ExpectedYieldRelative, domain.Quotation{Units: "100", Nano: 0})
 
-	p.Dividends = portfolio.AllDividends[p.Ticker]
-	p.TotalYield = AddMoneyValue(p.ExpectedYield, p.Dividends)
+	pos.Dividends = allDividends[pos.Ticker]
+	pos.TotalYield = AddMoneyValue(pos.ExpectedYield, pos.Dividends)
 
-	p.TotalYieldRelative, err = DivideQuotation(
-		domain.Quotation{Units: p.TotalYield.Units, Nano: p.TotalYield.Nano},
+	pos.TotalYieldRelative, err = DivideQuotation(
+		domain.Quotation{Units: pos.TotalYield.Units, Nano: pos.TotalYield.Nano},
 		domain.Quotation{Units: posAmount.Units, Nano: posAmount.Nano},
 	)
 	if err != nil {
-		log.Printf("failed to calculate TotalYieldRelative for position %s: %v", p.PositionUID, err)
-		return
+		log.Printf("failed to calculate TotalYieldRelative for position %s: %v", pos.PositionUID, err)
 	}
-	p.TotalYieldRelative = MultiplyQuotation(p.TotalYieldRelative, domain.Quotation{Units: "100", Nano: 0})
+	pos.TotalYieldRelative = MultiplyQuotation(pos.TotalYieldRelative, domain.Quotation{Units: "100", Nano: 0})
 }
 
 func maxIntervalRange(interval pkg.CandleInterval) time.Duration {
@@ -253,13 +252,16 @@ func getPaymentsByInterval(
 	operations domain.UserOperations,
 	candleInterval pkg.CandleInterval,
 ) (map[time.Time]domain.MoneyValue, error) {
+
 	result := make(map[time.Time]domain.MoneyValue)
 	for _, item := range operations.Items {
 		switch pkg.OperationType(item.Type) {
 		case pkg.OperationTypeDividend, pkg.OperationTypeCoupon:
 			interval := truncateToInterval(item.Date, candleInterval)
 			result[interval] = AddMoneyValue(result[interval], domain.MoneyValue(item.Payment))
+
 		}
+
 	}
 	return result, nil
 }
@@ -278,21 +280,11 @@ func buildIndexPortfolioCandles(
 		return nil, fmt.Errorf("index candle not found")
 	}
 
+	opsByInterval := opsByInterval(operations, candleInterval)
+
 	candleIndex := make(map[time.Time]domain.Candle)
 	for _, c := range indexCandles {
 		candleIndex[truncateToInterval(c.Time, candleInterval)] = c
-	}
-
-	opsByInterval := make(map[time.Time][]domain.Item)
-	for _, item := range operations.Items {
-		switch pkg.OperationType(item.Type) {
-		case pkg.OperationTypeBuy, pkg.OperationTypeSell:
-			if !isInvestmentInstrument(item.InstrumentType) {
-				continue
-			}
-			interval := truncateToInterval(item.Date, candleInterval)
-			opsByInterval[interval] = append(opsByInterval[interval], item)
-		}
 	}
 
 	var currentQty domain.Quotation
@@ -353,4 +345,76 @@ func buildIndexPortfolioCandles(
 	}
 
 	return result, nil
+}
+
+// CalculateHistoricalHoldings reconstructs portfolio positions for each interval
+// by walking backwards from `to` and reversing buy/sell operations.
+func calculateHistoricalHoldings(
+	operations map[time.Time][]domain.Item,
+	positions []domain.Position,
+	from time.Time,
+	to time.Time,
+	candleInterval pkg.CandleInterval,
+) (map[time.Time]map[string]domain.Quotation, error) {
+
+	start := truncateToInterval(from, candleInterval)
+	end := truncateToInterval(to, candleInterval)
+
+	holdings := make(map[time.Time]map[string]domain.Quotation)
+	holdings[end] = make(map[string]domain.Quotation)
+
+	for _, pos := range positions {
+		if !isInvestmentInstrument(pos.InstrumentType) {
+			continue
+		}
+		holdings[end][pos.Figi] = pos.Quantity
+	}
+
+	currentTime := end
+	for currentTime.After(start) {
+		var prevTime time.Time
+		switch candleInterval {
+		case pkg.CandleIntervalWeek:
+			prevTime = currentTime.AddDate(0, 0, -7)
+		case pkg.CandleIntervalMonth:
+			prevTime = currentTime.AddDate(0, -1, 0)
+		default:
+			prevTime = currentTime.Add(-candleIntervalDuration(candleInterval))
+		}
+
+		holdings[prevTime] = make(map[string]domain.Quotation)
+		for figi, qty := range holdings[currentTime] {
+			holdings[prevTime][figi] = qty
+		}
+
+		for _, item := range operations[currentTime] {
+			switch pkg.OperationType(item.Type) {
+			case pkg.OperationTypeBuy:
+				holdings[prevTime][item.Figi] = SubtractQuotations(
+					holdings[prevTime][item.Figi],
+					domain.Quotation{Units: item.Quantity},
+				)
+			case pkg.OperationTypeSell, pkg.OperationTypeBondRepaymentFull:
+				holdings[prevTime][item.Figi] = AddQuotations(
+					holdings[prevTime][item.Figi],
+					domain.Quotation{Units: item.Quantity},
+				)
+			}
+		}
+		currentTime = prevTime
+	}
+
+	return holdings, nil
+}
+
+func opsByInterval(operations domain.UserOperations, candleInterval pkg.CandleInterval) map[time.Time][]domain.Item {
+	opsByInterval := make(map[time.Time][]domain.Item)
+	for _, item := range operations.Items {
+		if !isInvestmentInstrument(item.InstrumentType) {
+			continue
+		}
+		interval := truncateToInterval(item.Date, candleInterval)
+		opsByInterval[interval] = append(opsByInterval[interval], item)
+	}
+	return opsByInterval
 }

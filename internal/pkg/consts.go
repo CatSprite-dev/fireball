@@ -1,5 +1,10 @@
 package pkg
 
+// when fetching historical candles, the first candle can fall on the weekend or holiday
+// and T-INVES-API will return the last available candle, which can be earlier than the requested start date
+// to avoid this, candle are pulled up 10 days earlier, which covers most cases of non-trading days
+const CandleFetchBufferDays = 10
+
 type OperationType string
 
 const (
