@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"slices"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/api"
@@ -416,9 +415,14 @@ func (calc *Calculator) GetChartData(
 		},
 		pkg.OperationStateExecuted, false,
 	)
-
 	if err != nil {
 		return domain.ChartData{}, fmt.Errorf("failed to get operations: %w", err)
+	}
+
+	opsByInterval := opsByInterval(operations, candleInterval)
+	paymentsByInterval, err := getPaymentsByInterval(operations, candleInterval)
+	if err != nil {
+		return domain.ChartData{}, fmt.Errorf("failed to get payments by interval: %w", err)
 	}
 
 	index, err := calc.GetIndexByTicker(ctx, token, indexTicker)
@@ -426,7 +430,7 @@ func (calc *Calculator) GetChartData(
 		return domain.ChartData{}, err
 	}
 
-	portfolioCandles, err := calc.GetCandlesForPortfolio(ctx, token, portfolio, operations, from, to, candleInterval, candleSource)
+	portfolioCandles, err := calc.GetCandlesForPortfolio(ctx, token, portfolio, opsByInterval, paymentsByInterval, from, to, candleInterval, candleSource)
 	if err != nil {
 		log.Printf("failed to get portfolio candles: %v", err)
 		portfolioCandles = []domain.Candle{}
@@ -438,7 +442,7 @@ func (calc *Calculator) GetChartData(
 		indexCandles = []domain.Candle{}
 	}
 
-	virtualPortfolioCandles, err := buildIndexPortfolioCandles(operations, indexCandles, portfolioCandles, candleInterval)
+	virtualPortfolioCandles, err := buildIndexPortfolioCandles(opsByInterval, indexCandles, portfolioCandles, candleInterval)
 	if err != nil {
 		log.Printf("failed to get virtual portfolio candles: %v", err)
 		virtualPortfolioCandles = []domain.Candle{}
@@ -471,7 +475,8 @@ func (calc *Calculator) GetCandlesForPortfolio(
 	ctx context.Context,
 	token string,
 	portfolio domain.Portfolio,
-	operations domain.UserOperations,
+	opsByInterval map[time.Time][]domain.Item,
+	paymentsByInterval map[time.Time]domain.MoneyValue,
 	from time.Time,
 	to time.Time,
 	candleInterval pkg.CandleInterval,
@@ -480,13 +485,6 @@ func (calc *Calculator) GetCandlesForPortfolio(
 	if portfolio.OpenedDate.After(from) {
 		from = portfolio.OpenedDate
 	}
-
-	paymentsByInterval, err := getPaymentsByInterval(operations, candleInterval)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get payments by interval: %w", err)
-	}
-
-	opsByInterval := opsByInterval(operations, candleInterval)
 
 	// Reconstruct historical qty per instrument per interval
 	historicalHoldings, err := calculateHistoricalHoldings(opsByInterval, portfolio.Positions, from, to, candleInterval)
@@ -505,51 +503,24 @@ func (calc *Calculator) GetCandlesForPortfolio(
 	figiToMultiplier := calc.FetchBondMultipliers(ctx, token, portfolio.Positions, opsByInterval)
 
 	// Index candles by truncated interval time for O(1) lookup
-	candleIndex := make(map[string]map[time.Time]domain.Candle)
+	candlesByTime := make(map[string]map[time.Time]domain.Candle)
 	for figi, candles := range historicalCandles {
-		candleIndex[figi] = make(map[time.Time]domain.Candle)
-		for _, c := range candles {
-			candleIndex[figi][truncateToInterval(c.Time, candleInterval)] = c
-		}
+		innerMap := makeCandlesByTime(candles, candleInterval)
+		candlesByTime[figi] = innerMap
 	}
-
-	intervals := make([]time.Time, 0, len(historicalHoldings))
-	for interval := range historicalHoldings {
-		intervals = append(intervals, interval)
-	}
-	slices.SortFunc(intervals, time.Time.Compare)
+	intervals := sortedIntervals(historicalHoldings)
+	lastPrice := buildLastPriceCache(historicalCandles, from)
 
 	result := make([]domain.Candle, 0, len(intervals))
-	lastPrice := make(map[string]domain.Candle) // forward-fill cache
-	// Pre-fill lastPrice from candles fetched before 'from'
-	for figi, candles := range historicalCandles {
-		for _, c := range candles {
-			if c.Time.Before(from) {
-				lastPrice[figi] = c
-			}
-		}
-	}
-
-	initial := AddMoneyValue(portfolio.TotalAmountShares, portfolio.TotalAmountBonds)
-	initial = AddMoneyValue(initial, portfolio.TotalAmountEtf)
-	initial = AddMoneyValue(initial, portfolio.TotalAmountSp)
-
-	for i, interval := range intervals {
-		if i == len(intervals)-1 {
-			closeVal := domain.Quotation{Units: initial.Units, Nano: initial.Nano}
-			result = append(result, domain.Candle{Time: interval, Close: closeVal})
-			break
-		}
-
+	for _, interval := range intervals {
 		var closeVal domain.Quotation
 		for figi, qty := range historicalHoldings[interval] {
-			candle, ok := candleIndex[figi][interval]
+			candle, ok := candlesByTime[figi][interval]
 			if ok {
 				lastPrice[figi] = candle
-			} else if candle, ok = lastPrice[figi]; ok {
-				// forward fill
-			} else {
-				continue
+			}
+			if !ok {
+				candle, ok = lastPrice[figi]
 			}
 
 			close_ := candle.Close

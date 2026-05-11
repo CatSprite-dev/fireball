@@ -19,10 +19,12 @@ type APIClient interface {
 		operationTypes []pkg.OperationType,
 		operationState pkg.OperationState,
 		WithoutCommissions bool) ([]api.UserOperations, error)
-	BondBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (api.Bond, error)
-	GetInstrumentBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (api.Instrument, error)
+	BondBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (api.InstrumentBond, error)
+	GetInstrumentBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (api.InstrumentResponse, error)
 	Indicatives(ctx context.Context, token string) (api.IndicativeInstruments, error)
-	GetCandles(ctx context.Context, token string,
+	GetCandles(
+		ctx context.Context,
+		token string,
 		from *time.Time,
 		to *time.Time,
 		interval pkg.CandleInterval,

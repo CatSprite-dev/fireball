@@ -142,7 +142,7 @@ func (client *Client) GetOperationsByCursor(
 	return allOperations, nil
 }
 
-func (client *Client) BondBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (Bond, error) {
+func (client *Client) BondBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (InstrumentBond, error) {
 	type InstrumentRequest struct {
 		IDType    pkg.InstrumentIdType `json:"idType"`
 		ClassCode pkg.ClassCode        `json:"classCode,omitempty"`
@@ -150,7 +150,7 @@ func (client *Client) BondBy(ctx context.Context, token string, idType pkg.Instr
 	}
 
 	if idType == pkg.InstrumentIdTypeTicker && classCode == pkg.ClassCodeUnspecified {
-		return Bond{}, fmt.Errorf("classCode is required when idType is TICKER")
+		return InstrumentBond{}, fmt.Errorf("classCode is required when idType is TICKER")
 	}
 
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/BondBy"
@@ -165,19 +165,19 @@ func (client *Client) BondBy(ctx context.Context, token string, idType pkg.Instr
 
 	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
-		return Bond{}, fmt.Errorf("do request error (BondsBy): %w", err)
+		return InstrumentBond{}, fmt.Errorf("do request error (BondsBy): %w", err)
 	}
 
-	var bond Bond
+	var bond InstrumentBond
 	err = json.Unmarshal(data, &bond)
 	if err != nil {
-		return Bond{}, fmt.Errorf("unmarshal error (BondsBy): %w", err)
+		return InstrumentBond{}, fmt.Errorf("unmarshal error (BondsBy): %w", err)
 	}
 
 	return bond, nil
 }
 
-func (client *Client) GetInstrumentBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (Instrument, error) {
+func (client *Client) GetInstrumentBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (InstrumentResponse, error) {
 	type InstrumentRequest struct {
 		IDType    pkg.InstrumentIdType `json:"idType"`
 		ClassCode pkg.ClassCode        `json:"classCode,omitempty"`
@@ -185,7 +185,7 @@ func (client *Client) GetInstrumentBy(ctx context.Context, token string, idType 
 	}
 
 	if idType == pkg.InstrumentIdTypeTicker && classCode == pkg.ClassCodeUnspecified {
-		return Instrument{}, fmt.Errorf("classCode is required when idType is TICKER")
+		return InstrumentResponse{}, fmt.Errorf("classCode is required when idType is TICKER")
 	}
 
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/GetInstrumentBy"
@@ -200,15 +200,14 @@ func (client *Client) GetInstrumentBy(ctx context.Context, token string, idType 
 
 	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
-		return Instrument{}, fmt.Errorf("do request error (GetInstrumentBy): %w", err)
+		return InstrumentResponse{}, fmt.Errorf("do request error (GetInstrumentBy): %w", err)
 	}
 
-	var instrument Instrument
+	var instrument InstrumentResponse
 	err = json.Unmarshal(data, &instrument)
 	if err != nil {
-		return Instrument{}, fmt.Errorf("unmarshal error (GetInstrumentBy): %w", err)
+		return InstrumentResponse{}, fmt.Errorf("unmarshal error (GetInstrumentBy): %w", err)
 	}
-
 	return instrument, nil
 }
 

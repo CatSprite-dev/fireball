@@ -61,14 +61,14 @@ func convertFullPortfolio(raw api.UserPortfolio) domain.Portfolio {
 	return full
 }
 
-func convertInstrument(raw api.Instrument) domain.Instrument {
+func convertInstrument(raw api.InstrumentResponse) domain.Instrument {
 	return domain.Instrument{
-		Name:           raw.Name,
-		InstrumentType: raw.InstrumentType,
+		Name:           raw.Instrument.Name,
+		InstrumentType: raw.Instrument.InstrumentType,
 	}
 }
 
-func convertBond(raw api.Bond) domain.Bond {
+func convertBond(raw api.InstrumentBond) domain.Bond {
 	return domain.Bond{
 		PositionUID: raw.Bond.PositionUID,
 		Name:        raw.Bond.Name,

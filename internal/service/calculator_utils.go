@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"slices"
 	"sync"
 	"time"
 
@@ -270,7 +271,7 @@ func getPaymentsByInterval(
 // operations were executed in the index instead.
 // qty_change = |payment| / index_price at operation interval
 func buildIndexPortfolioCandles(
-	operations domain.UserOperations,
+	opsByInterval map[time.Time][]domain.Item,
 	indexCandles []domain.Candle,
 	portfolioCandles []domain.Candle,
 	candleInterval pkg.CandleInterval,
@@ -280,50 +281,32 @@ func buildIndexPortfolioCandles(
 		return nil, fmt.Errorf("index candle not found")
 	}
 
-	opsByInterval := opsByInterval(operations, candleInterval)
-
-	candleIndex := make(map[time.Time]domain.Candle)
-	for _, c := range indexCandles {
-		candleIndex[truncateToInterval(c.Time, candleInterval)] = c
-	}
+	candlesByTime := makeCandlesByTime(indexCandles, candleInterval)
 
 	var currentQty domain.Quotation
 	var lastIndexCandle domain.Candle
 
 	// Seed initial position: buy index for the value of the first portfolio candle
-	firstPortfolioClose := portfolioCandles[0].Close
-	for _, portfolioCandle := range portfolioCandles {
-		firstInterval := truncateToInterval(portfolioCandle.Time, candleInterval)
-		firstIndexCandle, ok := candleIndex[firstInterval]
-		if ok {
-			initialQty, err := DivideQuotation(firstPortfolioClose, firstIndexCandle.Close)
-			if err == nil {
-				currentQty = initialQty
-				lastIndexCandle = firstIndexCandle
-			}
-			break
-		}
+	firstInterval := truncateToInterval(portfolioCandles[0].Time, candleInterval)
+	firstIndexCandle, ok := candlesByTime[firstInterval]
+	if ok {
+		currentQty, _ = DivideQuotation(portfolioCandles[0].Close, firstIndexCandle.Close)
+		lastIndexCandle = firstIndexCandle
 	}
 
 	result := make([]domain.Candle, 0, len(portfolioCandles))
 
 	for _, portfolioCandle := range portfolioCandles {
 		interval := truncateToInterval(portfolioCandle.Time, candleInterval)
-
-		if c, ok := candleIndex[interval]; ok {
+		if c, ok := candlesByTime[interval]; ok {
 			lastIndexCandle = c
 		}
-		if lastIndexCandle.Close.Units == "" && lastIndexCandle.Close.Nano == 0 {
-			continue
-		}
 
-		opAmount := domain.MoneyValue{}
 		for _, item := range opsByInterval[interval] {
-			itemCost := MultiplyQuotation(
+			itemCost := AddQuotations(MultiplyQuotation(
 				domain.Quotation{Units: item.InstrumentPrice.Units, Nano: item.InstrumentPrice.Nano},
 				domain.Quotation{Units: item.Quantity},
-			)
-			opAmount = AddMoneyValue(opAmount, domain.MoneyValue{Units: itemCost.Units, Nano: itemCost.Nano})
+			), domain.Quotation{Units: item.AccruedInt.Units, Nano: item.AccruedInt.Nano})
 			qtyChange, err := DivideQuotation(itemCost, lastIndexCandle.Close)
 			if err != nil {
 				continue
@@ -331,7 +314,7 @@ func buildIndexPortfolioCandles(
 			switch pkg.OperationType(item.Type) {
 			case pkg.OperationTypeBuy:
 				currentQty = AddQuotations(currentQty, qtyChange)
-			case pkg.OperationTypeSell:
+			case pkg.OperationTypeSell, pkg.OperationTypeBondRepaymentFull, pkg.OperationTypeBondRepayment:
 				currentQty = SubtractQuotations(currentQty, qtyChange)
 			}
 		}
@@ -417,4 +400,33 @@ func opsByInterval(operations domain.UserOperations, candleInterval pkg.CandleIn
 		opsByInterval[interval] = append(opsByInterval[interval], item)
 	}
 	return opsByInterval
+}
+
+func sortedIntervals(holdings map[time.Time]map[string]domain.Quotation) []time.Time {
+	intervals := make([]time.Time, 0, len(holdings))
+	for interval := range holdings {
+		intervals = append(intervals, interval)
+	}
+	slices.SortFunc(intervals, time.Time.Compare)
+	return intervals
+}
+
+func makeCandlesByTime(candles []domain.Candle, candleInterval pkg.CandleInterval) map[time.Time]domain.Candle {
+	candleMap := make(map[time.Time]domain.Candle)
+	for _, c := range candles {
+		candleMap[truncateToInterval(c.Time, candleInterval)] = c
+	}
+	return candleMap
+}
+
+func buildLastPriceCache(historicalCandles map[string][]domain.Candle, from time.Time) map[string]domain.Candle {
+	lastPrice := make(map[string]domain.Candle)
+	for figi, candles := range historicalCandles {
+		for _, c := range candles {
+			if c.Time.Before(from) {
+				lastPrice[figi] = c
+			}
+		}
+	}
+	return lastPrice
 }

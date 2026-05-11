@@ -20,10 +20,10 @@ type MockAPIClient struct {
 		operationTypes []pkg.OperationType,
 		operationState pkg.OperationState,
 		WithoutCommissions bool) ([]api.UserOperations, error)
-	MockBondBy          func(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (api.Bond, error)
-	MockGetInstrumentBy func(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (api.Instrument, error)
+	MockBondBy          func(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (api.InstrumentBond, error)
+	MockGetInstrumentBy func(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (api.InstrumentResponse, error)
 	MockIndicatives     func(ctx context.Context, token string) (api.IndicativeInstruments, error)
-	MockGetCandles      func(tctx context.Context, oken string,
+	MockGetCandles      func(ctx context.Context, token string,
 		from *time.Time,
 		to *time.Time,
 		interval pkg.CandleInterval,
@@ -77,16 +77,16 @@ func (m *MockAPIClient) GetCandles(
 	return api.Candles{}, nil
 }
 
-func (m *MockAPIClient) BondBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (api.Bond, error) {
+func (m *MockAPIClient) BondBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (api.InstrumentBond, error) {
 	if m.MockBondBy != nil {
 		return m.MockBondBy(ctx, token, idType, classCode, id)
 	}
-	return api.Bond{}, nil
+	return api.InstrumentBond{}, nil
 }
 
-func (m *MockAPIClient) GetInstrumentBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (api.Instrument, error) {
+func (m *MockAPIClient) GetInstrumentBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (api.InstrumentResponse, error) {
 	if m.MockGetInstrumentBy != nil {
 		return m.MockGetInstrumentBy(ctx, token, idType, classCode, id)
 	}
-	return api.Instrument{}, nil
+	return api.InstrumentResponse{}, nil
 }
