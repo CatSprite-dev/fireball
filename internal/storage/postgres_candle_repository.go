@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var ErrCandlesNotFound = errors.New("rows not found")
+var ErrCandlesNotFound = errors.New("candles rows not found")
 
 type CandleRepository struct {
 	db *pgxpool.Pool
@@ -70,7 +70,16 @@ func (cr *CandleRepository) PutCandles(ctx context.Context, figi string, interva
 
 	batch := &pgx.Batch{}
 	for _, c := range candles {
-		batch.Queue(query, figi, interval, c.Time, c.Open.Units, c.Open.Nano, c.Close.Units, c.Close.Nano)
+		batch.Queue(
+			query,
+			figi,
+			interval,
+			c.Time,
+			c.Open.Units,
+			c.Open.Nano,
+			c.Close.Units,
+			c.Close.Nano,
+		)
 	}
 
 	results := cr.db.SendBatch(ctx, batch)
