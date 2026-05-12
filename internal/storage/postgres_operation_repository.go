@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/domain"
+	"github.com/CatSprite-dev/fireball/internal/pkg"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -21,7 +22,7 @@ func NewOperationsRepository(pool *pgxpool.Pool) *OperationRepository {
 	return &OperationRepository{db: pool}
 }
 
-func (r *OperationRepository) GetOperations(ctx context.Context, accountID string, from, to time.Time, types []string) (domain.UserOperations, error) {
+func (r *OperationRepository) GetOperations(ctx context.Context, accountID string, from, to time.Time, types []pkg.OperationType) (domain.UserOperations, error) {
 	query := `
 		SELECT date, type, instrument_type, figi, ticker, quantity, payment_currency, payment_units, payment_nano 
 		FROM operations 

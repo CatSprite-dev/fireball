@@ -28,7 +28,8 @@ func enrichFullPortfolio(
 		return domain.Portfolio{}, err
 	}
 
-	dividends, err := calc.GetDividends(ctx, token, accountID, "", openedDate, time.Now().UTC())
+	now := time.Now().UTC()
+	dividends, err := calc.GetDividends(ctx, token, accountID, "", openedDate, now)
 	if err != nil {
 		log.Printf("failed to get dividends: %v", err)
 	} else {

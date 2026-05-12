@@ -24,14 +24,16 @@ type PortfolioRequest struct {
 var ErrNotFound = errors.New("not found")
 
 type Calculator struct {
-	ApiClient        *api.Client
-	CandleRepository *storage.CandleRepository
+	ApiClient           *api.Client
+	CandleRepository    *storage.CandleRepository
+	OperationRepository *storage.OperationRepository
 }
 
-func NewCalculator(apiClient *api.Client, candleRepo *storage.CandleRepository) *Calculator {
+func NewCalculator(apiClient *api.Client, candleRepo *storage.CandleRepository, operationsRepo *storage.OperationRepository) *Calculator {
 	return &Calculator{
-		ApiClient:        apiClient,
-		CandleRepository: candleRepo,
+		ApiClient:           apiClient,
+		CandleRepository:    candleRepo,
+		OperationRepository: operationsRepo,
 	}
 }
 
@@ -52,7 +54,7 @@ func (calc *Calculator) GetFullPortfolio(ctx context.Context, session PortfolioR
 	return portfolio, nil
 }
 
-func (calc *Calculator) GetOperations(
+func (calc *Calculator) fetchOperations(
 	ctx context.Context,
 	token string,
 	accountId string,
@@ -63,14 +65,82 @@ func (calc *Calculator) GetOperations(
 	operationState pkg.OperationState,
 	withoutCommissions bool,
 ) (domain.UserOperations, error) {
-	rawOperations, err := calc.ApiClient.GetUserOperationsByCursor(
+	operations, err := calc.ApiClient.GetUserOperationsByCursor(
 		ctx, token, accountId, instrumentId, from, to,
 		operationTypes, operationState, withoutCommissions,
 	)
 	if err != nil {
 		return domain.UserOperations{}, err
 	}
-	return convertOperations(rawOperations), nil
+	return convertOperations(operations), nil
+}
+
+func (calc *Calculator) fetchAndStoreOperations(
+	ctx context.Context,
+	token, accountID string,
+	instrumentId string,
+	from time.Time,
+	to time.Time,
+	operationTypes []pkg.OperationType,
+	operationState pkg.OperationState,
+	withoutCommissions bool,
+) (domain.UserOperations, error) {
+	operations, err := calc.fetchOperations(ctx, token, accountID, instrumentId, &from, &to, operationTypes, operationState, withoutCommissions)
+	if err != nil {
+		return domain.UserOperations{}, err
+	}
+	if len(operations.Items) > 0 {
+		err = calc.OperationRepository.PutOperations(ctx, accountID, operations)
+		if err != nil {
+			log.Printf("error putting fetched operations: %v", err)
+		}
+	}
+	return operations, nil
+}
+
+func (calc *Calculator) GetOrFetchOperations(
+	ctx context.Context,
+	token string,
+	accountId string,
+	instrumentId string,
+	from time.Time,
+	to time.Time,
+	operationTypes []pkg.OperationType,
+	operationState pkg.OperationState,
+	withoutCommissions bool,
+) (domain.UserOperations, error) {
+	if calc.OperationRepository == nil {
+		return calc.fetchOperations(ctx, token, accountId, instrumentId, &from, &to, operationTypes, operationState, withoutCommissions)
+	}
+
+	operations, err := calc.OperationRepository.GetOperations(ctx, accountId, from, to, operationTypes)
+
+	if err != nil {
+		log.Printf("no operations in db")
+		if !errors.Is(err, storage.ErrOperationsNotFound) {
+			log.Printf("%v\n", err)
+		}
+		return calc.fetchAndStoreOperations(ctx, token, accountId, instrumentId, from, to, operationTypes, operationState, withoutCommissions)
+	}
+
+	log.Printf("found operations in db")
+
+	if operations.Items[len(operations.Items)-1].Date.Before(to) {
+		from = operations.Items[len(operations.Items)-1].Date.Add(time.Second)
+		restOfOperations, err := calc.fetchOperations(ctx, token, accountId, instrumentId, &from, &to, operationTypes, operationState, withoutCommissions)
+		if err != nil {
+			return domain.UserOperations{}, err
+		}
+		operations.Items = append(operations.Items, restOfOperations.Items...)
+		if len(restOfOperations.Items) > 0 {
+			err = calc.OperationRepository.PutOperations(ctx, accountId, restOfOperations)
+			if err != nil {
+				log.Printf("error putting fetched operations: %v", err)
+			}
+		}
+		return operations, nil
+	}
+	return operations, nil
 }
 
 func (calc *Calculator) GetDividends(
@@ -81,8 +151,8 @@ func (calc *Calculator) GetDividends(
 	from time.Time,
 	to time.Time,
 ) (map[string]domain.MoneyValue, error) {
-	operations, err := calc.ApiClient.GetUserOperationsByCursor(
-		ctx, token, accountID, instrumentId, &from, &to,
+	operations, err := calc.GetOrFetchOperations(
+		ctx, token, accountID, instrumentId, from, to,
 		[]pkg.OperationType{pkg.OperationTypeDividend, pkg.OperationTypeCoupon},
 		pkg.OperationStateExecuted, false,
 	)
@@ -91,13 +161,12 @@ func (calc *Calculator) GetDividends(
 	}
 
 	result := make(map[string]domain.MoneyValue)
-	for _, block := range operations {
-		for _, item := range block.Items {
-			if item.Ticker == "" {
-				continue
-			}
-			result[item.Ticker] = AddMoneyValue(result[item.Ticker], domain.MoneyValue(item.Payment))
+	for _, item := range operations.Items {
+		if item.Ticker == "" {
+			continue
 		}
+		result[item.Ticker] = AddMoneyValue(result[item.Ticker], domain.MoneyValue(item.Payment))
+
 	}
 	return result, nil
 }
@@ -110,25 +179,23 @@ func (calc *Calculator) GetTotalReturn(
 	openedDate time.Time,
 ) (domain.MoneyValue, domain.Quotation, domain.MoneyValue, error) {
 	now := time.Now()
-	operations, err := calc.ApiClient.GetUserOperationsByCursor(
-		ctx, token, accountID, "", &openedDate, &now,
+	operations, err := calc.GetOrFetchOperations(
+		ctx, token, accountID, "", openedDate, now,
 		[]pkg.OperationType{
 			pkg.OperationTypeInput,
 			pkg.OperationTypeOutput,
 			pkg.OperationTypeInpMulti,
 			pkg.OperationTypeOutMulti,
 		},
-		pkg.OperationStateExecuted, true,
+		pkg.OperationStateExecuted, false,
 	)
 	if err != nil {
 		return domain.MoneyValue{}, domain.Quotation{}, domain.MoneyValue{}, err
 	}
 
 	var totalInvested domain.MoneyValue
-	for _, block := range operations {
-		for _, item := range block.Items {
-			totalInvested = AddMoneyValue(totalInvested, domain.MoneyValue(item.Payment))
-		}
+	for _, item := range operations.Items {
+		totalInvested = AddMoneyValue(totalInvested, domain.MoneyValue(item.Payment))
 	}
 
 	totalReturn := SubtractMoneyValue(portfolio.TotalAmountPortfolio, totalInvested)
@@ -200,7 +267,7 @@ func (calc *Calculator) GetIndexByTicker(ctx context.Context, token string, tick
 	return domain.Instrument{}, nil
 }
 
-func (calc *Calculator) fetchAndStore(
+func (calc *Calculator) fetchAndStoreCandles(
 	ctx context.Context,
 	token, figi string,
 	from, to time.Time,
@@ -240,12 +307,12 @@ func (calc *Calculator) GetOrFetchCandles(
 		if !errors.Is(err, storage.ErrCandlesNotFound) {
 			log.Printf("%v\n", err)
 		}
-		return calc.fetchAndStore(ctx, token, figi, from, to, candleInterval, candleSourceType)
+		return calc.fetchAndStoreCandles(ctx, token, figi, from, to, candleInterval, candleSourceType)
 	}
 
 	log.Printf("found candles in db")
 
-	if truncateToInterval(candles[len(candles)-1].Time, candleInterval).Before(truncateToInterval(time.Now(), candleInterval)) {
+	if truncateToInterval(candles[len(candles)-1].Time, candleInterval).Before(truncateToInterval(to, candleInterval)) {
 		from = truncateToInterval(candles[len(candles)-1].Time, candleInterval).Add(candleIntervalDuration(candleInterval))
 		restOfCandles, err := calc.FetchCandles(ctx, token, figi, from, time.Now(), candleInterval, candleSourceType)
 		if err != nil {
@@ -302,8 +369,8 @@ func (calc *Calculator) GetChartData(
 	candleSource pkg.CandleSource,
 ) (domain.ChartData, error) {
 	t := time.Now()
-	operations, err := calc.GetOperations(
-		ctx, token, portfolio.AccountID, "", &from, &to,
+	operations, err := calc.GetOrFetchOperations(
+		ctx, token, portfolio.AccountID, "", from, to,
 		[]pkg.OperationType{
 			pkg.OperationTypeBuy,
 			pkg.OperationTypeSell,

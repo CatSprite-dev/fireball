@@ -10,6 +10,7 @@ Fireball is an investment app for investors that allows them to plan and track t
 ## Installation guide
 To try app locally clone repo to your machine. App was developed on Ubuntu and MacOS, so Windows is not supported for dev environment. Make sure you you have [go](https://go.dev/doc/install) and [node](https://nodejs.org/en/download) installed on your machine. Setup scripts are written in makefile, so if you for some reason don't have **make** utility, get it installed too
 Also, we use image of [Redis](https://hub.docker.com/layers/library/redis/7.0-alpine) and [Postgres](https://hub.docker.com/layers/library/postgres/16-alpine), so [docker](https://docs.docker.com/get-docker/) is necessary for correct work
+For db migrations the [goose](https://github.com/pressly/goose) is used
 
 * After cloning repo, create the **.env** file in the root of the repo. Contents example:
 ```

@@ -6,6 +6,7 @@ setup-environment:
 	@command -v npm >/dev/null 2>&1 || { echo >&2 "Error: Node.js is not installed. Install and try again."; exit 1; }
 	@echo "Go and npm are found. Continue..."
 	@go mod download
+	@go install github.com/pressly/goose/v3/cmd/goose@latest
 	@cd frontend && npm install
 	@echo "Check if your Node.js version is compatible. If not, preferrably install 20v:\n nvm install 20\n nvm use 20"
 
