@@ -44,20 +44,20 @@ export const useChartStore = defineStore('chart', () => {
     const chartSeries = computed(() => {
         if (!chartData.value) return []
 
-        return [    
-            { name: 'Portfolio', 
-                data: chartData.value.times
-                .map((time, i) => ({
-                    x: time,
-                    y: parseMoney(chartData.value?.portfolio[i])
-                        }))},
-            { name: 'Index',   
-                data: chartData.value.times
-                .map((time, i) => ({
-                    x: time,
-                    y: parseMoney(chartData.value?.index[i])
-                        }))},
-            ]
+    return [    
+        { name: 'Portfolio', 
+            data: chartData.value.times
+            .map((time, i) => ({
+                x: time,
+                y: parseMoney(chartData.value?.portfolio[i])
+                    }))},
+        { name: 'Index',   
+            data: chartData.value.times
+            .map((time, i) => ({
+                x: time,
+                y: parseMoney(chartData.value?.benchmark[i])
+                    }))},
+        ]
     })
 
     function abort() {

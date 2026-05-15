@@ -274,3 +274,11 @@ func (client *Client) GetCandles(ctx context.Context,
 
 	return candles, nil
 }
+
+func (c *Client) FigiToTicker(ctx context.Context, token string, figi string) (string, error) {
+	instrument, err := c.GetInstrumentBy(ctx, token, pkg.InstrumentIdTypeFigi, pkg.ClassCodeUnspecified, figi)
+	if err != nil {
+		return "", fmt.Errorf("GetInstrumentBy error (FigiToTicker): %w", err)
+	}
+	return instrument.Instrument.Ticker, nil
+}

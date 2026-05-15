@@ -442,28 +442,28 @@ func (calc *Calculator) GetChartData(
 		indexCandles = []domain.Candle{}
 	}
 
-	virtualPortfolioCandles, err := buildIndexPortfolioCandles(opsByInterval, indexCandles, portfolioCandles, candleInterval)
+	benchmarkCandles, err := buildBenchmarkCandles(opsByInterval, indexCandles, portfolioCandles, paymentsByInterval, candleInterval)
 	if err != nil {
 		log.Printf("failed to get virtual portfolio candles: %v", err)
-		virtualPortfolioCandles = []domain.Candle{}
+		benchmarkCandles = []domain.Candle{}
 	}
 
 	times := make([]time.Time, 0, len(portfolioCandles))
 	portfolioClose := make([]domain.Quotation, 0, len(portfolioCandles))
-	indexClose := make([]domain.Quotation, 0, len(virtualPortfolioCandles))
+	benchmarkClose := make([]domain.Quotation, 0, len(benchmarkCandles))
 
 	for _, c := range portfolioCandles {
 		times = append(times, c.Time)
 		portfolioClose = append(portfolioClose, c.Close)
 	}
-	for _, c := range virtualPortfolioCandles {
-		indexClose = append(indexClose, c.Close)
+	for _, c := range benchmarkCandles {
+		benchmarkClose = append(benchmarkClose, c.Close)
 	}
 
 	log.Printf("Время выполнения GetChartData: %.2f сек\n", time.Since(t).Seconds())
 	return domain.ChartData{
 		Times:     times,
-		Index:     indexClose,
+		Benchmark: benchmarkClose,
 		Portfolio: portfolioClose,
 	}, nil
 }

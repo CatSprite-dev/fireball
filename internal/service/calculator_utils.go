@@ -270,10 +270,11 @@ func getPaymentsByInterval(
 // BuildIndexPortfolioCandles simulates portfolio performance if all buy/sell
 // operations were executed in the index instead.
 // qty_change = |payment| / index_price at operation interval
-func buildIndexPortfolioCandles(
+func buildBenchmarkCandles(
 	opsByInterval map[time.Time][]domain.Item,
 	indexCandles []domain.Candle,
 	portfolioCandles []domain.Candle,
+	paymentsByInterval map[time.Time]domain.MoneyValue,
 	candleInterval pkg.CandleInterval,
 ) ([]domain.Candle, error) {
 
@@ -289,10 +290,12 @@ func buildIndexPortfolioCandles(
 	// Seed initial position: buy index for the value of the first portfolio candle
 	firstInterval := truncateToInterval(portfolioCandles[0].Time, candleInterval)
 	firstIndexCandle, ok := candlesByTime[firstInterval]
-	if ok {
-		currentQty, _ = DivideQuotation(portfolioCandles[0].Close, firstIndexCandle.Close)
-		lastIndexCandle = firstIndexCandle
+	if !ok {
+		firstIndexCandle = indexCandles[0]
 	}
+	currentQty, _ = DivideQuotation(portfolioCandles[0].Close, firstIndexCandle.Close)
+	lastIndexCandle = firstIndexCandle
+	accumulatedDividends := domain.Quotation{}
 
 	result := make([]domain.Candle, 0, len(portfolioCandles))
 
@@ -302,19 +305,34 @@ func buildIndexPortfolioCandles(
 			lastIndexCandle = c
 		}
 
+		// Accumulate dividends/coupons for this interval
+		if payment, ok := paymentsByInterval[interval]; ok {
+			accumulatedDividends = AddQuotations(accumulatedDividends, domain.Quotation{Units: payment.Units, Nano: payment.Nano})
+		}
+
 		for _, item := range opsByInterval[interval] {
-			itemCost := AddQuotations(MultiplyQuotation(
+			itemCost := MultiplyQuotation(
 				domain.Quotation{Units: item.InstrumentPrice.Units, Nano: item.InstrumentPrice.Nano},
 				domain.Quotation{Units: item.Quantity},
-			), domain.Quotation{Units: item.AccruedInt.Units, Nano: item.AccruedInt.Nano})
-			qtyChange, err := DivideQuotation(itemCost, lastIndexCandle.Close)
-			if err != nil {
-				continue
-			}
+			)
+
 			switch pkg.OperationType(item.Type) {
 			case pkg.OperationTypeBuy:
+				// Use accumulated dividends to offset the cost
+				effectiveCost := SubtractQuotations(itemCost, accumulatedDividends)
+				qtyChange, err := DivideQuotation(effectiveCost, lastIndexCandle.Close)
+				if err != nil {
+					log.Println(err.Error())
+					continue
+				}
 				currentQty = AddQuotations(currentQty, qtyChange)
-			case pkg.OperationTypeSell, pkg.OperationTypeBondRepaymentFull, pkg.OperationTypeBondRepayment:
+				accumulatedDividends = domain.Quotation{} // Reset after use
+			case pkg.OperationTypeSell:
+				qtyChange, err := DivideQuotation(itemCost, lastIndexCandle.Close)
+				if err != nil {
+					log.Println(err.Error())
+					continue
+				}
 				currentQty = SubtractQuotations(currentQty, qtyChange)
 			}
 		}
@@ -345,12 +363,14 @@ func calculateHistoricalHoldings(
 
 	holdings := make(map[time.Time]map[string]domain.Quotation)
 	holdings[end] = make(map[string]domain.Quotation)
+	positionUIDtoFigi := make(map[string]string)
 
 	for _, pos := range positions {
 		if !isInvestmentInstrument(pos.InstrumentType) {
 			continue
 		}
 		holdings[end][pos.Figi] = pos.Quantity
+		positionUIDtoFigi[pos.PositionUID] = pos.Figi
 	}
 
 	currentTime := end
@@ -371,6 +391,12 @@ func calculateHistoricalHoldings(
 		}
 
 		for _, item := range operations[currentTime] {
+			if figi, ok := positionUIDtoFigi[item.PositionUID]; ok {
+				item.Figi = figi
+			} else {
+				positionUIDtoFigi[item.PositionUID] = item.Figi
+			}
+
 			switch pkg.OperationType(item.Type) {
 			case pkg.OperationTypeBuy:
 				holdings[prevTime][item.Figi] = SubtractQuotations(
@@ -382,6 +408,9 @@ func calculateHistoricalHoldings(
 					holdings[prevTime][item.Figi],
 					domain.Quotation{Units: item.Quantity},
 				)
+			}
+			if holdings[prevTime][item.Figi].Units == "0" && holdings[prevTime][item.Figi].Nano == 0 {
+				delete(holdings[prevTime], item.Figi)
 			}
 		}
 		currentTime = prevTime
