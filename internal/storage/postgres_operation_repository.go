@@ -26,7 +26,7 @@ func (r *OperationRepository) GetOperations(ctx context.Context, accountID strin
 	query := `
 		SELECT date, type, instrument_type, figi, ticker, quantity, payment_currency, payment_units, payment_nano 
 		FROM operations 
-		WHERE account_id=$1 AND date>=$2 AND date<=$3 AND type = ANY($4)
+		WHERE account_id=$1 AND date>=$2 AND date<=$3 AND type=ANY($4)
 		ORDER BY date ASC`
 
 	rows, err := r.db.Query(ctx, query, accountID, from, to, types)
@@ -69,6 +69,12 @@ func (r *OperationRepository) GetOperations(ctx context.Context, accountID strin
 }
 
 func (r *OperationRepository) PutOperations(ctx context.Context, accountID string, operations domain.UserOperations) error {
+	/* 	if len(operations.Items) > 0 {
+		for i, o := range operations.Items {
+			log.Printf("%d: id - %s\n account_id - %s\n date - %v\n type - %s\n instrument_type - %s\n figi - %s\n ticker - %s\n quantity - %s\n payment_currency - %s\n payment_units - %s\n payment_nano - %d\n",
+				i, o.ID, accountID, o.Date, o.Type, o.InstrumentType, o.Figi, o.Ticker, o.Quantity, o.Payment.Currency, o.Payment.Units, o.Payment.Nano)
+		}
+	} */
 	query := `
 		INSERT INTO operations (id, account_id, date, type, instrument_type, figi, ticker, quantity, payment_currency, payment_units, payment_nano)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT DO NOTHING

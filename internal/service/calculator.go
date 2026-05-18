@@ -23,6 +23,17 @@ type PortfolioRequest struct {
 
 var ErrNotFound = errors.New("not found")
 
+var allOperationTypes = []pkg.OperationType{
+	pkg.OperationTypeBuy,
+	pkg.OperationTypeSell,
+	pkg.OperationTypeDividend,
+	pkg.OperationTypeCoupon,
+	pkg.OperationTypeInput,
+	pkg.OperationTypeOutput,
+	pkg.OperationTypeInpMulti,
+	pkg.OperationTypeOutMulti,
+}
+
 type Calculator struct {
 	ApiClient           *api.Client
 	CandleRepository    *storage.CandleRepository
@@ -85,17 +96,31 @@ func (calc *Calculator) fetchAndStoreOperations(
 	operationState pkg.OperationState,
 	withoutCommissions bool,
 ) (domain.UserOperations, error) {
-	operations, err := calc.fetchOperations(ctx, token, accountID, instrumentId, &from, &to, operationTypes, operationState, withoutCommissions)
+	operations, err := calc.fetchOperations(ctx, token, accountID, instrumentId, &from, &to, allOperationTypes, operationState, withoutCommissions)
 	if err != nil {
 		return domain.UserOperations{}, err
 	}
+
+	opsToReturn := domain.UserOperations{}
 	if len(operations.Items) > 0 {
+		for _, op := range operations.Items {
+			isIn := false
+			for _, t := range operationTypes {
+				if op.Type == string(t) {
+					isIn = true
+					break
+				}
+			}
+			if isIn {
+				opsToReturn.Items = append(opsToReturn.Items, op)
+			}
+		}
 		err = calc.OperationRepository.PutOperations(ctx, accountID, operations)
 		if err != nil {
 			log.Printf("error putting fetched operations: %v", err)
 		}
 	}
-	return operations, nil
+	return opsToReturn, nil
 }
 
 func (calc *Calculator) GetOrFetchOperations(
@@ -114,7 +139,6 @@ func (calc *Calculator) GetOrFetchOperations(
 	}
 
 	operations, err := calc.OperationRepository.GetOperations(ctx, accountId, from, to, operationTypes)
-
 	if err != nil {
 		log.Printf("no operations in db")
 		if !errors.Is(err, storage.ErrOperationsNotFound) {
@@ -127,12 +151,24 @@ func (calc *Calculator) GetOrFetchOperations(
 
 	if operations.Items[len(operations.Items)-1].Date.Before(to) {
 		from = operations.Items[len(operations.Items)-1].Date.Add(time.Second)
-		restOfOperations, err := calc.fetchOperations(ctx, token, accountId, instrumentId, &from, &to, operationTypes, operationState, withoutCommissions)
+		restOfOperations, err := calc.fetchOperations(ctx, token, accountId, instrumentId, &from, &to, allOperationTypes, operationState, withoutCommissions)
 		if err != nil {
 			return domain.UserOperations{}, err
 		}
-		operations.Items = append(operations.Items, restOfOperations.Items...)
+
 		if len(restOfOperations.Items) > 0 {
+			for _, op := range restOfOperations.Items {
+				isIn := false
+				for _, t := range operationTypes {
+					if op.Type == string(t) {
+						isIn = true
+						break
+					}
+				}
+				if isIn {
+					operations.Items = append(operations.Items, op)
+				}
+			}
 			err = calc.OperationRepository.PutOperations(ctx, accountId, restOfOperations)
 			if err != nil {
 				log.Printf("error putting fetched operations: %v", err)
@@ -303,7 +339,6 @@ func (calc *Calculator) GetOrFetchCandles(
 	candles, err := calc.CandleRepository.GetCandles(ctx, figi, string(candleInterval), from, to)
 
 	if err != nil {
-		log.Printf("no candles in db")
 		if !errors.Is(err, storage.ErrCandlesNotFound) {
 			log.Printf("%v\n", err)
 		}

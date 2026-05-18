@@ -228,7 +228,7 @@ func extractUniqueFigis(holdings map[time.Time]map[string]domain.Quotation) []st
 // Handles both lowercase (Position.InstrumentType) and uppercase (operation InstrumentKind) formats.
 func isInvestmentInstrument(kind string) bool {
 	switch kind {
-	case "share", "bond", "etf", "sp", "clearing_certificate", "commodity", "currency":
+	case "share", "bond", "etf", "sp", "clearing_certificate", "commodity":
 		return true
 	}
 	switch pkg.InstrumentType(kind) {

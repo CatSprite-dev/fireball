@@ -30,3 +30,6 @@ stop-deps:
 
 migrate:
 	@export POSTGRES_URL=$$(grep POSTGRES_URL .env | cut -d '=' -f2 | tr -d '"') && goose -dir migrations postgres "$$POSTGRES_URL" up
+
+reset:
+	$(MAKE) stop-deps && $(MAKE) start-deps && sleep 6 && $(MAKE) migrate
