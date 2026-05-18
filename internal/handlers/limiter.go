@@ -36,7 +36,6 @@ func NewRateLimiter(rps int) *RateLimiter {
 func (rl *RateLimiter) reap(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	for range ticker.C {
-		defer rl.mu.Unlock()
 		rl.mu.Lock()
 		now := time.Now()
 		for k, v := range rl.clients {
@@ -44,6 +43,7 @@ func (rl *RateLimiter) reap(interval time.Duration) {
 				delete(rl.clients, k)
 			}
 		}
+		rl.mu.Unlock()
 	}
 }
 

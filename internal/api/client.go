@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -42,7 +43,7 @@ func (e RequestError) Error() string {
 	return e.Message
 }
 
-func (client *Client) DoRequest(url string, httpMethod string, token string, payload interface{}) ([]byte, error) {
+func (client *Client) DoRequest(ctx context.Context, url string, httpMethod string, token string, payload interface{}) ([]byte, error) {
 	client.requestCount.Add(1)
 
 	body, err := json.Marshal(payload)
@@ -50,7 +51,7 @@ func (client *Client) DoRequest(url string, httpMethod string, token string, pay
 		return nil, fmt.Errorf("payload marshal error: %w", err)
 	}
 
-	req, err := http.NewRequest(httpMethod, url, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, httpMethod, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("request creation error: %w", err)
 	}

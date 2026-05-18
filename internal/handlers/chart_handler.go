@@ -22,6 +22,7 @@ func NewChartHandler(sm *storage.SessionManager, ps *service.PortfolioService) *
 }
 
 func (h *ChartHandler) HandlerChart(w http.ResponseWriter, r *http.Request) {
+	log.Println("serving chart handler")
 	sessionID, err := getSessionFromCookie(r)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusBadRequest, err.Error(), err)
@@ -48,10 +49,15 @@ func (h *ChartHandler) HandlerChart(w http.ResponseWriter, r *http.Request) {
 
 	period := r.URL.Query().Get("period")
 	index := r.URL.Query().Get("index")
+	log.Printf("%s %s", period, index)
 
-	from, to, interval := PeriodToParams(period)
-
-	chartData, err := h.portfolioService.GetChartData(request.Token, userPortfolio, index, from, to, interval, pkg.CandleSourceExchange)
+	chartData, err := h.portfolioService.GetOrFetchChartData(r.Context(),
+		sessionID,
+		request.Token,
+		userPortfolio,
+		period,
+		index,
+		pkg.CandleSourceExchange)
 	if err != nil {
 		log.Printf("GetChartData error: %v", err)
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)

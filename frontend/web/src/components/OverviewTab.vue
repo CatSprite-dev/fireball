@@ -162,13 +162,14 @@ const chartOptions = computed(() => ({
         <div class="card-body" style="min-height: 300px;">
             <div v-if="isChartLoading" class="skeleton-chart"></div>
             <apexchart
-                v-else
+                v-else-if="props.chartSeries.length > 0"
                 ref="chartRef"
                 type="line" 
                 :series="props.chartSeries" 
                 :options="chartOptions"
                 height="300"
             />
+            <div v-else class="skeleton-chart"></div>
         </div>
     </div>
 </template>

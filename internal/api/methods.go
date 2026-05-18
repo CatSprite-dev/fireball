@@ -9,7 +9,7 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 )
 
-func (client *Client) GetAccounts(token string, accountStatus pkg.AccountStatus) (UserAccounts, error) {
+func (client *Client) GetAccounts(ctx context.Context, token string, accountStatus pkg.AccountStatus) (UserAccounts, error) {
 	type AccountsRequest struct {
 		Status pkg.AccountStatus `json:"status,omitempty"`
 	}
@@ -20,7 +20,7 @@ func (client *Client) GetAccounts(token string, accountStatus pkg.AccountStatus)
 
 	client.usersLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
 		return UserAccounts{}, fmt.Errorf("do request error (api.GetAccounts): %w", err)
 	}
@@ -33,14 +33,14 @@ func (client *Client) GetAccounts(token string, accountStatus pkg.AccountStatus)
 	return accounts, nil
 }
 
-func (client *Client) GetInfo(token string) (UserInfo, error) {
+func (client *Client) GetInfo(ctx context.Context, token string) (UserInfo, error) {
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.UsersService/GetInfo"
 
 	payload := struct{}{}
 
 	client.usersLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
 		return UserInfo{}, fmt.Errorf("do request error (api.GetInfo): %w", err)
 	}
@@ -53,7 +53,7 @@ func (client *Client) GetInfo(token string) (UserInfo, error) {
 	return user, nil
 }
 
-func (client *Client) GetPortfolio(token string, accountID string) (UserPortfolio, error) {
+func (client *Client) GetPortfolio(ctx context.Context, token string, accountID string) (UserPortfolio, error) {
 	type PortfolioRequest struct {
 		AccountID string `json:"accountId"`
 	}
@@ -64,7 +64,7 @@ func (client *Client) GetPortfolio(token string, accountID string) (UserPortfoli
 
 	client.operationsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
 		return UserPortfolio{}, fmt.Errorf("do request error (GetPortfolio): %w", err)
 	}
@@ -79,6 +79,7 @@ func (client *Client) GetPortfolio(token string, accountID string) (UserPortfoli
 }
 
 func (client *Client) GetUserOperationsByCursor(
+	ctx context.Context,
 	token string,
 	accountId string,
 	instrumentId string,
@@ -120,7 +121,7 @@ func (client *Client) GetUserOperationsByCursor(
 
 		client.operationsLimiter.Wait(context.Background())
 
-		data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+		data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
 		if err != nil {
 			return []UserOperations{}, fmt.Errorf("do request error (GetOperationsByCursor): %w", err)
 		}
@@ -140,7 +141,7 @@ func (client *Client) GetUserOperationsByCursor(
 	return allOperations, nil
 }
 
-func (client *Client) BondBy(token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (Bond, error) {
+func (client *Client) BondBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (Bond, error) {
 	type InstrumentRequest struct {
 		IDType    pkg.InstrumentIdType `json:"idType"`
 		ClassCode pkg.ClassCode        `json:"classCode,omitempty"`
@@ -161,7 +162,7 @@ func (client *Client) BondBy(token string, idType pkg.InstrumentIdType, classCod
 
 	client.instrumentsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
 		return Bond{}, fmt.Errorf("do request error (BondsBy): %w", err)
 	}
@@ -175,7 +176,7 @@ func (client *Client) BondBy(token string, idType pkg.InstrumentIdType, classCod
 	return bond, nil
 }
 
-func (client *Client) GetInstrumentBy(token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (Instrument, error) {
+func (client *Client) GetInstrumentBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (Instrument, error) {
 	type InstrumentRequest struct {
 		IDType    pkg.InstrumentIdType `json:"idType"`
 		ClassCode pkg.ClassCode        `json:"classCode,omitempty"`
@@ -196,7 +197,7 @@ func (client *Client) GetInstrumentBy(token string, idType pkg.InstrumentIdType,
 
 	client.instrumentsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
 		return Instrument{}, fmt.Errorf("do request error (GetInstrumentBy): %w", err)
 	}
@@ -210,14 +211,14 @@ func (client *Client) GetInstrumentBy(token string, idType pkg.InstrumentIdType,
 	return instrument, nil
 }
 
-func (client *Client) Indicatives(token string) (IndicativeInstruments, error) {
+func (client *Client) Indicatives(ctx context.Context, token string) (IndicativeInstruments, error) {
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Indicatives"
 
 	payload := struct{}{}
 
 	client.operationsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
 		return IndicativeInstruments{}, fmt.Errorf("do request error (api.Indicatives): %w", err)
 	}
@@ -229,7 +230,8 @@ func (client *Client) Indicatives(token string) (IndicativeInstruments, error) {
 	return indicativeInstruments, nil
 }
 
-func (client *Client) GetCandles(token string,
+func (client *Client) GetCandles(ctx context.Context,
+	token string,
 	from *time.Time,
 	to *time.Time,
 	interval pkg.CandleInterval,
@@ -259,7 +261,7 @@ func (client *Client) GetCandles(token string,
 
 	client.operationsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
 	if err != nil {
 		return Candles{}, fmt.Errorf("do request error (GetCandles): %w", err)
 	}

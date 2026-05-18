@@ -1,8 +1,9 @@
 import type { UserFullPortfolio } from "../types"
 
-export async function fetchPortfolio(): Promise <UserFullPortfolio> {
+export async function fetchPortfolio(ctrl: AbortController): Promise <UserFullPortfolio> {
     const response = await fetch('/api/portfolio', {
         method: 'POST',
+        signal: ctrl.signal,
     })
 
     if (response.status === 401) {

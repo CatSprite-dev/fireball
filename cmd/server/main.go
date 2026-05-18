@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/api"
 	"github.com/CatSprite-dev/fireball/internal/config"
@@ -14,6 +18,9 @@ import (
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	cfg, err := config.NewConfig()
 	if err != nil {
 		os.Exit(1)
@@ -24,18 +31,26 @@ func main() {
 		log.Fatalf("%v\n", err)
 	}
 
+	pool, err := storage.NewPostgresPool(ctx, cfg.PostgresURL)
+	if err != nil {
+		log.Fatalf("failed to connect to postgres: %v\n", err)
+	}
+
+	candleRepository := storage.NewCandleRepository(pool)
+	//operationsRepository := storage.NewOperationsRepository(pool)
+
 	sessionManager, err := storage.NewSessionManager(store, cfg.GetSecret(), cfg.RedisTTL)
 	if err != nil {
 		log.Fatalf("%v\n", err)
 	}
-	cacheManager := storage.NewCacheManager(store, cfg.CacheTTL)
+	cacheManager := storage.NewCacheManager(store, cfg.PortfolioCacheTTL, cfg.ChartDataCacheTTL)
 
 	apiClient := api.NewClient(cfg.BaseURL)
-	calculator := service.NewCalculator(apiClient)
+	calculator := service.NewCalculator(apiClient, candleRepository, nil)
 
 	portfolioService := service.NewPortfolioService(calculator, cacheManager)
 
-	loginHandler := handlers.NewLoginHandler(sessionManager, apiClient)
+	loginHandler := handlers.NewLoginHandler(sessionManager, cacheManager, apiClient)
 
 	loginRateLimiter := handlers.NewRateLimiter(10)
 	authRateLimiter := handlers.NewRateLimiter(200)
@@ -72,6 +87,28 @@ func main() {
 		IdleTimeout:  cfg.IdleTimeout,
 	}
 
-	log.Printf("Serving on: http://localhost:%s/\n", cfg.ServerPort)
-	log.Fatal(srv.ListenAndServe())
+	go func() {
+		log.Printf("Serving on: http://localhost:%s/\n", cfg.ServerPort)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+
+	<-ctx.Done()
+	log.Println("Shutting down gracefully...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	pool.Close()
+
+	if err := store.Close(); err != nil {
+		log.Printf("Redis close error: %v", err)
+	}
+
+	os.Exit(0)
 }

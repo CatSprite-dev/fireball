@@ -36,6 +36,10 @@ func NewRedisStore(redisURL string) (*Store, error) {
 	}, nil
 }
 
+func (s *Store) Close() error {
+	return s.redisClient.Close()
+}
+
 func (s *Store) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
 	return s.redisClient.Set(ctx, key, value, ttl).Err()
 }
@@ -54,4 +58,23 @@ func (s *Store) Get(ctx context.Context, key string) (string, error) {
 
 func (s *Store) Delete(ctx context.Context, key string) error {
 	return s.redisClient.Del(ctx, key).Err()
+}
+
+func (s *Store) DeleteByPattern(ctx context.Context, pattern string) error {
+	scanCmd := s.redisClient.Scan(ctx, 0, pattern, 0)
+	err := scanCmd.Err()
+	if err != nil {
+		return err
+	}
+	iter := scanCmd.Iterator()
+	for iter.Next(ctx) {
+		err := s.redisClient.Unlink(ctx, iter.Val()).Err()
+		if err != nil {
+			return err
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return err
+	}
+	return nil
 }
