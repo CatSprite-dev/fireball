@@ -282,3 +282,77 @@ func (c *Client) FigiToTicker(ctx context.Context, token string, figi string) (s
 	}
 	return instrument.Instrument.Ticker, nil
 }
+
+func (client *Client) GenerateBrokerReport(token string, accountId string, from time.Time, to time.Time) (GenerateBrokerReportResponse, error) {
+	type GenerateBrokerReportRequest struct {
+		AccountID string    `json:"accountId"`
+		From      time.Time `json:"from"`
+		To        time.Time `json:"to"`
+	}
+
+	type requestWrapper struct {
+		GenerateBrokerReportRequest GenerateBrokerReportRequest `json:"generateBrokerReportRequest"`
+	}
+
+	url := "/rest/tinkoff.public.invest.api.contract.v1.OperationsService/GetBrokerReport"
+
+	payload := requestWrapper{
+		GenerateBrokerReportRequest: GenerateBrokerReportRequest{
+			AccountID: accountId,
+			From:      from,
+			To:        to,
+		},
+	}
+
+	client.operationsLimiter.Wait(context.Background())
+
+	data, err := client.DoRequest(url, http.MethodPost, token, payload)
+	if err != nil {
+		return GenerateBrokerReportResponse{}, fmt.Errorf("do request error (GenerateBrokerReportRequest): %w", err)
+	}
+
+	var response GenerateBrokerReportResponse
+	err = json.Unmarshal(data, &response)
+	if err != nil {
+		return GenerateBrokerReportResponse{}, fmt.Errorf("unmarshal error (GenerateBrokerReportRequest): %w", err)
+	}
+
+	return response, nil
+}
+
+func (client *Client) GetBrokerReport(token string, taskId string, page int) (GetBrokerReportResponse, error) {
+	type GetBrokerReportRequest struct {
+		TaskID string `json:"taskId"`
+		Page   int    `json:"page"`
+	}
+
+	type requestWrapper struct {
+		GetBrokerReportRequest GetBrokerReportRequest `json:"getBrokerReportRequest"`
+	}
+
+	url := "/rest/tinkoff.public.invest.api.contract.v1.OperationsService/GetBrokerReport"
+
+	payload := requestWrapper{
+		GetBrokerReportRequest: GetBrokerReportRequest{
+			TaskID: taskId,
+			Page:   page,
+		},
+	}
+
+	client.operationsLimiter.Wait(context.Background())
+
+	data, err := client.DoRequest(url, http.MethodPost, token, payload)
+	if err != nil {
+		fmt.Printf("do request error (GetBrokerReportRequest): %v\n", err)
+		return GetBrokerReportResponse{}, fmt.Errorf("do request error (GetBrokerReportRequest): %w", err)
+	}
+
+	var response GetBrokerReportResponse
+	err = json.Unmarshal(data, &response)
+	if err != nil {
+		fmt.Printf("unmarshal error (GetBrokerReportRequest): %v\n", err)
+		return GetBrokerReportResponse{}, fmt.Errorf("unmarshal error (GetBrokerReportRequest): %w", err)
+	}
+
+	return response, nil
+}

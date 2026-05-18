@@ -254,3 +254,43 @@ type Candles struct {
 		IsComplete bool      `json:"isComplete"`
 	} `json:"candles"`
 }
+
+type GenerateBrokerReportResponse struct {
+	TaskID string `json:"taskId"`
+}
+
+type GetBrokerReportResponse struct {
+	BrokerReport []struct {
+		ExchangeClearingCommission MoneyValue `json:"exchangeClearingCommission"`
+		SeparateAgreementDate      string     `json:"separateAgreementDate"`
+		OrderID                    string     `json:"orderId"`
+		Figi                       string     `json:"figi"`
+		ExecuteSign                string     `json:"executeSign"`
+		BrokerCommission           MoneyValue `json:"brokerCommission"`
+		RepoRate                   Quotation  `json:"repoRate"`
+		OrderAmount                MoneyValue `json:"orderAmount"`
+		Price                      MoneyValue `json:"price"`
+		AciValue                   Quotation  `json:"aciValue"`
+		SecValueDate               time.Time  `json:"secValueDate"`
+		Direction                  string     `json:"direction"`
+		ClassCode                  string     `json:"classCode"`
+		Ticker                     string     `json:"ticker"`
+		Quantity                   string     `json:"quantity"`
+		DeliveryType               string     `json:"deliveryType"`
+		TradeDatetime              time.Time  `json:"tradeDatetime"`
+		ExchangeCommission         MoneyValue `json:"exchangeCommission"`
+		BrokerStatus               string     `json:"brokerStatus"`
+		TotalOrderAmount           MoneyValue `json:"totalOrderAmount"`
+		SeparateAgreementNumber    string     `json:"separateAgreementNumber"`
+		ClearValueDate             time.Time  `json:"clearValueDate"`
+		Name                       string     `json:"name"`
+		Exchange                   string     `json:"exchange"`
+		SeparateAgreementType      string     `json:"separateAgreementType"`
+		TradeID                    string     `json:"tradeId"`
+		Party                      string     `json:"party"`
+	} `json:"brokerReport"`
+	PagesCount int    `json:"pagesCount"`
+	Page       int    `json:"page"`
+	ItemsCount int    `json:"itemsCount"`
+	TaskID     string `json:"taskId"`
+}
