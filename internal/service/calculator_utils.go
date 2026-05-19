@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -277,7 +278,6 @@ func buildBenchmarkCandles(
 	paymentsByInterval map[time.Time]domain.MoneyValue,
 	candleInterval pkg.CandleInterval,
 ) ([]domain.Candle, error) {
-
 	if len(indexCandles) == 0 || len(portfolioCandles) == 0 {
 		return nil, fmt.Errorf("index candle not found")
 	}
@@ -334,6 +334,14 @@ func buildBenchmarkCandles(
 					continue
 				}
 				currentQty = SubtractQuotations(currentQty, qtyChange)
+			case pkg.OperationTypeBondRepayment, pkg.OperationTypeBondRepaymentFull:
+				itemCost = domain.Quotation{Units: item.Payment.Units, Nano: item.Payment.Nano}
+				qtyChange, err := DivideQuotation(itemCost, lastIndexCandle.Close)
+				if err != nil {
+					log.Println(err.Error())
+					continue
+				}
+				currentQty = SubtractQuotations(currentQty, qtyChange)
 			}
 		}
 
@@ -353,11 +361,11 @@ func buildBenchmarkCandles(
 func calculateHistoricalHoldings(
 	operations map[time.Time][]domain.Item,
 	positions []domain.Position,
+	bondNominals map[string]domain.MoneyValue,
 	from time.Time,
 	to time.Time,
 	candleInterval pkg.CandleInterval,
 ) (map[time.Time]map[string]domain.Quotation, error) {
-
 	start := truncateToInterval(from, candleInterval)
 	end := truncateToInterval(to, candleInterval)
 
@@ -391,6 +399,17 @@ func calculateHistoricalHoldings(
 		}
 
 		for _, item := range operations[currentTime] {
+			// splits handler
+			if split, ok := pkg.Splits[item.Ticker]; ok && item.Date.Before(split.Date) {
+				qtyFloat, err := strconv.ParseFloat(item.Quantity, 64)
+				if err != nil {
+					log.Printf("failed to parse quantity %s: %v", item.Quantity, err)
+					continue
+				}
+				newQtyFloat := qtyFloat * split.Coef
+				item.Quantity = strconv.FormatFloat(newQtyFloat, 'f', -1, 64)
+			}
+
 			if figi, ok := positionUIDtoFigi[item.PositionUID]; ok {
 				item.Figi = figi
 			} else {
@@ -403,11 +422,24 @@ func calculateHistoricalHoldings(
 					holdings[prevTime][item.Figi],
 					domain.Quotation{Units: item.Quantity},
 				)
-			case pkg.OperationTypeSell, pkg.OperationTypeBondRepaymentFull:
+			case pkg.OperationTypeSell:
 				holdings[prevTime][item.Figi] = AddQuotations(
 					holdings[prevTime][item.Figi],
 					domain.Quotation{Units: item.Quantity},
 				)
+			case pkg.OperationTypeBondRepaymentFull:
+				if nominal, ok := bondNominals[item.Figi]; ok {
+					qty, err := DivideMoneyValueToQuotation(item.Payment, nominal)
+					if err != nil {
+						log.Printf("failed to calculate quantity for bond repayment of %s: %v", item.Figi, err)
+						continue
+					}
+					holdings[prevTime][item.Figi] = AddQuotations(
+						holdings[prevTime][item.Figi],
+						qty,
+					)
+				}
+
 			}
 			if holdings[prevTime][item.Figi].Units == "0" && holdings[prevTime][item.Figi].Nano == 0 {
 				delete(holdings[prevTime], item.Figi)

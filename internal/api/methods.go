@@ -283,7 +283,7 @@ func (c *Client) FigiToTicker(ctx context.Context, token string, figi string) (s
 	return instrument.Instrument.Ticker, nil
 }
 
-func (client *Client) GenerateBrokerReport(token string, accountId string, from time.Time, to time.Time) (GenerateBrokerReportResponse, error) {
+func (client *Client) GenerateBrokerReport(ctx context.Context, token string, accountId string, from time.Time, to time.Time) (GenerateBrokerReportResponse, error) {
 	type GenerateBrokerReportRequest struct {
 		AccountID string    `json:"accountId"`
 		From      time.Time `json:"from"`
@@ -306,7 +306,7 @@ func (client *Client) GenerateBrokerReport(token string, accountId string, from 
 
 	client.operationsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(url, http.MethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		return GenerateBrokerReportResponse{}, fmt.Errorf("do request error (GenerateBrokerReportRequest): %w", err)
 	}
@@ -320,7 +320,7 @@ func (client *Client) GenerateBrokerReport(token string, accountId string, from 
 	return response, nil
 }
 
-func (client *Client) GetBrokerReport(token string, taskId string, page int) (GetBrokerReportResponse, error) {
+func (client *Client) GetBrokerReport(ctx context.Context, token string, taskId string, page int) (GetBrokerReportResponse, error) {
 	type GetBrokerReportRequest struct {
 		TaskID string `json:"taskId"`
 		Page   int    `json:"page"`
@@ -341,7 +341,7 @@ func (client *Client) GetBrokerReport(token string, taskId string, page int) (Ge
 
 	client.operationsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(url, http.MethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		fmt.Printf("do request error (GetBrokerReportRequest): %v\n", err)
 		return GetBrokerReportResponse{}, fmt.Errorf("do request error (GetBrokerReportRequest): %w", err)

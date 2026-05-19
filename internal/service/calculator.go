@@ -31,6 +31,8 @@ var allOperationTypes = []pkg.OperationType{
 	pkg.OperationTypeOutput,
 	pkg.OperationTypeInpMulti,
 	pkg.OperationTypeOutMulti,
+	pkg.OperationTypeBondRepayment,
+	pkg.OperationTypeBondRepaymentFull,
 }
 
 type Calculator struct {
@@ -436,7 +438,7 @@ func (calc *Calculator) GetChartData(
 		portfolioCandles = []domain.Candle{}
 	}
 
-	indexCandles, err := calc.GetOrFetchCandles(ctx, token, index.Figi, from, to, candleInterval, candleSource)
+	indexCandles, err := calc.GetOrFetchCandles(ctx, token, index.Figi, from.AddDate(0, 0, -pkg.CandleFetchBufferDays), to, candleInterval, candleSource)
 	if err != nil {
 		log.Printf("failed to get index candles: %v", err)
 		indexCandles = []domain.Candle{}
@@ -486,8 +488,11 @@ func (calc *Calculator) GetCandlesForPortfolio(
 		from = portfolio.OpenedDate
 	}
 
+	// Bond price multiplier
+	multipliers, nominals := calc.FetchBondInfo(ctx, token, portfolio.Positions, opsByInterval)
+
 	// Reconstruct historical qty per instrument per interval
-	historicalHoldings, err := calculateHistoricalHoldings(opsByInterval, portfolio.Positions, from, to, candleInterval)
+	historicalHoldings, err := calculateHistoricalHoldings(opsByInterval, portfolio.Positions, nominals, from, to, candleInterval)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get historical holdings: %w", err)
 	}
@@ -498,9 +503,6 @@ func (calc *Calculator) GetCandlesForPortfolio(
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch candles: %w", err)
 	}
-
-	// Bond price multiplier
-	figiToMultiplier := calc.FetchBondMultipliers(ctx, token, portfolio.Positions, opsByInterval)
 
 	// Index candles by truncated interval time for O(1) lookup
 	candlesByTime := make(map[string]map[time.Time]domain.Candle)
@@ -524,7 +526,7 @@ func (calc *Calculator) GetCandlesForPortfolio(
 			}
 
 			close_ := candle.Close
-			if m, ok := figiToMultiplier[figi]; ok {
+			if m, ok := multipliers[figi]; ok {
 				close_ = MultiplyQuotation(close_, m)
 			}
 
@@ -562,7 +564,7 @@ func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
 	resultCh := make(chan candleResult, len(figis))
 	for _, figi := range figis {
 		go func(f string) {
-			candles, err := calc.GetOrFetchCandles(ctx, token, f, from.AddDate(0, 0, pkg.CandleFetchBufferDays), to, candleInterval, candleSource)
+			candles, err := calc.GetOrFetchCandles(ctx, token, f, from.AddDate(0, 0, -pkg.CandleFetchBufferDays), to, candleInterval, candleSource)
 			resultCh <- candleResult{figi: f, candles: candles, err: err}
 		}(figi)
 	}
@@ -582,12 +584,12 @@ func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
 
 // fetchBondMultipliers fetches nominal/100 multiplier for each bond figi in parallel.
 // Falls back to 10 (1000 RUB nominal) if bond info is unavailable.
-func (calc *Calculator) FetchBondMultipliers(
+func (calc *Calculator) FetchBondInfo(
 	ctx context.Context,
 	token string,
 	positions []domain.Position,
 	operations map[time.Time][]domain.Item,
-) map[string]domain.Quotation {
+) (multipliers map[string]domain.Quotation, nominals map[string]domain.MoneyValue) {
 	// Collect unique bond figis
 	bondFigis := make(map[string]struct{})
 
@@ -609,6 +611,7 @@ func (calc *Calculator) FetchBondMultipliers(
 	type bondResult struct {
 		figi       string
 		multiplier domain.Quotation
+		nominal    domain.MoneyValue
 	}
 
 	resultCh := make(chan bondResult, len(bondFigis))
@@ -617,23 +620,30 @@ func (calc *Calculator) FetchBondMultipliers(
 			bond, err := calc.BondBy(ctx, token, pkg.InstrumentIdTypeFigi, "", f)
 			if err != nil {
 				log.Printf("failed to get bond info for %s, using default multiplier: %v", f, err)
-				resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: "10", Nano: 0}}
+				resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: "10", Nano: 0}, nominal: domain.MoneyValue{Units: "1000", Nano: 0}}
 				return
 			}
 			multiplier, err := DivideMoneyValue(bond.Nominal, domain.MoneyValue{Units: "100", Nano: 0})
 			if err != nil {
 				log.Printf("failed to calculate multiplier for %s, using default: %v", f, err)
-				resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: "10", Nano: 0}}
+				resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: "10", Nano: 0}, nominal: domain.MoneyValue{Units: "1000", Nano: 0}}
 				return
 			}
-			resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: multiplier.Units, Nano: multiplier.Nano}}
+			resultCh <- bondResult{
+				figi:       f,
+				multiplier: domain.Quotation{Units: multiplier.Units, Nano: multiplier.Nano},
+				nominal:    bond.InitialNominal}
 		}(figi)
 	}
 
-	result := make(map[string]domain.Quotation, len(bondFigis))
-	for range bondFigis {
-		r := <-resultCh
-		result[r.figi] = r.multiplier
+	multipliers = make(map[string]domain.Quotation, len(bondFigis))
+	nominals = make(map[string]domain.MoneyValue, len(bondFigis))
+	if len(bondFigis) > 0 {
+		for range bondFigis {
+			r := <-resultCh
+			multipliers[r.figi] = r.multiplier
+			nominals[r.figi] = r.nominal
+		}
 	}
-	return result
+	return multipliers, nominals
 }

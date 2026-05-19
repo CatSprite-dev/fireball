@@ -52,7 +52,7 @@ func (s *PortfolioService) GetOrFetchChartData(
 ) (domain.ChartData, error) {
 	chartData, err := s.cacheManager.GetChart(ctx, sessionID, period, indexTicker)
 	if errors.Is(err, storage.ErrNotFound) {
-		from, to, candleInterval := PeriodToParams(period)
+		from, to, candleInterval := periodToParams(period)
 		chartData, err = s.calculator.GetChartData(ctx, token, portfolio, indexTicker, from, to, candleInterval, candleSource)
 		if err != nil {
 			return domain.ChartData{}, err
@@ -69,24 +69,24 @@ func (s *PortfolioService) GetOrFetchChartData(
 	return domain.ChartData{}, err
 }
 
-func PeriodToParams(period string) (time.Time, time.Time, pkg.CandleInterval) {
+func periodToParams(period string) (time.Time, time.Time, pkg.CandleInterval) {
 	now := time.Now().UTC()
 	switch period {
 	case "7d":
 		return now.AddDate(0, 0, -7), now, pkg.CandleInterval4Hour
-	case "1M":
+	case "1m":
 		return now.AddDate(0, -1, 0), now, pkg.CandleIntervalDay
-	case "3M":
+	case "3m":
 		return now.AddDate(0, -3, 0), now, pkg.CandleIntervalDay
-	case "6M":
+	case "6m":
 		return now.AddDate(0, -6, 0), now, pkg.CandleIntervalDay
-	case "YTD":
+	case "ytd":
 		return time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location()), now, pkg.CandleIntervalDay
-	case "1Y":
+	case "1y":
 		return now.AddDate(-1, 0, 0), now, pkg.CandleIntervalDay
-	case "5Y":
+	case "5y":
 		return now.AddDate(-5, 0, 0), now, pkg.CandleIntervalWeek
-	case "ALL":
+	case "all": // 10 years should be enough for everyone, right?
 		return now.AddDate(-10, 0, 0), now, pkg.CandleIntervalMonth
 	default:
 		return now.AddDate(0, -6, 0), now, pkg.CandleIntervalDay

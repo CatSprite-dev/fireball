@@ -70,15 +70,16 @@ func convertInstrument(raw api.InstrumentResponse) domain.Instrument {
 
 func convertBond(raw api.InstrumentBond) domain.Bond {
 	return domain.Bond{
-		PositionUID: raw.Bond.PositionUID,
-		Name:        raw.Bond.Name,
-		Figi:        raw.Bond.Figi,
-		UID:         raw.Bond.UID,
-		Nominal:     domain.MoneyValue(raw.Bond.Nominal),
-		Currency:    raw.Bond.Currency,
-		AciValue:    domain.MoneyValue(raw.Bond.AciValue),
-		ClassCode:   raw.Bond.ClassCode,
-		Ticker:      raw.Bond.Ticker,
+		PositionUID:    raw.Bond.PositionUID,
+		Name:           raw.Bond.Name,
+		Figi:           raw.Bond.Figi,
+		UID:            raw.Bond.UID,
+		Nominal:        domain.MoneyValue(raw.Bond.Nominal),
+		InitialNominal: domain.MoneyValue(raw.Bond.InitialNominal),
+		Currency:       raw.Bond.Currency,
+		AciValue:       domain.MoneyValue(raw.Bond.AciValue),
+		ClassCode:      raw.Bond.ClassCode,
+		Ticker:         raw.Bond.Ticker,
 	}
 }
 

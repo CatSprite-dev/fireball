@@ -37,7 +37,7 @@ func main() {
 	}
 
 	candleRepository := storage.NewCandleRepository(pool)
-	//operationsRepository := storage.NewOperationsRepository(pool)
+	operationsRepository := storage.NewOperationsRepository(pool)
 
 	sessionManager, err := storage.NewSessionManager(store, cfg.GetSecret(), cfg.RedisTTL)
 	if err != nil {
@@ -46,7 +46,7 @@ func main() {
 	cacheManager := storage.NewCacheManager(store, cfg.PortfolioCacheTTL, cfg.ChartDataCacheTTL)
 
 	apiClient := api.NewClient(cfg.BaseURL)
-	calculator := service.NewCalculator(apiClient, candleRepository, nil)
+	calculator := service.NewCalculator(apiClient, candleRepository, operationsRepository)
 
 	portfolioService := service.NewPortfolioService(calculator, cacheManager)
 

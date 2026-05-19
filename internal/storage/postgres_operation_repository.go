@@ -24,7 +24,7 @@ func NewOperationsRepository(pool *pgxpool.Pool) *OperationRepository {
 
 func (r *OperationRepository) GetOperations(ctx context.Context, accountID string, from, to time.Time, types []pkg.OperationType) (domain.UserOperations, error) {
 	query := `
-		SELECT date, type, instrument_type, figi, ticker, quantity, payment_currency, payment_units, payment_nano 
+		SELECT date, type, instrument_type, figi, position_uid, ticker, quantity, payment_currency, payment_units, payment_nano, instrument_price_currency, instrument_price_units, instrument_price_nano
 		FROM operations 
 		WHERE account_id=$1 AND date>=$2 AND date<=$3 AND type=ANY($4)
 		ORDER BY date ASC`
@@ -45,11 +45,15 @@ func (r *OperationRepository) GetOperations(ctx context.Context, accountID strin
 			&o.Type,
 			&o.InstrumentType,
 			&o.Figi,
+			&o.PositionUID,
 			&o.Ticker,
 			&o.Quantity,
 			&o.Payment.Currency,
 			&o.Payment.Units,
 			&o.Payment.Nano,
+			&o.InstrumentPrice.Currency,
+			&o.InstrumentPrice.Units,
+			&o.InstrumentPrice.Nano,
 		)
 		if err != nil {
 			return domain.UserOperations{}, fmt.Errorf("scan failed: %w", err)
@@ -76,8 +80,8 @@ func (r *OperationRepository) PutOperations(ctx context.Context, accountID strin
 		}
 	} */
 	query := `
-		INSERT INTO operations (id, account_id, date, type, instrument_type, figi, ticker, quantity, payment_currency, payment_units, payment_nano)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT DO NOTHING
+		INSERT INTO operations (id, account_id, date, type, instrument_type, figi, position_uid, ticker, quantity, payment_currency, payment_units, payment_nano, instrument_price_currency, instrument_price_units, instrument_price_nano)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT DO NOTHING
 	`
 
 	batch := &pgx.Batch{}
@@ -90,11 +94,15 @@ func (r *OperationRepository) PutOperations(ctx context.Context, accountID strin
 			o.Type,
 			o.InstrumentType,
 			o.Figi,
+			o.PositionUID,
 			o.Ticker,
 			o.Quantity,
 			o.Payment.Currency,
 			o.Payment.Units,
-			o.Payment.Nano)
+			o.Payment.Nano,
+			o.InstrumentPrice.Currency,
+			o.InstrumentPrice.Units,
+			o.InstrumentPrice.Nano)
 	}
 
 	results := r.db.SendBatch(ctx, batch)

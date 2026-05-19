@@ -13,7 +13,7 @@ export const useChartStore = defineStore('chart', () => {
     const error = ref('')
     const ctrl = ref<AbortController | null>(null)
 
-    async function load(period: string = '6M', index: string = 'IMOEX') {
+    async function load(period: string = '1y', index: string = 'IMOEX') {
         console.log('in load chart')
         const auth = useAuthStore()
         if (!auth.isLoggedIn) return
