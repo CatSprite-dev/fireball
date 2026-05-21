@@ -50,7 +50,7 @@ export interface UserFullPortfolio {
 
 export interface ChartData {
     times: string[]
-    index: Quotation[]
+    benchmark: Quotation[]
     portfolio: Quotation[]
 }
 

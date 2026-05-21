@@ -28,8 +28,12 @@ start-deps:
 stop-deps:
 	@docker compose down
 
-migrate:
+migrate-up:
 	@export POSTGRES_URL=$$(grep POSTGRES_URL .env | cut -d '=' -f2 | tr -d '"') && goose -dir migrations postgres "$$POSTGRES_URL" up
 
+migrate-down:
+	@export POSTGRES_URL=$$(grep POSTGRES_URL .env | cut -d '=' -f2 | tr -d '"') && goose -dir migrations postgres "$$POSTGRES_URL" down
+
+
 reset:
-	$(MAKE) stop-deps && $(MAKE) start-deps && sleep 6 && $(MAKE) migrate
+	$(MAKE) stop-deps && $(MAKE) start-deps && sleep 6 && $(MAKE) migrate-up

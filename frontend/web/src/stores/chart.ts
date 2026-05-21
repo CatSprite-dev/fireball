@@ -13,7 +13,7 @@ export const useChartStore = defineStore('chart', () => {
     const error = ref('')
     const ctrl = ref<AbortController | null>(null)
 
-    async function load(period: string = '6M', index: string = 'IMOEX') {
+    async function load(period: string = '1y', index: string = 'IMOEX') {
         console.log('in load chart')
         const auth = useAuthStore()
         if (!auth.isLoggedIn) return
@@ -44,20 +44,20 @@ export const useChartStore = defineStore('chart', () => {
     const chartSeries = computed(() => {
         if (!chartData.value) return []
 
-        return [    
-            { name: 'Portfolio', 
-                data: chartData.value.times
-                .map((time, i) => ({
-                    x: time,
-                    y: parseMoney(chartData.value?.portfolio[i])
-                        }))},
-            { name: 'Index',   
-                data: chartData.value.times
-                .map((time, i) => ({
-                    x: time,
-                    y: parseMoney(chartData.value?.index[i])
-                        }))},
-            ]
+    return [    
+        { name: 'Portfolio', 
+            data: chartData.value.times
+            .map((time, i) => ({
+                x: time,
+                y: parseMoney(chartData.value?.portfolio[i])
+                    }))},
+        { name: 'Index',   
+            data: chartData.value.times
+            .map((time, i) => ({
+                x: time,
+                y: parseMoney(chartData.value?.benchmark[i])
+                    }))},
+        ]
     })
 
     function abort() {

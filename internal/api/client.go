@@ -13,6 +13,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
+const maxConcurrent = 10
+
 type Client struct {
 	httpClient         http.Client
 	baseURL            string
@@ -20,6 +22,7 @@ type Client struct {
 	operationsLimiter  *rate.Limiter
 	instrumentsLimiter *rate.Limiter
 	requestCount       atomic.Int64
+	semaphore          chan struct{}
 }
 
 func NewClient(baseURL string) *Client {
@@ -31,6 +34,7 @@ func NewClient(baseURL string) *Client {
 		usersLimiter:       rate.NewLimiter(rate.Every(time.Minute), 100),
 		operationsLimiter:  rate.NewLimiter(rate.Every(time.Minute), 200),
 		instrumentsLimiter: rate.NewLimiter(rate.Every(time.Minute), 200),
+		semaphore:          make(chan struct{}, maxConcurrent),
 	}
 }
 
@@ -44,6 +48,9 @@ func (e RequestError) Error() string {
 }
 
 func (client *Client) DoRequest(ctx context.Context, url string, httpMethod string, token string, payload interface{}) ([]byte, error) {
+	client.semaphore <- struct{}{}
+	defer func() { <-client.semaphore }()
+
 	client.requestCount.Add(1)
 
 	body, err := json.Marshal(payload)

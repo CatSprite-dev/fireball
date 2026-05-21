@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/pkg"
@@ -20,7 +21,7 @@ func (client *Client) GetAccounts(ctx context.Context, token string, accountStat
 
 	client.usersLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		return UserAccounts{}, fmt.Errorf("do request error (api.GetAccounts): %w", err)
 	}
@@ -40,7 +41,7 @@ func (client *Client) GetInfo(ctx context.Context, token string) (UserInfo, erro
 
 	client.usersLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		return UserInfo{}, fmt.Errorf("do request error (api.GetInfo): %w", err)
 	}
@@ -64,7 +65,7 @@ func (client *Client) GetPortfolio(ctx context.Context, token string, accountID 
 
 	client.operationsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		return UserPortfolio{}, fmt.Errorf("do request error (GetPortfolio): %w", err)
 	}
@@ -78,7 +79,7 @@ func (client *Client) GetPortfolio(ctx context.Context, token string, accountID 
 	return userPortfolio, nil
 }
 
-func (client *Client) GetUserOperationsByCursor(
+func (client *Client) GetOperationsByCursor(
 	ctx context.Context,
 	token string,
 	accountId string,
@@ -121,7 +122,7 @@ func (client *Client) GetUserOperationsByCursor(
 
 		client.operationsLimiter.Wait(context.Background())
 
-		data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+		data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 		if err != nil {
 			return []UserOperations{}, fmt.Errorf("do request error (GetOperationsByCursor): %w", err)
 		}
@@ -141,7 +142,7 @@ func (client *Client) GetUserOperationsByCursor(
 	return allOperations, nil
 }
 
-func (client *Client) BondBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (Bond, error) {
+func (client *Client) BondBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (InstrumentBond, error) {
 	type InstrumentRequest struct {
 		IDType    pkg.InstrumentIdType `json:"idType"`
 		ClassCode pkg.ClassCode        `json:"classCode,omitempty"`
@@ -149,7 +150,7 @@ func (client *Client) BondBy(ctx context.Context, token string, idType pkg.Instr
 	}
 
 	if idType == pkg.InstrumentIdTypeTicker && classCode == pkg.ClassCodeUnspecified {
-		return Bond{}, fmt.Errorf("classCode is required when idType is TICKER")
+		return InstrumentBond{}, fmt.Errorf("classCode is required when idType is TICKER")
 	}
 
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/BondBy"
@@ -162,21 +163,21 @@ func (client *Client) BondBy(ctx context.Context, token string, idType pkg.Instr
 
 	client.instrumentsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
-		return Bond{}, fmt.Errorf("do request error (BondsBy): %w", err)
+		return InstrumentBond{}, fmt.Errorf("do request error (BondsBy): %w", err)
 	}
 
-	var bond Bond
+	var bond InstrumentBond
 	err = json.Unmarshal(data, &bond)
 	if err != nil {
-		return Bond{}, fmt.Errorf("unmarshal error (BondsBy): %w", err)
+		return InstrumentBond{}, fmt.Errorf("unmarshal error (BondsBy): %w", err)
 	}
 
 	return bond, nil
 }
 
-func (client *Client) GetInstrumentBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (Instrument, error) {
+func (client *Client) GetInstrumentBy(ctx context.Context, token string, idType pkg.InstrumentIdType, classCode pkg.ClassCode, id string) (InstrumentResponse, error) {
 	type InstrumentRequest struct {
 		IDType    pkg.InstrumentIdType `json:"idType"`
 		ClassCode pkg.ClassCode        `json:"classCode,omitempty"`
@@ -184,7 +185,7 @@ func (client *Client) GetInstrumentBy(ctx context.Context, token string, idType 
 	}
 
 	if idType == pkg.InstrumentIdTypeTicker && classCode == pkg.ClassCodeUnspecified {
-		return Instrument{}, fmt.Errorf("classCode is required when idType is TICKER")
+		return InstrumentResponse{}, fmt.Errorf("classCode is required when idType is TICKER")
 	}
 
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/GetInstrumentBy"
@@ -197,17 +198,16 @@ func (client *Client) GetInstrumentBy(ctx context.Context, token string, idType 
 
 	client.instrumentsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
-		return Instrument{}, fmt.Errorf("do request error (GetInstrumentBy): %w", err)
+		return InstrumentResponse{}, fmt.Errorf("do request error (GetInstrumentBy): %w", err)
 	}
 
-	var instrument Instrument
+	var instrument InstrumentResponse
 	err = json.Unmarshal(data, &instrument)
 	if err != nil {
-		return Instrument{}, fmt.Errorf("unmarshal error (GetInstrumentBy): %w", err)
+		return InstrumentResponse{}, fmt.Errorf("unmarshal error (GetInstrumentBy): %w", err)
 	}
-
 	return instrument, nil
 }
 
@@ -218,7 +218,7 @@ func (client *Client) Indicatives(ctx context.Context, token string) (Indicative
 
 	client.operationsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		return IndicativeInstruments{}, fmt.Errorf("do request error (api.Indicatives): %w", err)
 	}
@@ -261,7 +261,7 @@ func (client *Client) GetCandles(ctx context.Context,
 
 	client.operationsLimiter.Wait(context.Background())
 
-	data, err := client.DoRequest(ctx, url, pkg.HTTPMethodPost, token, payload)
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
 	if err != nil {
 		return Candles{}, fmt.Errorf("do request error (GetCandles): %w", err)
 	}
@@ -273,4 +273,86 @@ func (client *Client) GetCandles(ctx context.Context,
 	}
 
 	return candles, nil
+}
+
+func (c *Client) FigiToTicker(ctx context.Context, token string, figi string) (string, error) {
+	instrument, err := c.GetInstrumentBy(ctx, token, pkg.InstrumentIdTypeFigi, pkg.ClassCodeUnspecified, figi)
+	if err != nil {
+		return "", fmt.Errorf("GetInstrumentBy error (FigiToTicker): %w", err)
+	}
+	return instrument.Instrument.Ticker, nil
+}
+
+func (client *Client) GenerateBrokerReport(ctx context.Context, token string, accountId string, from time.Time, to time.Time) (GenerateBrokerReportResponse, error) {
+	type GenerateBrokerReportRequest struct {
+		AccountID string    `json:"accountId"`
+		From      time.Time `json:"from"`
+		To        time.Time `json:"to"`
+	}
+
+	type requestWrapper struct {
+		GenerateBrokerReportRequest GenerateBrokerReportRequest `json:"generateBrokerReportRequest"`
+	}
+
+	url := "/rest/tinkoff.public.invest.api.contract.v1.OperationsService/GetBrokerReport"
+
+	payload := requestWrapper{
+		GenerateBrokerReportRequest: GenerateBrokerReportRequest{
+			AccountID: accountId,
+			From:      from,
+			To:        to,
+		},
+	}
+
+	client.operationsLimiter.Wait(context.Background())
+
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
+	if err != nil {
+		return GenerateBrokerReportResponse{}, fmt.Errorf("do request error (GenerateBrokerReportRequest): %w", err)
+	}
+
+	var response GenerateBrokerReportResponse
+	err = json.Unmarshal(data, &response)
+	if err != nil {
+		return GenerateBrokerReportResponse{}, fmt.Errorf("unmarshal error (GenerateBrokerReportRequest): %w", err)
+	}
+
+	return response, nil
+}
+
+func (client *Client) GetBrokerReport(ctx context.Context, token string, taskId string, page int) (GetBrokerReportResponse, error) {
+	type GetBrokerReportRequest struct {
+		TaskID string `json:"taskId"`
+		Page   int    `json:"page"`
+	}
+
+	type requestWrapper struct {
+		GetBrokerReportRequest GetBrokerReportRequest `json:"getBrokerReportRequest"`
+	}
+
+	url := "/rest/tinkoff.public.invest.api.contract.v1.OperationsService/GetBrokerReport"
+
+	payload := requestWrapper{
+		GetBrokerReportRequest: GetBrokerReportRequest{
+			TaskID: taskId,
+			Page:   page,
+		},
+	}
+
+	client.operationsLimiter.Wait(context.Background())
+
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
+	if err != nil {
+		fmt.Printf("do request error (GetBrokerReportRequest): %v\n", err)
+		return GetBrokerReportResponse{}, fmt.Errorf("do request error (GetBrokerReportRequest): %w", err)
+	}
+
+	var response GetBrokerReportResponse
+	err = json.Unmarshal(data, &response)
+	if err != nil {
+		fmt.Printf("unmarshal error (GetBrokerReportRequest): %v\n", err)
+		return GetBrokerReportResponse{}, fmt.Errorf("unmarshal error (GetBrokerReportRequest): %w", err)
+	}
+
+	return response, nil
 }

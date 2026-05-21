@@ -64,7 +64,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         }
     })
 
-    async function load() {
+    async function load(force: boolean = false) {
         isLoading.value = true
         error.value = ''
 
