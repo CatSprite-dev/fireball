@@ -72,7 +72,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         ctrl.value = new AbortController()
 
         try {
-            portfolio.value = await fetchPortfolio(ctrl.value)
+            portfolio.value = await fetchPortfolio(force, ctrl.value)
         } catch (e) {
             if (e instanceof DOMException && e.name === 'AbortError') {
                 return

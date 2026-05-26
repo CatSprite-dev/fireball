@@ -84,7 +84,7 @@ onUnmounted(() => {
     </template>
     <button v-if="!portfolio.isLoading"
       class="refresh-btn" 
-      @click="portfolio.load(true)" 
+      @click="portfolio.load(true), chart.load(true)" 
       title="Refresh portfolio">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
           viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"

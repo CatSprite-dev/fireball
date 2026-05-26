@@ -148,10 +148,8 @@ func (calc *Calculator) GetOrFetchOperations(
 		return calc.fetchAndStoreOperations(ctx, token, accountId, instrumentId, from, to, operationTypes, operationState, withoutCommissions)
 	}
 
-	log.Printf("found operations in db")
-
 	if operations.Items[len(operations.Items)-1].Date.Before(to) {
-		from = operations.Items[len(operations.Items)-1].Date.Add(time.Second)
+		from = operations.Items[len(operations.Items)-1].Date.Add(time.Millisecond)
 		restOfOperations, err := calc.fetchOperations(ctx, token, accountId, instrumentId, &from, &to, allOperationTypes, operationState, withoutCommissions)
 		if err != nil {
 			return domain.UserOperations{}, err
@@ -345,8 +343,6 @@ func (calc *Calculator) GetOrFetchCandles(
 		}
 		return calc.fetchAndStoreCandles(ctx, token, figi, from, to, candleInterval, candleSourceType)
 	}
-
-	log.Printf("found candles in db")
 
 	if truncateToInterval(candles[len(candles)-1].Time, candleInterval).Before(truncateToInterval(to, candleInterval)) {
 		from = truncateToInterval(candles[len(candles)-1].Time, candleInterval).Add(candleIntervalDuration(candleInterval))

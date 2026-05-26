@@ -3,6 +3,7 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 	"github.com/CatSprite-dev/fireball/internal/service"
@@ -23,6 +24,11 @@ func NewChartHandler(sm *storage.SessionManager, ps *service.PortfolioService) *
 
 func (h *ChartHandler) HandlerChart(w http.ResponseWriter, r *http.Request) {
 	log.Println("serving chart handler")
+	force, err := strconv.ParseBool(r.URL.Query().Get("force"))
+	if err != nil {
+		log.Println("'force' param incorrect, the default false param is set")
+		force = false
+	}
 	sessionID, err := getSessionFromCookie(r)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusBadRequest, err.Error(), err)
@@ -41,7 +47,7 @@ func (h *ChartHandler) HandlerChart(w http.ResponseWriter, r *http.Request) {
 		OpenedDate: sessionData.OpenedDate,
 	}
 
-	userPortfolio, err := h.portfolioService.GetOrFetchPortfolio(r.Context(), sessionID, request)
+	userPortfolio, err := h.portfolioService.GetOrFetchPortfolio(r.Context(), force, sessionID, request)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
 		return
@@ -52,6 +58,7 @@ func (h *ChartHandler) HandlerChart(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s %s", period, index)
 
 	chartData, err := h.portfolioService.GetOrFetchChartData(r.Context(),
+		force,
 		sessionID,
 		request.Token,
 		userPortfolio,

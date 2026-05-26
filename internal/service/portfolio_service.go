@@ -23,9 +23,9 @@ func NewPortfolioService(calc *Calculator, cm *storage.CacheManager) *PortfolioS
 	}
 }
 
-func (s *PortfolioService) GetOrFetchPortfolio(ctx context.Context, sessionID string, request PortfolioRequest) (domain.Portfolio, error) {
+func (s *PortfolioService) GetOrFetchPortfolio(ctx context.Context, force bool, sessionID string, request PortfolioRequest) (domain.Portfolio, error) {
 	portfolio, err := s.cacheManager.GetPortfolio(ctx, sessionID)
-	if errors.Is(err, storage.ErrNotFound) {
+	if errors.Is(err, storage.ErrNotFound) || force == true {
 		portfolio, err = s.calculator.GetFullPortfolio(ctx, request)
 		if err != nil {
 			return domain.Portfolio{}, err
@@ -43,6 +43,7 @@ func (s *PortfolioService) GetOrFetchPortfolio(ctx context.Context, sessionID st
 
 func (s *PortfolioService) GetOrFetchChartData(
 	ctx context.Context,
+	force bool,
 	sessionID string,
 	token string,
 	portfolio domain.Portfolio,
@@ -51,7 +52,7 @@ func (s *PortfolioService) GetOrFetchChartData(
 	candleSource pkg.CandleSource,
 ) (domain.ChartData, error) {
 	chartData, err := s.cacheManager.GetChart(ctx, sessionID, period, indexTicker)
-	if errors.Is(err, storage.ErrNotFound) {
+	if errors.Is(err, storage.ErrNotFound) || force == true {
 		from, to, candleInterval := periodToParams(period)
 		chartData, err = s.calculator.GetChartData(ctx, token, portfolio, indexTicker, from, to, candleInterval, candleSource)
 		if err != nil {
