@@ -10,6 +10,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     const portfolio = ref<UserFullPortfolio | null>(null)
     const isLoading = ref(false)
     const error = ref('')
+    const ctrl = ref<AbortController | null>(null)
 
     const investments = computed<Investment[]>(() => {
         if (!portfolio.value) return []
@@ -63,13 +64,19 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         }
     })
 
-    async function load() {
+    async function load(force: boolean = false) {
         isLoading.value = true
         error.value = ''
+
+        ctrl.value?.abort()
+        ctrl.value = new AbortController()
+
         try {
-            portfolio.value = await fetchPortfolio()
+            portfolio.value = await fetchPortfolio(force, ctrl.value)
         } catch (e) {
-            if (e instanceof Error && e.message === 'UNAUTHORIZED') {
+            if (e instanceof DOMException && e.name === 'AbortError') {
+                return
+            } else if (e instanceof Error && e.message === 'UNAUTHORIZED') {
                 const auth = useAuthStore()
                 auth.isLoggedIn = false
                 router.push('/login')
@@ -81,5 +88,9 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         }
     }
 
-    return { raw: portfolio, investments, metrics, isLoading, error, load }
+    function abort() {
+        ctrl.value?.abort()
+    }
+
+    return { raw: portfolio, investments, metrics, isLoading, error, load, abort }
 })

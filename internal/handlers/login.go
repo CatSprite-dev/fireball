@@ -41,7 +41,7 @@ func (h *LoginHandler) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userAccounts, err := h.apiClient.GetAccounts(req.Token, pkg.AccountStatusOpen)
+	userAccounts, err := h.apiClient.GetAccounts(r.Context(), req.Token, pkg.AccountStatusOpen)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusUnauthorized, err.Error(), err)
 		return
@@ -71,7 +71,11 @@ func (h *LoginHandler) HandlerLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.cacheManager.Delete(r.Context(), sessionID)
+	err = h.cacheManager.DeletePortfolio(r.Context(), sessionID)
+	if err != nil {
+		log.Printf("couldn't delete cache for %s: %v", sessionID, err)
+	}
+	err = h.cacheManager.DeleteChartCache(r.Context(), sessionID)
 	if err != nil {
 		log.Printf("couldn't delete cache for %s: %v", sessionID, err)
 	}

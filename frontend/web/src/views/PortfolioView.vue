@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import { useAuthStore } from '../stores/auth'
@@ -23,8 +23,13 @@ async function logout() {
 onMounted(async () => {
   if (!portfolio.raw) {
     await portfolio.load()
-    chart.load()
+    await chart.load()
   }
+})
+
+onUnmounted(() => {
+  portfolio.abort()
+  chart.abort()
 })
 </script>
 
@@ -79,7 +84,7 @@ onMounted(async () => {
     </template>
     <button v-if="!portfolio.isLoading"
       class="refresh-btn" 
-      @click="portfolio.load()" 
+      @click="portfolio.load(true), chart.load(true)" 
       title="Refresh portfolio">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
           viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"

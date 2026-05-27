@@ -1,11 +1,14 @@
-import type { UserFullPortfolio, ChartData } from '../types'
+import type { ChartData } from '../types'
 
 export async function fetchChart(
+    force: boolean,
+    ctrl: AbortController,
     period: string = '1y',
-    index: string = 'IMOEX'
+    index: string = 'IMOEX',
 ): Promise<ChartData> {
-    const response = await fetch(`/api/chart?period=${period}&index=${index}`, {
+    const response = await fetch(`/api/chart?period=${period}&index=${index}&force=${force}`, {
         method: 'GET',
+        signal: ctrl.signal,
     })
     
     if (response.status === 401) {

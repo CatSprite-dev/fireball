@@ -13,15 +13,16 @@ type Instrument struct {
 }
 
 type Bond struct {
-	PositionUID string     `json:"positionUid"`
-	Name        string     `json:"name"`
-	Figi        string     `json:"figi"`
-	UID         string     `json:"uid"`
-	Nominal     MoneyValue `json:"nominal"`
-	Currency    string     `json:"currency"`
-	AciValue    MoneyValue `json:"aciValue"`
-	ClassCode   string     `json:"classCode"`
-	Ticker      string     `json:"ticker"`
+	PositionUID    string     `json:"positionUid"`
+	Name           string     `json:"name"`
+	Figi           string     `json:"figi"`
+	UID            string     `json:"uid"`
+	Nominal        MoneyValue `json:"nominal"`
+	InitialNominal MoneyValue `json:"initialNominal"`
+	Currency       string     `json:"currency"`
+	AciValue       MoneyValue `json:"aciValue"`
+	ClassCode      string     `json:"classCode"`
+	Ticker         string     `json:"ticker"`
 }
 
 type IndicativeInstruments struct {
@@ -36,7 +37,7 @@ type Candle struct {
 
 type ChartData struct {
 	Times     []time.Time `json:"times"`
-	Index     []Quotation `json:"index"`
+	Benchmark []Quotation `json:"benchmark"`
 	Portfolio []Quotation `json:"portfolio"`
 }
 

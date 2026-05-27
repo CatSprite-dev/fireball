@@ -1,16 +1,17 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"slices"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/api"
 	"github.com/CatSprite-dev/fireball/internal/domain"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
+	"github.com/CatSprite-dev/fireball/internal/storage"
 )
 
 type PortfolioRequest struct {
@@ -21,23 +22,42 @@ type PortfolioRequest struct {
 
 var ErrNotFound = errors.New("not found")
 
+var allOperationTypes = []pkg.OperationType{
+	pkg.OperationTypeBuy,
+	pkg.OperationTypeSell,
+	pkg.OperationTypeDividend,
+	pkg.OperationTypeCoupon,
+	pkg.OperationTypeInput,
+	pkg.OperationTypeOutput,
+	pkg.OperationTypeInpMulti,
+	pkg.OperationTypeOutMulti,
+	pkg.OperationTypeBondRepayment,
+	pkg.OperationTypeBondRepaymentFull,
+}
+
 type Calculator struct {
-	ApiClient *api.Client
+	ApiClient           APIClient
+	CandleRepository    *storage.CandleRepository
+	OperationRepository *storage.OperationRepository
 }
 
-func NewCalculator(apiClient *api.Client) *Calculator {
-	return &Calculator{ApiClient: apiClient}
+func NewCalculator(apiClient APIClient, candleRepo *storage.CandleRepository, operationsRepo *storage.OperationRepository) *Calculator {
+	return &Calculator{
+		ApiClient:           apiClient,
+		CandleRepository:    candleRepo,
+		OperationRepository: operationsRepo,
+	}
 }
 
-func (calc *Calculator) GetFullPortfolio(session PortfolioRequest) (domain.Portfolio, error) {
+func (calc *Calculator) GetFullPortfolio(ctx context.Context, session PortfolioRequest) (domain.Portfolio, error) {
 	t := time.Now()
 
-	rawPortfolio, err := calc.ApiClient.GetPortfolio(session.Token, session.AccountID)
+	rawPortfolio, err := calc.ApiClient.GetPortfolio(ctx, session.Token, session.AccountID)
 	if err != nil {
 		return domain.Portfolio{}, err
 	}
 	portfolio := convertFullPortfolio(rawPortfolio)
-	portfolio, err = enrichFullPortfolio(calc, portfolio, session.Token, session.AccountID, session.OpenedDate)
+	portfolio, err = enrichFullPortfolio(ctx, calc, portfolio, session.Token, session.AccountID, session.OpenedDate)
 	if err != nil {
 		return domain.Portfolio{}, err
 	}
@@ -46,7 +66,8 @@ func (calc *Calculator) GetFullPortfolio(session PortfolioRequest) (domain.Portf
 	return portfolio, nil
 }
 
-func (calc *Calculator) GetOperations(
+func (calc *Calculator) fetchOperations(
+	ctx context.Context,
 	token string,
 	accountId string,
 	instrumentId string,
@@ -56,25 +77,117 @@ func (calc *Calculator) GetOperations(
 	operationState pkg.OperationState,
 	withoutCommissions bool,
 ) (domain.UserOperations, error) {
-	rawOperations, err := calc.ApiClient.GetUserOperationsByCursor(
-		token, accountId, instrumentId, from, to,
+	operations, err := calc.ApiClient.GetOperationsByCursor(
+		ctx, token, accountId, instrumentId, from, to,
 		operationTypes, operationState, withoutCommissions,
 	)
 	if err != nil {
 		return domain.UserOperations{}, err
 	}
-	return convertOperations(rawOperations), nil
+	return convertOperations(operations), nil
+}
+
+func (calc *Calculator) fetchAndStoreOperations(
+	ctx context.Context,
+	token, accountID string,
+	instrumentId string,
+	from time.Time,
+	to time.Time,
+	operationTypes []pkg.OperationType,
+	operationState pkg.OperationState,
+	withoutCommissions bool,
+) (domain.UserOperations, error) {
+	operations, err := calc.fetchOperations(ctx, token, accountID, instrumentId, &from, &to, allOperationTypes, operationState, withoutCommissions)
+	if err != nil {
+		return domain.UserOperations{}, err
+	}
+
+	opsToReturn := domain.UserOperations{}
+	if len(operations.Items) > 0 {
+		for _, op := range operations.Items {
+			isIn := false
+			for _, t := range operationTypes {
+				if op.Type == string(t) {
+					isIn = true
+					break
+				}
+			}
+			if isIn {
+				opsToReturn.Items = append(opsToReturn.Items, op)
+			}
+		}
+		err = calc.OperationRepository.PutOperations(ctx, accountID, operations)
+		if err != nil {
+			log.Printf("error putting fetched operations: %v", err)
+		}
+	}
+	return opsToReturn, nil
+}
+
+func (calc *Calculator) GetOrFetchOperations(
+	ctx context.Context,
+	token string,
+	accountId string,
+	instrumentId string,
+	from time.Time,
+	to time.Time,
+	operationTypes []pkg.OperationType,
+	operationState pkg.OperationState,
+	withoutCommissions bool,
+) (domain.UserOperations, error) {
+	if calc.OperationRepository == nil {
+		return calc.fetchOperations(ctx, token, accountId, instrumentId, &from, &to, operationTypes, operationState, withoutCommissions)
+	}
+
+	operations, err := calc.OperationRepository.GetOperations(ctx, accountId, from, to, operationTypes)
+	if err != nil {
+		log.Printf("no operations in db")
+		if !errors.Is(err, storage.ErrOperationsNotFound) {
+			log.Printf("%v\n", err)
+		}
+		return calc.fetchAndStoreOperations(ctx, token, accountId, instrumentId, from, to, operationTypes, operationState, withoutCommissions)
+	}
+
+	if operations.Items[len(operations.Items)-1].Date.Before(to) {
+		from = operations.Items[len(operations.Items)-1].Date.Add(time.Millisecond)
+		restOfOperations, err := calc.fetchOperations(ctx, token, accountId, instrumentId, &from, &to, allOperationTypes, operationState, withoutCommissions)
+		if err != nil {
+			return domain.UserOperations{}, err
+		}
+
+		if len(restOfOperations.Items) > 0 {
+			for _, op := range restOfOperations.Items {
+				isIn := false
+				for _, t := range operationTypes {
+					if op.Type == string(t) {
+						isIn = true
+						break
+					}
+				}
+				if isIn {
+					operations.Items = append(operations.Items, op)
+				}
+			}
+			err = calc.OperationRepository.PutOperations(ctx, accountId, restOfOperations)
+			if err != nil {
+				log.Printf("error putting fetched operations: %v", err)
+			}
+		}
+		return operations, nil
+	}
+	return operations, nil
 }
 
 func (calc *Calculator) GetDividends(
+	ctx context.Context,
 	token string,
 	accountID string,
 	instrumentId string,
 	from time.Time,
 	to time.Time,
 ) (map[string]domain.MoneyValue, error) {
-	operations, err := calc.ApiClient.GetUserOperationsByCursor(
-		token, accountID, instrumentId, &from, &to,
+	operations, err := calc.GetOrFetchOperations(
+		ctx, token, accountID, instrumentId, from, to,
 		[]pkg.OperationType{pkg.OperationTypeDividend, pkg.OperationTypeCoupon},
 		pkg.OperationStateExecuted, false,
 	)
@@ -83,43 +196,41 @@ func (calc *Calculator) GetDividends(
 	}
 
 	result := make(map[string]domain.MoneyValue)
-	for _, block := range operations {
-		for _, item := range block.Items {
-			if item.Ticker == "" {
-				continue
-			}
-			result[item.Ticker] = AddMoneyValue(result[item.Ticker], domain.MoneyValue(item.Payment))
+	for _, item := range operations.Items {
+		if item.Ticker == "" {
+			continue
 		}
+		result[item.Ticker] = AddMoneyValue(result[item.Ticker], domain.MoneyValue(item.Payment))
+
 	}
 	return result, nil
 }
 
 func (calc *Calculator) GetTotalReturn(
+	ctx context.Context,
 	token string,
 	portfolio domain.Portfolio,
 	accountID string,
 	openedDate time.Time,
 ) (domain.MoneyValue, domain.Quotation, domain.MoneyValue, error) {
 	now := time.Now()
-	operations, err := calc.ApiClient.GetUserOperationsByCursor(
-		token, accountID, "", &openedDate, &now,
+	operations, err := calc.GetOrFetchOperations(
+		ctx, token, accountID, "", openedDate, now,
 		[]pkg.OperationType{
 			pkg.OperationTypeInput,
 			pkg.OperationTypeOutput,
 			pkg.OperationTypeInpMulti,
 			pkg.OperationTypeOutMulti,
 		},
-		pkg.OperationStateExecuted, true,
+		pkg.OperationStateExecuted, false,
 	)
 	if err != nil {
 		return domain.MoneyValue{}, domain.Quotation{}, domain.MoneyValue{}, err
 	}
 
 	var totalInvested domain.MoneyValue
-	for _, block := range operations {
-		for _, item := range block.Items {
-			totalInvested = AddMoneyValue(totalInvested, domain.MoneyValue(item.Payment))
-		}
+	for _, item := range operations.Items {
+		totalInvested = AddMoneyValue(totalInvested, domain.MoneyValue(item.Payment))
 	}
 
 	totalReturn := SubtractMoneyValue(portfolio.TotalAmountPortfolio, totalInvested)
@@ -132,11 +243,17 @@ func (calc *Calculator) GetTotalReturn(
 	return totalReturn, totalReturnRelative, totalInvested, nil
 }
 
-func (calc *Calculator) GetInstrument(token string, instrumentIdType pkg.InstrumentIdType, classCode pkg.ClassCode, instrumentId string) (domain.Instrument, error) {
+func (calc *Calculator) GetInstrument(
+	ctx context.Context,
+	token string,
+	instrumentIdType pkg.InstrumentIdType,
+	classCode pkg.ClassCode,
+	instrumentId string,
+) (domain.Instrument, error) {
 	if classCode == "" {
 		classCode = pkg.ClassCodeUnspecified
 	}
-	rawInstrument, err := calc.ApiClient.GetInstrumentBy(token, instrumentIdType, classCode, instrumentId)
+	rawInstrument, err := calc.ApiClient.GetInstrumentBy(ctx, token, instrumentIdType, classCode, instrumentId)
 	if err != nil {
 		var requestErr api.RequestError
 		if errors.As(err, &requestErr) && requestErr.StatusCode == http.StatusNotFound {
@@ -147,12 +264,18 @@ func (calc *Calculator) GetInstrument(token string, instrumentIdType pkg.Instrum
 	return convertInstrument(rawInstrument), nil
 }
 
-func (calc *Calculator) BondBy(token string, instrumentIdType pkg.InstrumentIdType, classCode pkg.ClassCode, instrumentId string) (domain.Bond, error) {
+func (calc *Calculator) BondBy(
+	ctx context.Context,
+	token string,
+	instrumentIdType pkg.InstrumentIdType,
+	classCode pkg.ClassCode,
+	instrumentId string,
+) (domain.Bond, error) {
 	if classCode == "" {
 		classCode = pkg.ClassCodeUnspecified
 	}
 
-	rawBond, err := calc.ApiClient.BondBy(token, instrumentIdType, classCode, instrumentId)
+	rawBond, err := calc.ApiClient.BondBy(ctx, token, instrumentIdType, classCode, instrumentId)
 	if err != nil {
 		var requestErr api.RequestError
 		if errors.As(err, &requestErr) && requestErr.StatusCode == http.StatusNotFound {
@@ -165,8 +288,8 @@ func (calc *Calculator) BondBy(token string, instrumentIdType pkg.InstrumentIdTy
 	return bond, nil
 }
 
-func (calc *Calculator) GetIndexByTicker(token string, ticker string) (domain.Instrument, error) {
-	rawInstruments, err := calc.ApiClient.Indicatives(token)
+func (calc *Calculator) GetIndexByTicker(ctx context.Context, token string, ticker string) (domain.Instrument, error) {
+	rawInstruments, err := calc.ApiClient.Indicatives(ctx, token)
 	if err != nil {
 		return domain.Instrument{}, err
 	}
@@ -179,9 +302,70 @@ func (calc *Calculator) GetIndexByTicker(token string, ticker string) (domain.In
 	return domain.Instrument{}, nil
 }
 
-func (calc *Calculator) GetCandles(
+func (calc *Calculator) fetchAndStoreCandles(
+	ctx context.Context,
+	token, figi string,
+	from, to time.Time,
+	candleInterval pkg.CandleInterval,
+	candleSourceType pkg.CandleSource,
+) ([]domain.Candle, error) {
+	candles, err := calc.FetchCandles(ctx, token, figi, from, to, candleInterval, candleSourceType)
+	if err != nil {
+		return nil, err
+	}
+	if len(candles) > 1 {
+		err = calc.CandleRepository.PutCandles(ctx, figi, string(candleInterval), candles[:len(candles)-1])
+		if err != nil {
+			log.Printf("error putting fetched candles: %v", err)
+		}
+	}
+	return candles, nil
+}
+
+func (calc *Calculator) GetOrFetchCandles(
+	ctx context.Context,
 	token string,
-	instrumentId string,
+	figi string,
+	from time.Time,
+	to time.Time,
+	candleInterval pkg.CandleInterval,
+	candleSourceType pkg.CandleSource,
+) ([]domain.Candle, error) {
+	if calc.CandleRepository == nil {
+		return calc.FetchCandles(ctx, token, figi, from, to, candleInterval, candleSourceType)
+	}
+
+	candles, err := calc.CandleRepository.GetCandles(ctx, figi, string(candleInterval), from, to)
+
+	if err != nil {
+		if !errors.Is(err, storage.ErrCandlesNotFound) {
+			log.Printf("%v\n", err)
+		}
+		return calc.fetchAndStoreCandles(ctx, token, figi, from, to, candleInterval, candleSourceType)
+	}
+
+	if truncateToInterval(candles[len(candles)-1].Time, candleInterval).Before(truncateToInterval(to, candleInterval)) {
+		from = truncateToInterval(candles[len(candles)-1].Time, candleInterval).Add(candleIntervalDuration(candleInterval))
+		restOfCandles, err := calc.FetchCandles(ctx, token, figi, from, time.Now(), candleInterval, candleSourceType)
+		if err != nil {
+			return nil, err
+		}
+		candles = append(candles, restOfCandles...)
+		if len(restOfCandles) > 1 {
+			err = calc.CandleRepository.PutCandles(ctx, figi, string(candleInterval), restOfCandles[:len(restOfCandles)-1])
+			if err != nil {
+				log.Printf("error putting fetched candles: %v", err)
+			}
+		}
+		return candles, nil
+	}
+	return candles, nil
+}
+
+func (calc *Calculator) FetchCandles(
+	ctx context.Context,
+	token string,
+	figi string,
 	from time.Time,
 	to time.Time,
 	candleInterval pkg.CandleInterval,
@@ -195,7 +379,7 @@ func (calc *Calculator) GetCandles(
 		if chunkTo.After(to) {
 			chunkTo = to
 		}
-		rawCandles, err := calc.ApiClient.GetCandles(token, &chunkFrom, &chunkTo, candleInterval, instrumentId, candleSourceType, 0)
+		rawCandles, err := calc.ApiClient.GetCandles(ctx, token, &chunkFrom, &chunkTo, candleInterval, figi, candleSourceType, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -207,6 +391,7 @@ func (calc *Calculator) GetCandles(
 }
 
 func (calc *Calculator) GetChartData(
+	ctx context.Context,
 	token string,
 	portfolio domain.Portfolio,
 	indexTicker string,
@@ -216,11 +401,13 @@ func (calc *Calculator) GetChartData(
 	candleSource pkg.CandleSource,
 ) (domain.ChartData, error) {
 	t := time.Now()
-	operations, err := calc.GetOperations(
-		token, portfolio.AccountID, "", &from, &to,
+	operations, err := calc.GetOrFetchOperations(
+		ctx, token, portfolio.AccountID, "", from, to,
 		[]pkg.OperationType{
 			pkg.OperationTypeBuy,
 			pkg.OperationTypeSell,
+			pkg.OperationTypeBondRepaymentFull,
+			pkg.OperationTypeBondRepayment,
 			pkg.OperationTypeDividend,
 			pkg.OperationTypeCoupon,
 		},
@@ -230,45 +417,51 @@ func (calc *Calculator) GetChartData(
 		return domain.ChartData{}, fmt.Errorf("failed to get operations: %w", err)
 	}
 
-	index, err := calc.GetIndexByTicker(token, indexTicker)
+	opsByInterval := opsByInterval(operations, candleInterval)
+	paymentsByInterval, err := getPaymentsByInterval(operations, candleInterval)
+	if err != nil {
+		return domain.ChartData{}, fmt.Errorf("failed to get payments by interval: %w", err)
+	}
+
+	index, err := calc.GetIndexByTicker(ctx, token, indexTicker)
 	if err != nil {
 		return domain.ChartData{}, err
 	}
 
-	portfolioCandles, err := calc.GetCandlesForPortfolio(token, portfolio, operations, from, to, candleInterval, candleSource)
+	portfolioCandles, err := calc.GetCandlesForPortfolio(ctx, token, portfolio, opsByInterval, paymentsByInterval, from, to, candleInterval, candleSource)
 	if err != nil {
 		log.Printf("failed to get portfolio candles: %v", err)
 		portfolioCandles = []domain.Candle{}
 	}
 
-	indexCandles, err := calc.GetCandles(token, index.UID, from, to, candleInterval, candleSource)
+	indexCandles, err := calc.GetOrFetchCandles(ctx, token, index.Figi, from.AddDate(0, 0, -pkg.CandleFetchBufferDays), to, candleInterval, candleSource)
 	if err != nil {
 		log.Printf("failed to get index candles: %v", err)
 		indexCandles = []domain.Candle{}
 	}
 
-	virtualPortfolioCandles, err := buildIndexPortfolioCandles(operations, indexCandles, portfolioCandles, candleInterval)
+	benchmarkCandles, err := buildBenchmarkCandles(opsByInterval, indexCandles, portfolioCandles, paymentsByInterval, candleInterval)
 	if err != nil {
 		log.Printf("failed to get virtual portfolio candles: %v", err)
-		virtualPortfolioCandles = []domain.Candle{}
+		benchmarkCandles = []domain.Candle{}
 	}
 
 	times := make([]time.Time, 0, len(portfolioCandles))
 	portfolioClose := make([]domain.Quotation, 0, len(portfolioCandles))
-	indexClose := make([]domain.Quotation, 0, len(virtualPortfolioCandles))
+	benchmarkClose := make([]domain.Quotation, 0, len(benchmarkCandles))
 
 	for _, c := range portfolioCandles {
 		times = append(times, c.Time)
 		portfolioClose = append(portfolioClose, c.Close)
 	}
-	for _, c := range virtualPortfolioCandles {
-		indexClose = append(indexClose, c.Close)
+	for _, c := range benchmarkCandles {
+		benchmarkClose = append(benchmarkClose, c.Close)
 	}
 
 	log.Printf("Время выполнения GetChartData: %.2f сек\n", time.Since(t).Seconds())
 	return domain.ChartData{
 		Times:     times,
-		Index:     indexClose,
+		Benchmark: benchmarkClose,
 		Portfolio: portfolioClose,
 	}, nil
 }
@@ -277,9 +470,11 @@ func (calc *Calculator) GetChartData(
 // Close = sum(qty * price) for each interval + dividends/coupons received that interval
 // Bond prices are converted from % of face value using a multiplier
 func (calc *Calculator) GetCandlesForPortfolio(
+	ctx context.Context,
 	token string,
 	portfolio domain.Portfolio,
-	operations domain.UserOperations,
+	opsByInterval map[time.Time][]domain.Item,
+	paymentsByInterval map[time.Time]domain.MoneyValue,
 	from time.Time,
 	to time.Time,
 	candleInterval pkg.CandleInterval,
@@ -289,77 +484,45 @@ func (calc *Calculator) GetCandlesForPortfolio(
 		from = portfolio.OpenedDate
 	}
 
+	// Bond price multiplier
+	multipliers, nominals := calc.FetchBondInfo(ctx, token, portfolio.Positions, opsByInterval)
+
 	// Reconstruct historical qty per instrument per interval
-	historicalHoldings, err := calc.CalculateHistoricalHoldings(operations, portfolio, from, to, candleInterval)
+	historicalHoldings, err := calculateHistoricalHoldings(opsByInterval, portfolio.Positions, nominals, from, to, candleInterval)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get historical holdings: %w", err)
 	}
 
 	figis := extractUniqueFigis(historicalHoldings)
 
-	historicalCandles, err := calc.FetchHistoricalCandlesForPortfolio(token, figis, from, to, candleInterval, candleSource)
+	historicalCandles, err := calc.FetchHistoricalCandlesForPortfolio(ctx, token, figis, from, to, candleInterval, candleSource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch candles: %w", err)
 	}
 
-	paymentsByInterval, err := getPaymentsByInterval(operations, candleInterval)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get payments by interval: %w", err)
-	}
-
-	// Bond price multiplier
-	figiToMultiplier := calc.FetchBondMultipliers(token, portfolio.Positions, operations)
-
 	// Index candles by truncated interval time for O(1) lookup
-	candleIndex := make(map[string]map[time.Time]domain.Candle)
+	candlesByTime := make(map[string]map[time.Time]domain.Candle)
 	for figi, candles := range historicalCandles {
-		candleIndex[figi] = make(map[time.Time]domain.Candle)
-		for _, c := range candles {
-			candleIndex[figi][truncateToInterval(c.Time, candleInterval)] = c
-		}
+		innerMap := makeCandlesByTime(candles, candleInterval)
+		candlesByTime[figi] = innerMap
 	}
-
-	intervals := make([]time.Time, 0, len(historicalHoldings))
-	for interval := range historicalHoldings {
-		intervals = append(intervals, interval)
-	}
-	slices.SortFunc(intervals, time.Time.Compare)
+	intervals := sortedIntervals(historicalHoldings)
+	lastPrice := buildLastPriceCache(historicalCandles, from)
 
 	result := make([]domain.Candle, 0, len(intervals))
-	lastPrice := make(map[string]domain.Candle) // forward-fill cache
-	// Pre-fill lastPrice from candles fetched before 'from'
-	for figi, candles := range historicalCandles {
-		for _, c := range candles {
-			if c.Time.Before(from) {
-				lastPrice[figi] = c
-			}
-		}
-	}
-
-	initial := AddMoneyValue(portfolio.TotalAmountShares, portfolio.TotalAmountBonds)
-	initial = AddMoneyValue(initial, portfolio.TotalAmountEtf)
-	initial = AddMoneyValue(initial, portfolio.TotalAmountSp)
-
-	for i, interval := range intervals {
-		if i == len(intervals)-1 {
-			closeVal := domain.Quotation{Units: initial.Units, Nano: initial.Nano}
-			result = append(result, domain.Candle{Time: interval, Close: closeVal})
-			break
-		}
-
+	for _, interval := range intervals {
 		var closeVal domain.Quotation
 		for figi, qty := range historicalHoldings[interval] {
-			candle, ok := candleIndex[figi][interval]
+			candle, ok := candlesByTime[figi][interval]
 			if ok {
 				lastPrice[figi] = candle
-			} else if candle, ok = lastPrice[figi]; ok {
-				// forward fill
-			} else {
-				continue
+			}
+			if !ok {
+				candle, ok = lastPrice[figi]
 			}
 
 			close_ := candle.Close
-			if m, ok := figiToMultiplier[figi]; ok {
+			if m, ok := multipliers[figi]; ok {
 				close_ = MultiplyQuotation(close_, m)
 			}
 
@@ -377,79 +540,9 @@ func (calc *Calculator) GetCandlesForPortfolio(
 	return result, nil
 }
 
-// CalculateHistoricalHoldings reconstructs portfolio positions for each interval
-// by walking backwards from `to` and reversing buy/sell operations.
-func (calc *Calculator) CalculateHistoricalHoldings(
-	operations domain.UserOperations,
-	portfolio domain.Portfolio,
-	from time.Time,
-	to time.Time,
-	candleInterval pkg.CandleInterval,
-) (map[time.Time]map[string]domain.Quotation, error) {
-	start := truncateToInterval(to, candleInterval)
-	end := truncateToInterval(from, candleInterval)
-
-	positionsQuantity := make(map[time.Time]map[string]domain.Quotation)
-	positionsQuantity[start] = make(map[string]domain.Quotation)
-
-	// Seed with current positions
-	for _, pos := range portfolio.Positions {
-		if !isInvestmentInstrument(pos.InstrumentType) {
-			continue
-		}
-		positionsQuantity[start][pos.Figi] = pos.Quantity
-	}
-
-	currentTime := start
-	for currentTime.After(end) {
-		var prevTime time.Time
-		switch candleInterval {
-		case pkg.CandleIntervalWeek:
-			prevTime = currentTime.AddDate(0, 0, -7)
-		case pkg.CandleIntervalMonth:
-			prevTime = currentTime.AddDate(0, -1, 0)
-		default:
-			prevTime = currentTime.Add(-candleIntervalDuration(candleInterval))
-		}
-
-		// Copy forward positions, then reverse operations that fall in this interval
-		positionsQuantity[prevTime] = make(map[string]domain.Quotation)
-		for figi, qty := range positionsQuantity[currentTime] {
-			positionsQuantity[prevTime][figi] = qty
-		}
-
-		for _, item := range operations.Items {
-			if !truncateToInterval(item.Date, candleInterval).Equal(currentTime) {
-				continue
-			}
-			switch pkg.OperationType(item.Type) {
-			case pkg.OperationTypeBuy:
-				if !isInvestmentInstrument(item.InstrumentType) {
-					continue
-				}
-				positionsQuantity[prevTime][item.Figi] = SubtractQuotations(
-					positionsQuantity[prevTime][item.Figi],
-					domain.Quotation{Units: item.Quantity},
-				)
-			case pkg.OperationTypeSell:
-				if !isInvestmentInstrument(item.InstrumentType) {
-					continue
-				}
-				positionsQuantity[prevTime][item.Figi] = AddQuotations(
-					positionsQuantity[prevTime][item.Figi],
-					domain.Quotation{Units: item.Quantity},
-				)
-			}
-		}
-
-		currentTime = prevTime
-	}
-
-	return positionsQuantity, nil
-}
-
 // FetchHistoricalCandlesForPortfolio fetches candles for all figis in parallel.
 func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
+	ctx context.Context,
 	token string,
 	figis []string,
 	from time.Time,
@@ -467,7 +560,7 @@ func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
 	resultCh := make(chan candleResult, len(figis))
 	for _, figi := range figis {
 		go func(f string) {
-			candles, err := calc.GetCandles(token, f, from.AddDate(0, 0, -10), to, candleInterval, candleSource)
+			candles, err := calc.GetOrFetchCandles(ctx, token, f, from.AddDate(0, 0, -pkg.CandleFetchBufferDays), to, candleInterval, candleSource)
 			resultCh <- candleResult{figi: f, candles: candles, err: err}
 		}(figi)
 	}
@@ -487,49 +580,66 @@ func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
 
 // fetchBondMultipliers fetches nominal/100 multiplier for each bond figi in parallel.
 // Falls back to 10 (1000 RUB nominal) if bond info is unavailable.
-func (calc *Calculator) FetchBondMultipliers(token string, positions []domain.Position, operations domain.UserOperations) map[string]domain.Quotation {
+func (calc *Calculator) FetchBondInfo(
+	ctx context.Context,
+	token string,
+	positions []domain.Position,
+	operations map[time.Time][]domain.Item,
+) (multipliers map[string]domain.Quotation, nominals map[string]domain.MoneyValue) {
 	// Collect unique bond figis
 	bondFigis := make(map[string]struct{})
 
 	for _, pos := range positions {
-		if isBond(pos.InstrumentType) && pos.Figi != "" {
+		if isBond(pos.InstrumentType) {
 			bondFigis[pos.Figi] = struct{}{}
 		}
 	}
 
-	for _, item := range operations.Items {
-		if isBond(item.InstrumentType) && item.Figi != "" {
-			bondFigis[item.Figi] = struct{}{}
+	for _, items := range operations {
+		for _, item := range items {
+			if isBond(item.InstrumentType) && item.Figi != "" {
+				bondFigis[item.Figi] = struct{}{}
+			}
 		}
+
 	}
 
 	type bondResult struct {
 		figi       string
 		multiplier domain.Quotation
+		nominal    domain.MoneyValue
 	}
 
 	resultCh := make(chan bondResult, len(bondFigis))
 	for figi := range bondFigis {
 		go func(f string) {
-			bond, err := calc.BondBy(token, pkg.InstrumentIdTypeFigi, "", f)
+			bond, err := calc.BondBy(ctx, token, pkg.InstrumentIdTypeFigi, "", f)
 			if err != nil {
 				log.Printf("failed to get bond info for %s, using default multiplier: %v", f, err)
-				resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: "10", Nano: 0}}
+				resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: "10", Nano: 0}, nominal: domain.MoneyValue{Units: "1000", Nano: 0}}
 				return
 			}
 			multiplier, err := DivideMoneyValue(bond.Nominal, domain.MoneyValue{Units: "100", Nano: 0})
 			if err != nil {
-				resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: "10", Nano: 0}}
+				log.Printf("failed to calculate multiplier for %s, using default: %v", f, err)
+				resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: "10", Nano: 0}, nominal: domain.MoneyValue{Units: "1000", Nano: 0}}
 				return
 			}
-			resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: multiplier.Units, Nano: multiplier.Nano}}
+			resultCh <- bondResult{
+				figi:       f,
+				multiplier: domain.Quotation{Units: multiplier.Units, Nano: multiplier.Nano},
+				nominal:    bond.InitialNominal}
 		}(figi)
 	}
 
-	result := make(map[string]domain.Quotation, len(bondFigis))
-	for range bondFigis {
-		r := <-resultCh
-		result[r.figi] = r.multiplier
+	multipliers = make(map[string]domain.Quotation, len(bondFigis))
+	nominals = make(map[string]domain.MoneyValue, len(bondFigis))
+	if len(bondFigis) > 0 {
+		for range bondFigis {
+			r := <-resultCh
+			multipliers[r.figi] = r.multiplier
+			nominals[r.figi] = r.nominal
+		}
 	}
-	return result
+	return multipliers, nominals
 }

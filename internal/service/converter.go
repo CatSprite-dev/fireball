@@ -61,24 +61,25 @@ func convertFullPortfolio(raw api.UserPortfolio) domain.Portfolio {
 	return full
 }
 
-func convertInstrument(raw api.Instrument) domain.Instrument {
+func convertInstrument(raw api.InstrumentResponse) domain.Instrument {
 	return domain.Instrument{
 		Name:           raw.Instrument.Name,
 		InstrumentType: raw.Instrument.InstrumentType,
 	}
 }
 
-func convertBond(raw api.Bond) domain.Bond {
+func convertBond(raw api.InstrumentBond) domain.Bond {
 	return domain.Bond{
-		PositionUID: raw.Bond.PositionUID,
-		Name:        raw.Bond.Name,
-		Figi:        raw.Bond.Figi,
-		UID:         raw.Bond.UID,
-		Nominal:     domain.MoneyValue(raw.Bond.Nominal),
-		Currency:    raw.Bond.Currency,
-		AciValue:    domain.MoneyValue(raw.Bond.AciValue),
-		ClassCode:   raw.Bond.ClassCode,
-		Ticker:      raw.Bond.Ticker,
+		PositionUID:    raw.Bond.PositionUID,
+		Name:           raw.Bond.Name,
+		Figi:           raw.Bond.Figi,
+		UID:            raw.Bond.UID,
+		Nominal:        domain.MoneyValue(raw.Bond.Nominal),
+		InitialNominal: domain.MoneyValue(raw.Bond.InitialNominal),
+		Currency:       raw.Bond.Currency,
+		AciValue:       domain.MoneyValue(raw.Bond.AciValue),
+		ClassCode:      raw.Bond.ClassCode,
+		Ticker:         raw.Bond.Ticker,
 	}
 }
 

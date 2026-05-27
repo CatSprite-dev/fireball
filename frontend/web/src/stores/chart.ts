@@ -11,18 +11,26 @@ export const useChartStore = defineStore('chart', () => {
     const chartData = ref<ChartData | null>(null)
     const isLoading = ref(false)
     const error = ref('')
+    const ctrl = ref<AbortController | null>(null)
 
-    async function load(period: string = '6m', index: string = 'IMOEX') {
+    async function load(force: boolean = false, period: string = '1y', index: string = 'IMOEX') {
+        console.log('in load chart')
         const auth = useAuthStore()
-        const portfolioStore = usePortfolioStore()
-        if (!auth.isLoggedIn || !portfolioStore.raw) return
+        if (!auth.isLoggedIn) return
 
         isLoading.value = true
         error.value = ''
+
+        ctrl.value?.abort()
+        ctrl.value = new AbortController()
+
         try {
-            chartData.value = await fetchChart(period, index)
+            console.log('fetching chart data')
+            chartData.value = await fetchChart(force, ctrl.value, period, index)
         } catch (e) {
-            if (e instanceof Error && e.message === 'UNAUTHORIZED') {
+            if (e instanceof DOMException && e.name === 'AbortError') {
+                return
+            } else if (e instanceof Error && e.message === 'UNAUTHORIZED') {
                 auth.logout()
                 error.value = 'Session expired, please log in again'
             } else {
@@ -34,7 +42,7 @@ export const useChartStore = defineStore('chart', () => {
     }
 
     const chartSeries = computed(() => {
-    if (!chartData.value) return []
+        if (!chartData.value) return []
 
     return [    
         { name: 'Portfolio', 
@@ -47,10 +55,14 @@ export const useChartStore = defineStore('chart', () => {
             data: chartData.value.times
             .map((time, i) => ({
                 x: time,
-                y: parseMoney(chartData.value?.index[i])
+                y: parseMoney(chartData.value?.benchmark[i])
                     }))},
         ]
     })
 
-    return { chartSeries, isLoading, error, load }
+    function abort() {
+        ctrl.value?.abort()
+    }
+
+    return { chartSeries, isLoading, error, load, abort }
 })
