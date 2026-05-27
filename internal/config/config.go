@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -65,11 +66,33 @@ func NewConfig() (*Config, error) {
 		log.Println("SESSION_SECRET variable is not found in environment")
 		return nil, err
 	}
-	postgresURL := os.Getenv("POSTGRES_URL")
-	if postgresURL == "" {
-		log.Println("POSTGRES_URL variable is not found in environment")
+	db_user := os.Getenv("DB_USER")
+	if db_user == "" {
+		log.Println("DB_USER variable is not found in environment")
 		return nil, err
 	}
+
+	db_password := os.Getenv("DB_PASSWORD")
+	if db_password == "" {
+		log.Println("DB_PASSWORD variable is not found in environment")
+		return nil, err
+	}
+
+	db_name := os.Getenv("DB_NAME")
+	if db_name == "" {
+		log.Println("DB_NAME variable is not found in environment")
+		return nil, err
+	}
+
+	db_host := "postgres"
+
+	postgresURL := fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable",
+		db_user,
+		db_password,
+		db_host,
+		db_name,
+	)
+
 	serverPort := os.Getenv("PORT")
 	if serverPort == "" {
 		log.Println("PORT variable is not found in environment\nSetting default 8080")
