@@ -16,14 +16,18 @@ services:
     restart: unless-stopped
     
   web:
-    build: 
+    image: catspritedev/fireball-web:latest #for deploy
+    
+    build:                                  #for dev
       context: .
       dockerfile: ./frontend/Dockerfile
     volumes:
       - static_files:/srv
 
   server:
-    build:
+    image: catspritedev/fireball-server:latest  #for deploy    
+
+    build:                                      #for dev
       context: .
       dockerfile: ./Dockerfile
     expose:
@@ -38,7 +42,7 @@ services:
     restart: unless-stopped
     volumes:
     - ./certs:/usr/local/share/ca-certificates
-    command: sh -c "update-ca-certificates && ./fireball"
+    command: sh -c "update-ca-certificates && exec ./fireball"
 
   redis:
     image: redis:7-alpine
