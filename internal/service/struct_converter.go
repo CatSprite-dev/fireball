@@ -15,7 +15,7 @@ func convertFullPortfolio(raw api.UserPortfolio) domain.Portfolio {
 		TotalAmountEtf:        domain.MoneyValue(raw.TotalAmountEtf),
 		TotalAmountCurrencies: domain.MoneyValue(raw.TotalAmountCurrencies),
 		TotalAmountFutures:    domain.MoneyValue(raw.TotalAmountFutures),
-		ExpectedYield:         domain.MoneyValue{},
+		ExpectedYield:         domain.MoneyValue{Currency: "rub"},
 		ExpectedYieldRelative: domain.Quotation(raw.ExpectedYield),
 		AccountID:             raw.AccountID,
 		TotalAmountOptions:    domain.MoneyValue(raw.TotalAmountOptions),
@@ -35,7 +35,7 @@ func convertFullPortfolio(raw api.UserPortfolio) domain.Portfolio {
 			InstrumentType:           pos.InstrumentType,
 			Quantity:                 domain.Quotation(pos.Quantity),
 			AveragePositionPrice:     domain.MoneyValue(pos.AveragePositionPrice),
-			ExpectedYield:            domain.MoneyValue{Units: pos.ExpectedYield.Units, Nano: pos.ExpectedYield.Nano},
+			ExpectedYield:            domain.MoneyValue{Units: pos.ExpectedYield.Units, Nano: pos.ExpectedYield.Nano, Currency: "rub"},
 			ExpectedYieldRelative:    domain.Quotation{},
 			AveragePositionPricePt:   domain.Quotation(pos.AveragePositionPricePt),
 			CurrentPrice:             domain.MoneyValue(pos.CurrentPrice),
@@ -52,8 +52,8 @@ func convertFullPortfolio(raw api.UserPortfolio) domain.Portfolio {
 			Ticker:                   pos.Ticker,
 			ClassCode:                pos.ClassCode,
 			CurrentNkd:               domain.MoneyValue(pos.CurrentNkd),
-			Dividends:                domain.MoneyValue{},
-			TotalYield:               domain.MoneyValue{},
+			Dividends:                domain.MoneyValue{Currency: "rub"},
+			TotalYield:               domain.MoneyValue{Currency: "rub"},
 			TotalYieldRelative:       domain.Quotation{},
 		}
 	}
@@ -147,4 +147,27 @@ func convertOperations(raw []api.UserOperations) domain.UserOperations {
 		}
 	}
 	return result
+}
+
+func converCurrencies(raw api.Currencies) []domain.Currency {
+	currencies := []domain.Currency{}
+	for _, rawCurrency := range raw.Instruments {
+		currency := domain.Currency{
+			Figi:            rawCurrency.Figi,
+			Ticker:          rawCurrency.Ticker,
+			ClassCode:       rawCurrency.ClassCode,
+			Isin:            rawCurrency.Isin,
+			Lot:             rawCurrency.Lot,
+			Currency:        rawCurrency.Currency,
+			Name:            rawCurrency.Name,
+			Nominal:         domain.MoneyValue(rawCurrency.Nominal),
+			IsoCurrencyName: rawCurrency.IsoCurrencyName,
+			UID:             rawCurrency.UID,
+			RealExchange:    rawCurrency.RealExchange,
+			PositionUID:     rawCurrency.PositionUID,
+			AssetUID:        rawCurrency.AssetUID,
+		}
+		currencies = append(currencies, currency)
+	}
+	return currencies
 }
