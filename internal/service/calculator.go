@@ -36,14 +36,14 @@ var allOperationTypes = []pkg.OperationType{
 }
 
 type Calculator struct {
-	ApiClient           APIClient
+	APIClient           APIClient
 	CandleRepository    *storage.CandleRepository
 	OperationRepository *storage.OperationRepository
 }
 
 func NewCalculator(apiClient APIClient, candleRepo *storage.CandleRepository, operationsRepo *storage.OperationRepository) *Calculator {
 	return &Calculator{
-		ApiClient:           apiClient,
+		APIClient:           apiClient,
 		CandleRepository:    candleRepo,
 		OperationRepository: operationsRepo,
 	}
@@ -52,7 +52,7 @@ func NewCalculator(apiClient APIClient, candleRepo *storage.CandleRepository, op
 func (calc *Calculator) GetFullPortfolio(ctx context.Context, session PortfolioRequest) (domain.Portfolio, error) {
 	t := time.Now()
 
-	rawPortfolio, err := calc.ApiClient.GetPortfolio(ctx, session.Token, session.AccountID)
+	rawPortfolio, err := calc.APIClient.GetPortfolio(ctx, session.Token, session.AccountID)
 	if err != nil {
 		return domain.Portfolio{}, err
 	}
@@ -77,7 +77,7 @@ func (calc *Calculator) fetchOperations(
 	operationState pkg.OperationState,
 	withoutCommissions bool,
 ) (domain.UserOperations, error) {
-	operations, err := calc.ApiClient.GetOperationsByCursor(
+	operations, err := calc.APIClient.GetOperationsByCursor(
 		ctx, token, accountId, instrumentId, from, to,
 		operationTypes, operationState, withoutCommissions,
 	)
@@ -200,7 +200,7 @@ func (calc *Calculator) GetDividends(
 		if item.Ticker == "" {
 			continue
 		}
-		result[item.Ticker] = AddMoneyValue(result[item.Ticker], domain.MoneyValue(item.Payment))
+		result[item.Ticker] = AddMoneyValue(result[item.Ticker], item.Payment)
 
 	}
 	return result, nil
@@ -212,7 +212,7 @@ func (calc *Calculator) GetTotalReturn(
 	portfolio domain.Portfolio,
 	accountID string,
 	openedDate time.Time,
-) (domain.MoneyValue, domain.Quotation, domain.MoneyValue, error) {
+) (totalReturn domain.MoneyValue, totalReturnRelative domain.Quotation, totalInvested domain.MoneyValue, err error) {
 	now := time.Now()
 	operations, err := calc.GetOrFetchOperations(
 		ctx, token, accountID, "", openedDate, now,
@@ -228,17 +228,17 @@ func (calc *Calculator) GetTotalReturn(
 		return domain.MoneyValue{}, domain.Quotation{}, domain.MoneyValue{}, err
 	}
 
-	var totalInvested domain.MoneyValue
+	totalInvested.Currency = "rub"
 	for _, item := range operations.Items {
 		totalInvested = AddMoneyValue(totalInvested, domain.MoneyValue(item.Payment))
 	}
 
-	totalReturn := SubtractMoneyValue(portfolio.TotalAmountPortfolio, totalInvested)
+	totalReturn = SubtractMoneyValue(portfolio.TotalAmountPortfolio, totalInvested)
 	coef, err := DivideMoneyValueToQuotation(totalReturn, totalInvested)
 	if err != nil {
 		return domain.MoneyValue{}, domain.Quotation{}, domain.MoneyValue{}, err
 	}
-	totalReturnRelative := MultiplyQuotation(coef, domain.Quotation{Units: "100"})
+	totalReturnRelative = MultiplyQuotation(coef, domain.Quotation{Units: "100"})
 
 	return totalReturn, totalReturnRelative, totalInvested, nil
 }
@@ -253,7 +253,7 @@ func (calc *Calculator) GetInstrument(
 	if classCode == "" {
 		classCode = pkg.ClassCodeUnspecified
 	}
-	rawInstrument, err := calc.ApiClient.GetInstrumentBy(ctx, token, instrumentIdType, classCode, instrumentId)
+	rawInstrument, err := calc.APIClient.GetInstrumentBy(ctx, token, instrumentIdType, classCode, instrumentId)
 	if err != nil {
 		var requestErr api.RequestError
 		if errors.As(err, &requestErr) && requestErr.StatusCode == http.StatusNotFound {
@@ -275,7 +275,7 @@ func (calc *Calculator) BondBy(
 		classCode = pkg.ClassCodeUnspecified
 	}
 
-	rawBond, err := calc.ApiClient.BondBy(ctx, token, instrumentIdType, classCode, instrumentId)
+	rawBond, err := calc.APIClient.BondBy(ctx, token, instrumentIdType, classCode, instrumentId)
 	if err != nil {
 		var requestErr api.RequestError
 		if errors.As(err, &requestErr) && requestErr.StatusCode == http.StatusNotFound {
@@ -289,7 +289,7 @@ func (calc *Calculator) BondBy(
 }
 
 func (calc *Calculator) GetIndexByTicker(ctx context.Context, token string, ticker string) (domain.Instrument, error) {
-	rawInstruments, err := calc.ApiClient.Indicatives(ctx, token)
+	rawInstruments, err := calc.APIClient.Indicatives(ctx, token)
 	if err != nil {
 		return domain.Instrument{}, err
 	}
@@ -366,8 +366,7 @@ func (calc *Calculator) FetchCandles(
 	ctx context.Context,
 	token string,
 	figi string,
-	from time.Time,
-	to time.Time,
+	from, to time.Time,
 	candleInterval pkg.CandleInterval,
 	candleSourceType pkg.CandleSource,
 ) ([]domain.Candle, error) {
@@ -379,7 +378,7 @@ func (calc *Calculator) FetchCandles(
 		if chunkTo.After(to) {
 			chunkTo = to
 		}
-		rawCandles, err := calc.ApiClient.GetCandles(ctx, token, &chunkFrom, &chunkTo, candleInterval, figi, candleSourceType, 0)
+		rawCandles, err := calc.APIClient.GetCandles(ctx, token, &chunkFrom, &chunkTo, candleInterval, figi, candleSourceType, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -418,7 +417,48 @@ func (calc *Calculator) GetChartData(
 	}
 
 	opsByInterval := opsByInterval(operations, candleInterval)
-	paymentsByInterval, err := getPaymentsByInterval(operations, candleInterval)
+	multipliers, nominals := calc.FetchBondInfo(ctx, token, portfolio.Positions, opsByInterval)
+
+	allCurrencies, err := calc.GetCurrencies(ctx, token, pkg.InstrumentStatusAll, pkg.InstrumentExchangeUnspecified)
+	if err != nil {
+		return domain.ChartData{}, err
+	}
+	portfolioCurrencies := extractUniqueElements(operations, "currency")
+	figis := extractUniqueElements(operations, "figi")
+
+	neededCurrencies := make(map[string]struct{})
+	for currency := range portfolioCurrencies {
+		if currency != "rub" {
+			neededCurrencies[currency] = struct{}{}
+		}
+	}
+
+	for _, nominal := range nominals {
+		if nominal.Currency != "rub" {
+			neededCurrencies[nominal.Currency] = struct{}{}
+		}
+	}
+
+	currencyCandles := make(map[string][]domain.Candle)
+	for _, curr := range allCurrencies {
+		if curr.ClassCode != string(pkg.ClassCodeEES_CETS) {
+			continue
+		}
+		if _, ok := neededCurrencies[curr.IsoCurrencyName]; !ok {
+			continue
+		}
+
+		candles, err := calc.GetOrFetchCandles(ctx, token, curr.Figi, from, to, candleInterval, candleSource)
+		if err != nil {
+			log.Printf(
+				"failed to get candles for currency %s: %v", curr.IsoCurrencyName, err)
+			continue
+		}
+		currencyCandles[curr.IsoCurrencyName] = candles
+	}
+
+	paymentsByInterval, err := calc.getPaymentsByInterval(operations, currencyCandles, candleInterval)
+
 	if err != nil {
 		return domain.ChartData{}, fmt.Errorf("failed to get payments by interval: %w", err)
 	}
@@ -428,7 +468,7 @@ func (calc *Calculator) GetChartData(
 		return domain.ChartData{}, err
 	}
 
-	portfolioCandles, err := calc.GetCandlesForPortfolio(ctx, token, portfolio, opsByInterval, paymentsByInterval, from, to, candleInterval, candleSource)
+	portfolioCandles, err := calc.BuildPortfolioCandles(ctx, token, portfolio, opsByInterval, paymentsByInterval, currencyCandles, figis, multipliers, nominals, from, to, candleInterval, candleSource)
 	if err != nil {
 		log.Printf("failed to get portfolio candles: %v", err)
 		portfolioCandles = []domain.Candle{}
@@ -469,12 +509,16 @@ func (calc *Calculator) GetChartData(
 // GetCandlesForPortfolio builds historical value candles for the portfolio
 // Close = sum(qty * price) for each interval + dividends/coupons received that interval
 // Bond prices are converted from % of face value using a multiplier
-func (calc *Calculator) GetCandlesForPortfolio(
+func (calc *Calculator) BuildPortfolioCandles(
 	ctx context.Context,
 	token string,
 	portfolio domain.Portfolio,
 	opsByInterval map[time.Time][]domain.Item,
 	paymentsByInterval map[time.Time]domain.MoneyValue,
+	currencyCandles map[string][]domain.Candle,
+	figis map[string]struct{},
+	multipliers map[string]domain.Quotation,
+	nominals map[string]domain.MoneyValue,
 	from time.Time,
 	to time.Time,
 	candleInterval pkg.CandleInterval,
@@ -484,18 +528,13 @@ func (calc *Calculator) GetCandlesForPortfolio(
 		from = portfolio.OpenedDate
 	}
 
-	// Bond price multiplier
-	multipliers, nominals := calc.FetchBondInfo(ctx, token, portfolio.Positions, opsByInterval)
-
 	// Reconstruct historical qty per instrument per interval
 	historicalHoldings, err := calculateHistoricalHoldings(opsByInterval, portfolio.Positions, nominals, from, to, candleInterval)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get historical holdings: %w", err)
 	}
 
-	figis := extractUniqueFigis(historicalHoldings)
-
-	historicalCandles, err := calc.FetchHistoricalCandlesForPortfolio(ctx, token, figis, from, to, candleInterval, candleSource)
+	historicalCandles, err := calc.FetchHistoricalCandles(ctx, token, figis, from, to, candleInterval, candleSource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch candles: %w", err)
 	}
@@ -524,6 +563,21 @@ func (calc *Calculator) GetCandlesForPortfolio(
 			close_ := candle.Close
 			if m, ok := multipliers[figi]; ok {
 				close_ = MultiplyQuotation(close_, m)
+				if nominals[figi].Currency != "rub" {
+					// Convert to RUB using currency candles
+					if currCandles, ok := currencyCandles[nominals[figi].Currency]; ok {
+						converted, err := convertToRUB(
+							domain.MoneyValue{Units: close_.Units,
+								Nano:     close_.Nano,
+								Currency: nominals[figi].Currency},
+							interval,
+							currCandles)
+						if err != nil {
+							log.Printf("failed to convert %s to RUB for figi %s at interval %v: %v", nominals[figi].Currency, figi, interval, err)
+						}
+						close_ = domain.Quotation{Units: converted.Units, Nano: converted.Nano}
+					}
+				}
 			}
 
 			posVal := MultiplyQuotation(qty, close_)
@@ -541,10 +595,10 @@ func (calc *Calculator) GetCandlesForPortfolio(
 }
 
 // FetchHistoricalCandlesForPortfolio fetches candles for all figis in parallel.
-func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
+func (calc *Calculator) FetchHistoricalCandles(
 	ctx context.Context,
 	token string,
-	figis []string,
+	figis map[string]struct{},
 	from time.Time,
 	to time.Time,
 	candleInterval pkg.CandleInterval,
@@ -558,7 +612,7 @@ func (calc *Calculator) FetchHistoricalCandlesForPortfolio(
 	}
 
 	resultCh := make(chan candleResult, len(figis))
-	for _, figi := range figis {
+	for figi := range figis {
 		go func(f string) {
 			candles, err := calc.GetOrFetchCandles(ctx, token, f, from.AddDate(0, 0, -pkg.CandleFetchBufferDays), to, candleInterval, candleSource)
 			resultCh <- candleResult{figi: f, candles: candles, err: err}
@@ -616,13 +670,13 @@ func (calc *Calculator) FetchBondInfo(
 			bond, err := calc.BondBy(ctx, token, pkg.InstrumentIdTypeFigi, "", f)
 			if err != nil {
 				log.Printf("failed to get bond info for %s, using default multiplier: %v", f, err)
-				resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: "10", Nano: 0}, nominal: domain.MoneyValue{Units: "1000", Nano: 0}}
+				resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: "10", Nano: 0}, nominal: domain.MoneyValue{Units: "1000", Nano: 0, Currency: "rub"}}
 				return
 			}
-			multiplier, err := DivideMoneyValue(bond.Nominal, domain.MoneyValue{Units: "100", Nano: 0})
+			multiplier, err := DivideMoneyValue(bond.Nominal, domain.MoneyValue{Units: "100", Nano: 0, Currency: bond.Nominal.Currency})
 			if err != nil {
 				log.Printf("failed to calculate multiplier for %s, using default: %v", f, err)
-				resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: "10", Nano: 0}, nominal: domain.MoneyValue{Units: "1000", Nano: 0}}
+				resultCh <- bondResult{figi: f, multiplier: domain.Quotation{Units: "10", Nano: 0}, nominal: domain.MoneyValue{Units: "1000", Nano: 0, Currency: "rub"}}
 				return
 			}
 			resultCh <- bondResult{
@@ -642,4 +696,49 @@ func (calc *Calculator) FetchBondInfo(
 		}
 	}
 	return multipliers, nominals
+}
+
+func (calc *Calculator) GetCurrencies(
+	ctx context.Context,
+	token string,
+	instrumentStatus pkg.InstrumentStatus,
+	instrumentExchange pkg.InstrumentExchange) ([]domain.Currency, error) {
+
+	currencies, err := calc.APIClient.Currencies(ctx, token, instrumentStatus, instrumentExchange)
+	if err != nil {
+		return nil, err
+	}
+
+	return converCurrencies(currencies), nil
+}
+
+// getPaymentsByInterval sums dividends and coupons received per interval.
+func (calc *Calculator) getPaymentsByInterval(
+	operations domain.UserOperations,
+	currenciesCandles map[string][]domain.Candle,
+	candleInterval pkg.CandleInterval,
+) (map[time.Time]domain.MoneyValue, error) {
+
+	result := make(map[time.Time]domain.MoneyValue)
+	for _, item := range operations.Items {
+		switch pkg.OperationType(item.Type) {
+		case pkg.OperationTypeDividend, pkg.OperationTypeCoupon:
+			interval := truncateToInterval(item.Date, candleInterval)
+			if item.Payment.Currency != "rub" {
+				candles, ok := currenciesCandles[item.Payment.Currency]
+				if !ok {
+					log.Printf("no candles found for currency %s, skipping payment conversion", item.Payment.Currency)
+					continue
+				}
+				convertedPayment, err := convertToRUB(item.Payment, item.Date, candles)
+				if err != nil {
+					log.Printf("failed to convert payment to RUB for currency %s: %v", item.Payment.Currency, err)
+					continue
+				}
+				item.Payment = convertedPayment
+			}
+			result[interval] = AddMoneyValue(result[interval], item.Payment)
+		}
+	}
+	return result, nil
 }
