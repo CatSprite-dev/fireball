@@ -26,6 +26,7 @@ type Config struct {
 	IdleTimeout  time.Duration
 
 	IsProduction bool
+	DemoToken    string
 
 	sessionSecret string
 }
@@ -124,6 +125,10 @@ func NewConfig() (*Config, error) {
 	}
 
 	isProduction := os.Getenv("ENV") == "production"
+	demoToken := os.Getenv("DEMO_TOKEN")
+	if demoToken == "" {
+		log.Println("DEMO_TOKEN variable is not found in environment\nDemo mode will be unavailable")
+	}
 
 	return &Config{
 		BaseURL: investURL,
@@ -141,6 +146,7 @@ func NewConfig() (*Config, error) {
 		IdleTimeout:  time.Duration(idleTimeout) * time.Second,
 
 		IsProduction: isProduction,
+		DemoToken:    demoToken,
 
 		sessionSecret: secret,
 	}, nil
