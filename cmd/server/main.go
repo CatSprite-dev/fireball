@@ -50,7 +50,7 @@ func main() {
 
 	portfolioService := service.NewPortfolioService(calculator, cacheManager)
 
-	loginHandler := handlers.NewLoginHandler(sessionManager, cacheManager, apiClient)
+	loginHandler := handlers.NewLoginHandler(sessionManager, cacheManager, apiClient, cfg.IsProduction)
 
 	loginRateLimiter := handlers.NewRateLimiter(10)
 	authRateLimiter := handlers.NewRateLimiter(200)
@@ -64,7 +64,7 @@ func main() {
 	mux.HandleFunc("GET /api/ping", authRateLimiter.LimiterMiddleware(handlers.AuthMiddleware(sessionManager, portfolioHandler.HandlerPing)))
 	mux.HandleFunc("POST /api/login", loginRateLimiter.LimiterMiddleware(loginHandler.HandlerLogin))
 	mux.HandleFunc("POST /api/logout", loginRateLimiter.LimiterMiddleware(loginHandler.HandlerLogout))
-	mux.HandleFunc("POST /api/portfolio", authRateLimiter.LimiterMiddleware(handlers.AuthMiddleware(sessionManager, portfolioHandler.HandlerPortfolio)))
+	mux.HandleFunc("GET /api/portfolio", authRateLimiter.LimiterMiddleware(handlers.AuthMiddleware(sessionManager, portfolioHandler.HandlerPortfolio)))
 	mux.HandleFunc("GET /api/chart", authRateLimiter.LimiterMiddleware(handlers.AuthMiddleware(sessionManager, chartHandler.HandlerChart)))
 
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

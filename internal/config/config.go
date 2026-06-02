@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"log"
 	"os"
 	"strconv"
@@ -24,6 +25,8 @@ type Config struct {
 	WriteTimeout time.Duration
 	IdleTimeout  time.Duration
 
+	IsProduction bool
+
 	sessionSecret string
 }
 
@@ -36,12 +39,12 @@ func NewConfig() (*Config, error) {
 	investURL := os.Getenv("T_INVEST_URL")
 	if investURL == "" {
 		log.Println("T_INVEST_URL variable is not found in environment")
-		return nil, err
+		return nil, errors.New("T_INVEST_URL is required")
 	}
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
 		log.Println("REDIS_URL variable is not found in environment")
-		return nil, err
+		return nil, errors.New("REDIS_URL is required")
 	}
 	redisTTLStr := os.Getenv("REDIS_TTL")
 	if redisTTLStr == "" {
@@ -61,12 +64,12 @@ func NewConfig() (*Config, error) {
 	secret := os.Getenv("SESSION_SECRET")
 	if secret == "" {
 		log.Println("SESSION_SECRET variable is not found in environment")
-		return nil, err
+		return nil, errors.New("SESSION_SECRET is required")
 	}
 	postgresURL := os.Getenv("DB_URL")
 	if postgresURL == "" {
 		log.Println("DB_URL variable is not found in environment")
-		return nil, err
+		return nil, errors.New("DB_URL variable is required")
 	}
 	serverPort := os.Getenv("PORT")
 	if serverPort == "" {
@@ -120,6 +123,8 @@ func NewConfig() (*Config, error) {
 		idleTimeout = 30
 	}
 
+	isProduction := os.Getenv("ENV") == "production"
+
 	return &Config{
 		BaseURL: investURL,
 
@@ -134,6 +139,8 @@ func NewConfig() (*Config, error) {
 		ReadTimeout:  time.Duration(readTimeout) * time.Second,
 		WriteTimeout: time.Duration(writeTimeout) * time.Second,
 		IdleTimeout:  time.Duration(idleTimeout) * time.Second,
+
+		IsProduction: isProduction,
 
 		sessionSecret: secret,
 	}, nil

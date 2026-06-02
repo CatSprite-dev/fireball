@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/pkg"
@@ -12,7 +11,7 @@ import (
 
 type sessionContextKey struct{}
 
-func setSessionCookie(w http.ResponseWriter, sessionID string, expireIn time.Duration, setToDelete bool) {
+func setSessionCookie(w http.ResponseWriter, sessionID string, expireIn time.Duration, setToDelete bool, secure bool) {
 	expiration := time.Now().Add(time.Duration(expireIn) * time.Hour)
 	maxAge := 0
 	if setToDelete {
@@ -24,7 +23,7 @@ func setSessionCookie(w http.ResponseWriter, sessionID string, expireIn time.Dur
 		Value:    sessionID,
 		Expires:  expiration,
 		HttpOnly: true,
-		Secure:   os.Getenv("ENV") == "production",
+		Secure:   secure,
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   maxAge,
 	}

@@ -20,13 +20,13 @@ type client struct {
 type RateLimiter struct {
 	clients map[string]*client
 	mu      sync.Mutex
-	rps     int
+	rpm     int
 }
 
-func NewRateLimiter(rps int) *RateLimiter {
+func NewRateLimiter(rpm int) *RateLimiter {
 	rl := RateLimiter{
 		clients: make(map[string]*client),
-		rps:     rps,
+		rpm:     rpm,
 	}
 	go rl.reap(3 * time.Minute)
 
@@ -67,6 +67,7 @@ func (rl *RateLimiter) LimiterMiddleware(next http.HandlerFunc) http.HandlerFunc
 	return func(w http.ResponseWriter, r *http.Request) {
 		ip, err := getClientIP(r)
 		if err != nil {
+			pkg.RespondWithError(w, http.StatusInternalServerError, "couldn't determine ip", err)
 			return
 		}
 
@@ -75,7 +76,7 @@ func (rl *RateLimiter) LimiterMiddleware(next http.HandlerFunc) http.HandlerFunc
 		v, ok := rl.clients[ip]
 		if !ok {
 			v = &client{
-				limiter:  rate.NewLimiter(rate.Every(time.Minute), rl.rps),
+				limiter:  rate.NewLimiter(rate.Limit(float64(rl.rpm)/60.0), rl.rpm),
 				lastSeen: time.Now(),
 			}
 			rl.clients[ip] = v

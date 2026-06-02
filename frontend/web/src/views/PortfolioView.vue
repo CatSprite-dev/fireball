@@ -51,7 +51,7 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <PortfolioSkeleton v-if="portfolio.isLoading" />
+    <PortfolioSkeleton v-if="portfolio.isLoading" :activeTab="activeTab" @update:activeTab="activeTab = $event"/>
 
     <div v-else-if="portfolio.error" class="state-message error">
       {{ portfolio.error }}

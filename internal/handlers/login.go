@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 
@@ -15,13 +14,15 @@ type LoginHandler struct {
 	sessionManager *storage.SessionManager
 	cacheManager   *storage.CacheManager
 	apiClient      *api.Client
+	secure         bool
 }
 
-func NewLoginHandler(sm *storage.SessionManager, cm *storage.CacheManager, client *api.Client) *LoginHandler {
+func NewLoginHandler(sm *storage.SessionManager, cm *storage.CacheManager, client *api.Client, secure bool) *LoginHandler {
 	return &LoginHandler{
 		sessionManager: sm,
 		cacheManager:   cm,
 		apiClient:      client,
+		secure:         secure,
 	}
 }
 
@@ -47,8 +48,12 @@ func (h *LoginHandler) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(userAccounts.Accounts) == 0 {
-		pkg.RespondWithError(w, http.StatusBadRequest, "found no accounts", errors.New("found no accounts"))
+		pkg.RespondWithError(w, http.StatusUnauthorized, "invalid token", nil)
 		return
+	}
+
+	if len(userAccounts.Accounts) > 1 {
+		log.Printf("user has %d accounts, using first one", len(userAccounts.Accounts))
 	}
 	accountID := userAccounts.Accounts[0].ID
 	openedDate := userAccounts.Accounts[0].OpenedDate
@@ -59,7 +64,7 @@ func (h *LoginHandler) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setSessionCookie(w, sessionID, h.sessionManager.RedisTTL, false)
+	setSessionCookie(w, sessionID, h.sessionManager.RedisTTL, false, h.secure)
 	log.Printf("Cookie for %s is set, session: %s\n", accountID, sessionID)
 	pkg.RespondWithJSON(w, http.StatusOK, struct{}{})
 }
@@ -85,7 +90,7 @@ func (h *LoginHandler) HandlerLogout(w http.ResponseWriter, r *http.Request) {
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
 		return
 	}
-	setSessionCookie(w, sessionID, h.sessionManager.RedisTTL, true)
+	setSessionCookie(w, sessionID, h.sessionManager.RedisTTL, true, h.secure)
 
 	log.Printf("Cookie for %s is deleted\n", sessionID)
 
