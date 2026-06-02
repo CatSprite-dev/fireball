@@ -15,6 +15,7 @@ import (
 )
 
 type PortfolioRequest struct {
+	ID         string
 	Token      string
 	AccountID  string
 	OpenedDate time.Time

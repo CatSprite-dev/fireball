@@ -67,7 +67,7 @@ func (h *LoginHandler) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 func (h *LoginHandler) HandlerLogout(w http.ResponseWriter, r *http.Request) {
 	sessionID, err := getSessionFromCookie(r)
 	if err != nil {
-		pkg.RespondWithError(w, http.StatusBadRequest, err.Error(), err)
+		pkg.RespondWithError(w, http.StatusBadRequest, "missing session cookie", err)
 		return
 	}
 

@@ -54,17 +54,18 @@ func main() {
 
 	loginRateLimiter := handlers.NewRateLimiter(10)
 	authRateLimiter := handlers.NewRateLimiter(200)
-	portfolioHandler := handlers.NewPortfolioHandler(sessionManager, portfolioService)
-	chartHandler := handlers.NewChartHandler(sessionManager, portfolioService)
+
+	portfolioHandler := handlers.NewPortfolioHandler(portfolioService)
+	chartHandler := handlers.NewChartHandler(portfolioService)
 
 	mux := http.NewServeMux()
 	fileServer := http.FileServer(http.Dir("frontend/dist"))
 
-	mux.HandleFunc("GET /api/ping", authRateLimiter.Middleware(portfolioHandler.HandlerPing))
-	mux.HandleFunc("POST /api/login", loginRateLimiter.Middleware(loginHandler.HandlerLogin))
-	mux.HandleFunc("POST /api/logout", loginRateLimiter.Middleware(loginHandler.HandlerLogout))
-	mux.HandleFunc("POST /api/portfolio", authRateLimiter.Middleware(portfolioHandler.HandlerPortfolio))
-	mux.HandleFunc("GET /api/chart", authRateLimiter.Middleware(chartHandler.HandlerChart))
+	mux.HandleFunc("GET /api/ping", authRateLimiter.LimiterMiddleware(handlers.AuthMiddleware(sessionManager, portfolioHandler.HandlerPing)))
+	mux.HandleFunc("POST /api/login", loginRateLimiter.LimiterMiddleware(loginHandler.HandlerLogin))
+	mux.HandleFunc("POST /api/logout", loginRateLimiter.LimiterMiddleware(loginHandler.HandlerLogout))
+	mux.HandleFunc("POST /api/portfolio", authRateLimiter.LimiterMiddleware(handlers.AuthMiddleware(sessionManager, portfolioHandler.HandlerPortfolio)))
+	mux.HandleFunc("GET /api/chart", authRateLimiter.LimiterMiddleware(handlers.AuthMiddleware(sessionManager, chartHandler.HandlerChart)))
 
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		//log.Printf("Catch-all hit: %s %s", r.Method, r.URL.Path)

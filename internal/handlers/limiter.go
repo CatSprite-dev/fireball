@@ -63,7 +63,7 @@ func getClientIP(r *http.Request) (string, error) {
 	return ip, nil
 }
 
-func (rl *RateLimiter) Middleware(next http.HandlerFunc) http.HandlerFunc {
+func (rl *RateLimiter) LimiterMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ip, err := getClientIP(r)
 		if err != nil {
