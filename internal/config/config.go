@@ -63,7 +63,7 @@ func NewConfig() (*Config, error) {
 		log.Println("SESSION_SECRET variable is not found in environment")
 		return nil, err
 	}
-	postgresURL := os.Getenv("POSTGRES_URL")
+	postgresURL := os.Getenv("DB_URL")
 	if postgresURL == "" {
 		log.Println("POSTGRES_URL variable is not found in environment")
 		return nil, err

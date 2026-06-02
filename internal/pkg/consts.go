@@ -140,13 +140,14 @@ type ClassCode string
 
 const (
 	ClassCodeUnspecified ClassCode = ""
-	ClassCodeTQBR        ClassCode = "TQBR"   // Основной режим торгов акциями на Московской бирже
-	ClassCodeTQOB        ClassCode = "TQOB"   // Основной режим торгов облигациями на Московской бирже
-	ClassCodeSPBRU       ClassCode = "SPBRU"  // Основной режим торгов акциями и фондами на Санкт-Петербургской бирже
-	ClassCodeSPBFUT      ClassCode = "SPBFUT" // Торговля фьючерсами на Московской бирже
-	ClassCodeSPBOPT      ClassCode = "SPBOPT" // Торговля опционами на Московской бирже
-	ClassCodeTQTF        ClassCode = "TQTF"   // Основной режим торгов фондами на Московской бирже
-	ClassCodeCETS        ClassCode = "CETS"   // Основной режим торгов валютой на Московской бирже
+	ClassCodeTQBR        ClassCode = "TQBR"     // Основной режим торгов акциями на Московской бирже
+	ClassCodeTQOB        ClassCode = "TQOB"     // Основной режим торгов облигациями на Московской бирже
+	ClassCodeSPBRU       ClassCode = "SPBRU"    // Основной режим торгов акциями и фондами на Санкт-Петербургской бирже
+	ClassCodeSPBFUT      ClassCode = "SPBFUT"   // Торговля фьючерсами на Московской бирже
+	ClassCodeSPBOPT      ClassCode = "SPBOPT"   // Торговля опционами на Московской бирже
+	ClassCodeTQTF        ClassCode = "TQTF"     // Основной режим торгов фондами на Московской бирже
+	ClassCodeCETS        ClassCode = "CETS"     // Основной режим торгов валютой на Московской бирже
+	ClassCodeEES_CETS    ClassCode = "EES_CETS" // Какой-то другой режим торгов валютой на Московской бирже
 )
 
 type InstrumentType string
@@ -163,4 +164,19 @@ const (
 	InstrumentTypeClearingCertificate InstrumentType = "INSTRUMENT_TYPE_CLEARING_CERTIFICATE"
 	InstrumentTypeIndex               InstrumentType = "INSTRUMENT_TYPE_INDEX"
 	InstrumentTypeCommodity           InstrumentType = "INSTRUMENT_TYPE_COMMODITY"
+)
+
+type InstrumentStatus string
+
+const (
+	InstrumentStatusUnspecified InstrumentStatus = "INSTRUMENT_STATUS_UNSPECIFIED"
+	InstrumentStatusBase        InstrumentStatus = "INSTRUMENT_STATUS_BASE"
+	InstrumentStatusAll         InstrumentStatus = "INSTRUMENT_STATUS_ALL"
+)
+
+type InstrumentExchange string
+
+const (
+	InstrumentExchangeUnspecified InstrumentExchange = "INSTRUMENT_EXCHANGE_UNSPECIFIED"
+	InstrumentExchangeDealer      InstrumentExchange = "INSTRUMENT_EXCHANGE_DEALER"
 )

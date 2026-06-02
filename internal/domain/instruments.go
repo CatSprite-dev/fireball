@@ -67,3 +67,31 @@ type Item struct {
 	AccruedInt      MoneyValue `json:"accruedInt"`
 	Quantity        string     `json:"quantity"`
 }
+
+type ClosePrice struct {
+	Figi                    string    `json:"figi"`
+	InstrumentUID           string    `json:"instrumentUid"`
+	Ticker                  string    `json:"ticker"`
+	ClassCode               string    `json:"classCode"`
+	ClosePrice              Quotation `json:"price"`
+	EveningSessionPrice     Quotation `json:"eveningSessionPrice"`
+	Time                    time.Time `json:"time"`
+	EveningSessionPriceTime time.Time `json:"eveningSessionPriceTime"`
+}
+
+type Currency struct {
+	Figi            string     `json:"figi"`
+	Ticker          string     `json:"ticker"`
+	ClassCode       string     `json:"classCode"`
+	Isin            string     `json:"isin"`
+	Lot             int        `json:"lot"`
+	Currency        string     `json:"currency"`
+	Name            string     `json:"name"`
+	Exchange        string     `json:"exchange"`
+	Nominal         MoneyValue `json:"nominal"`
+	IsoCurrencyName string     `json:"isoCurrencyName"`
+	UID             string     `json:"uid"`
+	RealExchange    string     `json:"realExchange"`
+	PositionUID     string     `json:"positionUid"`
+	AssetUID        string     `json:"assetUid"`
+}

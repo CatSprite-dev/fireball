@@ -48,14 +48,14 @@ func enrichFullPortfolio(
 }
 
 func enrichPortfolioMetrics(portfolio domain.Portfolio) (domain.Portfolio, error) {
-	coeff, err := DivideMoneyValue(
-		domain.MoneyValue{Units: portfolio.ExpectedYieldRelative.Units, Nano: portfolio.ExpectedYieldRelative.Nano},
-		domain.MoneyValue{Units: "100", Nano: 0},
+	coeff, err := DivideQuotation(
+		portfolio.ExpectedYieldRelative,
+		domain.Quotation{Units: "100", Nano: 0},
 	)
 	if err != nil {
 		return domain.Portfolio{}, err
 	}
-	portfolio.ExpectedYield = MultiplyMoneyValue(portfolio.TotalAmountPortfolio, coeff)
+	portfolio.ExpectedYield = MultiplyMoneyValue(portfolio.TotalAmountPortfolio, domain.MoneyValue{Units: coeff.Units, Nano: coeff.Nano, Currency: portfolio.TotalAmountPortfolio.Currency})
 	return portfolio, nil
 }
 
@@ -88,7 +88,7 @@ func getPositionInfo(ctx context.Context, wg *sync.WaitGroup, p *domain.Position
 func getPositionMetrics(wg *sync.WaitGroup, allDividends map[string]domain.MoneyValue, pos *domain.Position) {
 	defer wg.Done()
 
-	posAmount := MultiplyMoneyValue(pos.AveragePositionPrice, domain.MoneyValue{Units: pos.Quantity.Units, Nano: pos.Quantity.Nano})
+	posAmount := MultiplyMoneyValue(pos.AveragePositionPrice, domain.MoneyValue{Units: pos.Quantity.Units, Nano: pos.Quantity.Nano, Currency: pos.AveragePositionPrice.Currency})
 
 	var err error
 	pos.ExpectedYieldRelative, err = DivideQuotation(
@@ -210,19 +210,34 @@ func candleIntervalDuration(interval pkg.CandleInterval) time.Duration {
 	}
 }
 
-// extractUniqueFigis returns all figis that had a positive quantity at any point in time.
-func extractUniqueFigis(holdings map[time.Time]map[string]domain.Quotation) []string {
-	uniqueFigis := make(map[string]struct{})
-	for _, positions := range holdings {
-		for figi := range positions {
-			uniqueFigis[figi] = struct{}{}
+// pattern can be "figi", "ticker", "currency", "classCode", "instrumentType" or "positionUid"
+func extractUniqueElements(operations domain.UserOperations, pattern string) map[string]struct{} {
+	getValue := func(item domain.Item) string {
+		switch pattern {
+		case "figi":
+			return item.Figi
+		case "ticker":
+			return item.Ticker
+		case "currency":
+			return item.Payment.Currency
+		case "classCode":
+			return item.ClassCode
+		case "instrumentType":
+			return item.InstrumentType
+		case "positionUid":
+			return item.PositionUID
+		default:
+			return ""
 		}
 	}
-	result := make([]string, 0, len(uniqueFigis))
-	for figi := range uniqueFigis {
-		result = append(result, figi)
+
+	unique := make(map[string]struct{})
+	for _, item := range operations.Items {
+		if val := getValue(item); val != "" {
+			unique[val] = struct{}{}
+		}
 	}
-	return result
+	return unique
 }
 
 // isInvestmentInstrument returns true for tradeable securities.
@@ -247,25 +262,6 @@ func isInvestmentInstrument(kind string) bool {
 // isBond handles both lowercase and uppercase bond type strings.
 func isBond(instrumentType string) bool {
 	return instrumentType == "bond" || pkg.InstrumentType(instrumentType) == pkg.InstrumentTypeBond
-}
-
-// getPaymentsByInterval sums dividends and coupons received per interval.
-func getPaymentsByInterval(
-	operations domain.UserOperations,
-	candleInterval pkg.CandleInterval,
-) (map[time.Time]domain.MoneyValue, error) {
-
-	result := make(map[time.Time]domain.MoneyValue)
-	for _, item := range operations.Items {
-		switch pkg.OperationType(item.Type) {
-		case pkg.OperationTypeDividend, pkg.OperationTypeCoupon:
-			interval := truncateToInterval(item.Date, candleInterval)
-			result[interval] = AddMoneyValue(result[interval], domain.MoneyValue(item.Payment))
-
-		}
-
-	}
-	return result, nil
 }
 
 // BuildIndexPortfolioCandles simulates portfolio performance if all buy/sell
@@ -490,4 +486,42 @@ func buildLastPriceCache(historicalCandles map[string][]domain.Candle, from time
 		}
 	}
 	return lastPrice
+}
+
+func convertToRUB(amount domain.MoneyValue, date time.Time, currencyRates []domain.Candle) (domain.MoneyValue, error) {
+	if amount.Currency == "rub" {
+		return amount, nil
+	}
+
+	if len(currencyRates) == 0 {
+		return amount, fmt.Errorf("no currency rates found for %s", amount.Currency)
+	}
+
+	slices.SortFunc(currencyRates, func(a, b domain.Candle) int {
+		return a.Time.Compare(b.Time)
+	})
+
+	var closestCandle *domain.Candle
+	for i := range currencyRates {
+		if !currencyRates[i].Time.After(date) {
+			closestCandle = &currencyRates[i]
+		} else {
+			break
+		}
+	}
+
+	if closestCandle == nil {
+		return amount, fmt.Errorf("no exchange rate found for %s on or before %v", amount.Currency, date)
+	}
+
+	exchangeRate := domain.MoneyValue{
+		Units:    closestCandle.Close.Units,
+		Nano:     closestCandle.Close.Nano,
+		Currency: amount.Currency,
+	}
+
+	result := MultiplyMoneyValue(amount, exchangeRate)
+	result.Currency = "rub"
+
+	return result, nil
 }
