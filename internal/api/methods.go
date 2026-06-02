@@ -356,3 +356,63 @@ func (client *Client) GetBrokerReport(ctx context.Context, token string, taskId 
 
 	return response, nil
 }
+
+func (client *Client) GetClosePrices(ctx context.Context, token string, instrumentID string, instrumentStatus pkg.InstrumentStatus) (ClosePrices, error) {
+	type GetClosePricesRequest struct {
+		InstrumentID     string               `json:"instrumentId"`
+		InstrumentStatus pkg.InstrumentStatus `json:"instrumentStatus,omitempty"`
+	}
+
+	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetClosePrices"
+	payload := GetClosePricesRequest{
+		InstrumentID:     instrumentID,
+		InstrumentStatus: instrumentStatus,
+	}
+
+	client.operationsLimiter.Wait(context.Background())
+
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
+	if err != nil {
+		return ClosePrices{}, fmt.Errorf("do request error (GetClosePrices): %w", err)
+	}
+
+	var closePrices ClosePrices
+	err = json.Unmarshal(data, &closePrices)
+	if err != nil {
+		return ClosePrices{}, fmt.Errorf("unmarshal error (GetClosePrices): %w", err)
+	}
+
+	return closePrices, nil
+}
+
+func (client *Client) Currencies(
+	ctx context.Context,
+	token string,
+	instrumentStatus pkg.InstrumentStatus,
+	instrumentExhange pkg.InstrumentExchange) (Currencies, error) {
+	type CurrenciesRequest struct {
+		InstrumentStatus   pkg.InstrumentStatus   `json:"instrumentStatus,omitempty"`
+		InstrumentExchange pkg.InstrumentExchange `json:"instrumentExchange,omitempty"`
+	}
+
+	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Currencies"
+	payload := CurrenciesRequest{
+		InstrumentStatus:   instrumentStatus,
+		InstrumentExchange: instrumentExhange,
+	}
+
+	client.operationsLimiter.Wait(context.Background())
+
+	data, err := client.DoRequest(ctx, url, http.MethodPost, token, payload)
+	if err != nil {
+		return Currencies{}, fmt.Errorf("do request error (Currencies): %w", err)
+	}
+
+	var currencies Currencies
+	err = json.Unmarshal(data, &currencies)
+	if err != nil {
+		return Currencies{}, fmt.Errorf("unmarshal error (Currencies): %w", err)
+	}
+
+	return currencies, nil
+}

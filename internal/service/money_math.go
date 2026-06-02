@@ -41,6 +41,18 @@ func unitsStr(units, nano int64) string {
 }
 
 func AddMoneyValue(a, b domain.MoneyValue) domain.MoneyValue {
+	switch {
+	case a.Currency == "":
+		return b
+	case b.Currency == "":
+		return a
+	case a.Currency != b.Currency:
+		panic(fmt.Sprintf(
+			"currency mismatch: %s != %s",
+			a.Currency,
+			b.Currency,
+		))
+	}
 	result := parseNano(a.Units, a.Nano).Add(parseNano(b.Units, b.Nano))
 	units := result.Div(decNano).IntPart()
 	nano := result.Mod(decNano).IntPart()
@@ -48,6 +60,18 @@ func AddMoneyValue(a, b domain.MoneyValue) domain.MoneyValue {
 }
 
 func SubtractMoneyValue(a, b domain.MoneyValue) domain.MoneyValue {
+	switch {
+	case a.Currency == "":
+		return domain.MoneyValue{Currency: b.Currency, Units: "-" + b.Units, Nano: -b.Nano}
+	case b.Currency == "":
+		return a
+	case a.Currency != b.Currency:
+		panic(fmt.Sprintf(
+			"currency mismatch: %s != %s",
+			a.Currency,
+			b.Currency,
+		))
+	}
 	result := parseNano(a.Units, a.Nano).Sub(parseNano(b.Units, b.Nano))
 	units := result.Div(decNano).IntPart()
 	nano := result.Mod(decNano).IntPart()
@@ -55,6 +79,9 @@ func SubtractMoneyValue(a, b domain.MoneyValue) domain.MoneyValue {
 }
 
 func MultiplyMoneyValue(a, b domain.MoneyValue) domain.MoneyValue {
+	if a.Currency != b.Currency {
+		panic("currency mismatch in MultiplyMoneyValue")
+	}
 	result := parseDecimal(a.Units, a.Nano).Mul(parseDecimal(b.Units, b.Nano))
 
 	units, nano := splitDecimal(result)
@@ -63,6 +90,9 @@ func MultiplyMoneyValue(a, b domain.MoneyValue) domain.MoneyValue {
 }
 
 func DivideMoneyValue(a, b domain.MoneyValue) (domain.MoneyValue, error) {
+	if a.Currency != b.Currency {
+		panic("currency mismatch in DivideMoneyValue")
+	}
 	divisor := parseDecimal(b.Units, b.Nano)
 	if divisor.IsZero() {
 		return domain.MoneyValue{}, fmt.Errorf("division by zero")

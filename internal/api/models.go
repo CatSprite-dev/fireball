@@ -294,3 +294,68 @@ type GetBrokerReportResponse struct {
 	ItemsCount int    `json:"itemsCount"`
 	TaskID     string `json:"taskId"`
 }
+
+type ClosePrices struct {
+	ClosePrices []struct {
+		Figi          string `json:"figi"`
+		InstrumentUID string `json:"instrumentUid"`
+		Ticker        string `json:"ticker"`
+		ClassCode     string `json:"classCode"`
+		Price         struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"price"`
+		EveningSessionPrice struct {
+			Units string `json:"units"`
+			Nano  int    `json:"nano"`
+		} `json:"eveningSessionPrice"`
+		Time                    time.Time `json:"time"`
+		EveningSessionPriceTime time.Time `json:"eveningSessionPriceTime"`
+	} `json:"closePrices"`
+}
+
+type Currencies struct {
+	Instruments []struct {
+		Figi                  string        `json:"figi"`
+		Ticker                string        `json:"ticker"`
+		ClassCode             string        `json:"classCode"`
+		Isin                  string        `json:"isin"`
+		Lot                   int           `json:"lot"`
+		Currency              string        `json:"currency"`
+		ShortEnabledFlag      bool          `json:"shortEnabledFlag"`
+		Name                  string        `json:"name"`
+		Exchange              string        `json:"exchange"`
+		Nominal               MoneyValue    `json:"nominal"`
+		CountryOfRisk         string        `json:"countryOfRisk"`
+		CountryOfRiskName     string        `json:"countryOfRiskName"`
+		TradingStatus         string        `json:"tradingStatus"`
+		OtcFlag               bool          `json:"otcFlag"`
+		BuyAvailableFlag      bool          `json:"buyAvailableFlag"`
+		SellAvailableFlag     bool          `json:"sellAvailableFlag"`
+		IsoCurrencyName       string        `json:"isoCurrencyName"`
+		MinPriceIncrement     Quotation     `json:"minPriceIncrement"`
+		APITradeAvailableFlag bool          `json:"apiTradeAvailableFlag"`
+		UID                   string        `json:"uid"`
+		RealExchange          string        `json:"realExchange"`
+		PositionUID           string        `json:"positionUid"`
+		RequiredTests         []interface{} `json:"requiredTests"`
+		AssetUID              string        `json:"assetUid"`
+		ForIisFlag            bool          `json:"forIisFlag"`
+		ForQualInvestorFlag   bool          `json:"forQualInvestorFlag"`
+		WeekendFlag           bool          `json:"weekendFlag"`
+		BlockedTcaFlag        bool          `json:"blockedTcaFlag"`
+		First1MinCandleDate   time.Time     `json:"first1minCandleDate,omitempty"`
+		First1DayCandleDate   time.Time     `json:"first1dayCandleDate,omitempty"`
+		Brand                 struct {
+			LogoName      string `json:"logoName"`
+			LogoBaseColor string `json:"logoBaseColor"`
+			TextColor     string `json:"textColor"`
+		} `json:"brand"`
+		Dlong        Quotation `json:"dlong,omitempty"`
+		Dshort       Quotation `json:"dshort,omitempty"`
+		DlongMin     Quotation `json:"dlongMin,omitempty"`
+		DshortMin    Quotation `json:"dshortMin,omitempty"`
+		DlongClient  Quotation `json:"dlongClient,omitempty"`
+		DshortClient Quotation `json:"dshortClient,omitempty"`
+	} `json:"instruments"`
+}
