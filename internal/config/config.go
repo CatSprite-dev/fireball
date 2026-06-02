@@ -65,7 +65,7 @@ func NewConfig() (*Config, error) {
 	}
 	postgresURL := os.Getenv("DB_URL")
 	if postgresURL == "" {
-		log.Println("POSTGRES_URL variable is not found in environment")
+		log.Println("DB_URL variable is not found in environment")
 		return nil, err
 	}
 	serverPort := os.Getenv("PORT")
