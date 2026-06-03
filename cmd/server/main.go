@@ -14,6 +14,7 @@ import (
 	"github.com/CatSprite-dev/fireball/internal/config"
 	"github.com/CatSprite-dev/fireball/internal/demo"
 	"github.com/CatSprite-dev/fireball/internal/handlers"
+	"github.com/CatSprite-dev/fireball/internal/middleware"
 	"github.com/CatSprite-dev/fireball/internal/service"
 	"github.com/CatSprite-dev/fireball/internal/storage"
 )
@@ -51,8 +52,8 @@ func main() {
 
 	portfolioService := service.NewPortfolioService(calculator, cacheManager)
 
-	loginRateLimiter := handlers.NewRateLimiter(10)
-	authRateLimiter := handlers.NewRateLimiter(200)
+	loginRateLimiter := middleware.NewRateLimiter(store.Client(), 10, cfg.IsProduction)
+	authRateLimiter := middleware.NewRateLimiter(store.Client(), 200, cfg.IsProduction)
 
 	loginHandler := handlers.NewLoginHandler(sessionManager, cacheManager, apiClient, cfg.IsProduction)
 	portfolioHandler := handlers.NewPortfolioHandler(portfolioService)
@@ -72,11 +73,11 @@ func main() {
 		mux.HandleFunc("GET /api/demo/chart", authRateLimiter.LimiterMiddleware(demoHandler.HandlerDemoChart))
 	}
 
-	mux.HandleFunc("GET /api/ping", authRateLimiter.LimiterMiddleware(handlers.AuthMiddleware(sessionManager, portfolioHandler.HandlerPing)))
+	mux.HandleFunc("GET /api/ping", authRateLimiter.LimiterMiddleware(middleware.AuthMiddleware(sessionManager, portfolioHandler.HandlerPing)))
 	mux.HandleFunc("POST /api/login", loginRateLimiter.LimiterMiddleware(loginHandler.HandlerLogin))
 	mux.HandleFunc("POST /api/logout", loginRateLimiter.LimiterMiddleware(loginHandler.HandlerLogout))
-	mux.HandleFunc("GET /api/portfolio", authRateLimiter.LimiterMiddleware(handlers.AuthMiddleware(sessionManager, portfolioHandler.HandlerPortfolio)))
-	mux.HandleFunc("GET /api/chart", authRateLimiter.LimiterMiddleware(handlers.AuthMiddleware(sessionManager, chartHandler.HandlerChart)))
+	mux.HandleFunc("GET /api/portfolio", authRateLimiter.LimiterMiddleware(middleware.AuthMiddleware(sessionManager, portfolioHandler.HandlerPortfolio)))
+	mux.HandleFunc("GET /api/chart", authRateLimiter.LimiterMiddleware(middleware.AuthMiddleware(sessionManager, chartHandler.HandlerChart)))
 
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		//log.Printf("Catch-all hit: %s %s", r.Method, r.URL.Path)
