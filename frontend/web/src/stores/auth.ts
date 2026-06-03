@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { usePortfolioStore } from './portfolio'
+import { useChartStore } from './chart'
 
 export const useAuthStore = defineStore('auth', () => {
     const isLoggedIn = ref(false)
@@ -30,8 +32,10 @@ export const useAuthStore = defineStore('auth', () => {
         }
         isLoggedIn.value = false
         isDemo.value = false
-    }
 
+        usePortfolioStore().reset()
+        useChartStore().reset()
+    }
 
     return { isLoggedIn, isReady, isDemo, checkAuth, logout, error }
 })
