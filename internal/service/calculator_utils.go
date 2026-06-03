@@ -64,14 +64,14 @@ func enrichPositions(ctx context.Context, portfolio domain.Portfolio, calc *Calc
 	for i := range portfolio.Positions {
 		wg.Add(2)
 		pos := &portfolio.Positions[i]
-		go getPositionInfo(ctx, &wg, pos, calc, token)
-		go getPositionMetrics(&wg, portfolio.AllDividends, pos)
+		go getPositionInfo(ctx, token, &wg, pos, calc)
+		go getPositionMetrics(ctx, token, &wg, portfolio.AllDividends, pos, calc)
 	}
 	wg.Wait()
 	return portfolio
 }
 
-func getPositionInfo(ctx context.Context, wg *sync.WaitGroup, p *domain.Position, calc *Calculator, token string) {
+func getPositionInfo(ctx context.Context, token string, wg *sync.WaitGroup, p *domain.Position, calc *Calculator) {
 	defer wg.Done()
 	instrument, err := calc.GetInstrument(ctx, token, pkg.InstrumentIdTypePositionUid, "", p.PositionUID)
 	if errors.Is(err, ErrNotFound) {
@@ -85,7 +85,7 @@ func getPositionInfo(ctx context.Context, wg *sync.WaitGroup, p *domain.Position
 	p.Type = instrument.InstrumentType
 }
 
-func getPositionMetrics(wg *sync.WaitGroup, allDividends map[string]domain.MoneyValue, pos *domain.Position) {
+func getPositionMetrics(ctx context.Context, token string, wg *sync.WaitGroup, allDividends map[string]domain.MoneyValue, pos *domain.Position, calc *Calculator) {
 	defer wg.Done()
 
 	posAmount := MultiplyMoneyValue(pos.AveragePositionPrice, domain.MoneyValue{Units: pos.Quantity.Units, Nano: pos.Quantity.Nano, Currency: pos.AveragePositionPrice.Currency})
@@ -102,6 +102,9 @@ func getPositionMetrics(wg *sync.WaitGroup, allDividends map[string]domain.Money
 	pos.ExpectedYieldRelative = MultiplyQuotation(pos.ExpectedYieldRelative, domain.Quotation{Units: "100", Nano: 0})
 
 	pos.Dividends = allDividends[pos.Ticker]
+	if pos.Dividends.Currency != "rub" {
+		pos.Dividends = calc.ConvertLastPriceToRUB(ctx, token, pos.Dividends)
+	}
 	pos.TotalYield = AddMoneyValue(pos.ExpectedYield, pos.Dividends)
 
 	pos.TotalYieldRelative, err = DivideQuotation(

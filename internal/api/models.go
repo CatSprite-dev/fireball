@@ -297,18 +297,12 @@ type GetBrokerReportResponse struct {
 
 type ClosePrices struct {
 	ClosePrices []struct {
-		Figi          string `json:"figi"`
-		InstrumentUID string `json:"instrumentUid"`
-		Ticker        string `json:"ticker"`
-		ClassCode     string `json:"classCode"`
-		Price         struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		} `json:"price"`
-		EveningSessionPrice struct {
-			Units string `json:"units"`
-			Nano  int    `json:"nano"`
-		} `json:"eveningSessionPrice"`
+		Figi                    string    `json:"figi"`
+		InstrumentUID           string    `json:"instrumentUid"`
+		Ticker                  string    `json:"ticker"`
+		ClassCode               string    `json:"classCode"`
+		Price                   Quotation `json:"price"`
+		EveningSessionPrice     Quotation `json:"eveningSessionPrice"`
 		Time                    time.Time `json:"time"`
 		EveningSessionPriceTime time.Time `json:"eveningSessionPriceTime"`
 	} `json:"closePrices"`
