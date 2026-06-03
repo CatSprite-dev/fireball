@@ -29,11 +29,25 @@ func (d *DemoClient) GetOperationsByCursor(
 	_ string,
 	_ *time.Time,
 	_ *time.Time,
-	_ []pkg.OperationType,
+	operationTypes []pkg.OperationType,
 	_ pkg.OperationState,
 	_ bool,
 ) ([]api.UserOperations, error) {
-	return demoOperations(), nil
+	all := demoOperations()
+	if len(operationTypes) == 0 {
+		return all, nil
+	}
+	typeSet := make(map[string]struct{}, len(operationTypes))
+	for _, t := range operationTypes {
+		typeSet[string(t)] = struct{}{}
+	}
+	filtered := []api.Item{}
+	for _, item := range all[0].Items {
+		if _, ok := typeSet[item.Type]; ok {
+			filtered = append(filtered, item)
+		}
+	}
+	return []api.UserOperations{{HasNext: false, Items: filtered}}, nil
 }
 
 func (d *DemoClient) BondBy(

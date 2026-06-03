@@ -101,21 +101,15 @@ func getPositionMetrics(ctx context.Context, token string, allDividends map[stri
 	}
 	pos.ExpectedYieldRelative = MultiplyQuotation(pos.ExpectedYieldRelative, domain.Quotation{Units: "100", Nano: 0})
 
-	/*candles := []domain.Candle{}
-	candles = append(candles, domain.Candle{
-		Time: time.Now(),
-		Close: domain.Quotation{
-			Units: "80", Nano: 0,
-		},
-		Open: domain.Quotation{
-			Units: "80", Nano: 0,
-		},
-	})*/
+	expectedYield := pos.ExpectedYield
+	if expectedYield.Currency != "rub" {
+		expectedYield = calc.ConvertLastPriceToRUB(ctx, token, expectedYield)
+	}
 	pos.Dividends = allDividends[pos.Ticker]
 	if pos.Dividends.Currency != "rub" {
 		pos.Dividends = calc.ConvertLastPriceToRUB(ctx, token, pos.Dividends)
 	}
-	pos.TotalYield = AddMoneyValue(pos.ExpectedYield, pos.Dividends)
+	pos.TotalYield = AddMoneyValue(expectedYield, pos.Dividends)
 
 	pos.TotalYieldRelative, err = DivideQuotation(
 		domain.Quotation{Units: pos.TotalYield.Units, Nano: pos.TotalYield.Nano},
