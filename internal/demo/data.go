@@ -254,20 +254,6 @@ var demoPositions = []api.Position{
 		DailyYield:           api.MoneyValue{Currency: "rub", Units: "68", Nano: 0},
 	},
 	{
-		Figi:                 "BBG004730ZJ9",
-		Ticker:               "VTBR",
-		ClassCode:            "TQBR",
-		InstrumentType:       "share",
-		PositionUID:          "626d2ab0-3359-4d2d-8366-daedd2a0d000",
-		InstrumentUID:        "8e2b0325-0292-4654-8a18-4f63ed3b0e09",
-		Quantity:             api.Quotation{Units: "5000", Nano: 0},
-		QuantityLots:         api.Quotation{Units: "5", Nano: 0},
-		AveragePositionPrice: api.MoneyValue{Currency: "rub", Units: "0", Nano: 24_500_000},
-		CurrentPrice:         api.MoneyValue{Currency: "rub", Units: "0", Nano: 26_100_000},
-		ExpectedYield:        api.Quotation{Units: "80", Nano: 0},
-		DailyYield:           api.MoneyValue{Currency: "rub", Units: "3", Nano: 0},
-	},
-	{
 		Figi:                 "BBG004RVFCY3",
 		Ticker:               "MGNT",
 		ClassCode:            "TQBR",
@@ -668,22 +654,6 @@ func demoOperations() []api.UserOperations {
 			InstrumentKind: "INSTRUMENT_TYPE_SHARE",
 			PositionUID:    "43ba384c-a484-4ee7-842d-59b80260fa3f",
 			Payment:        api.MoneyValue{Currency: "rub", Units: "4800", Nano: 0},
-		},
-
-		// ── VTBR ─────────────────────────────────────────────────────────────
-		{
-			ID:             "demo-op-023",
-			Date:           base.AddDate(1, 4, 0),
-			Type:           "OPERATION_TYPE_BUY",
-			State:          "OPERATION_STATE_EXECUTED",
-			Figi:           "BBG004730ZJ9",
-			Ticker:         "VTBR",
-			ClassCode:      "TQBR",
-			InstrumentKind: "INSTRUMENT_TYPE_SHARE",
-			PositionUID:    "626d2ab0-3359-4d2d-8366-daedd2a0d000",
-			Payment:        api.MoneyValue{Currency: "rub", Units: "-122500", Nano: 0},
-			Price:          api.MoneyValue{Currency: "rub", Units: "0", Nano: 24_500_000},
-			QuantityDone:   "5000",
 		},
 
 		// ── SU26243RMFS4 (OFZ) ───────────────────────────────────────────────

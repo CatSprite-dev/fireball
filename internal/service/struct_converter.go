@@ -15,7 +15,7 @@ func convertFullPortfolio(raw api.UserPortfolio) domain.Portfolio {
 		TotalAmountEtf:        domain.MoneyValue(raw.TotalAmountEtf),
 		TotalAmountCurrencies: domain.MoneyValue(raw.TotalAmountCurrencies),
 		TotalAmountFutures:    domain.MoneyValue(raw.TotalAmountFutures),
-		ExpectedYield:         domain.MoneyValue{Currency: "rub"},
+		ExpectedYield:         domain.MoneyValue{},
 		ExpectedYieldRelative: domain.Quotation(raw.ExpectedYield),
 		AccountID:             raw.AccountID,
 		TotalAmountOptions:    domain.MoneyValue(raw.TotalAmountOptions),
@@ -52,8 +52,8 @@ func convertFullPortfolio(raw api.UserPortfolio) domain.Portfolio {
 			Ticker:                   pos.Ticker,
 			ClassCode:                pos.ClassCode,
 			CurrentNkd:               domain.MoneyValue(pos.CurrentNkd),
-			Dividends:                domain.MoneyValue{Currency: "rub"},
-			TotalYield:               domain.MoneyValue{Currency: "rub"},
+			Dividends:                domain.MoneyValue{},
+			TotalYield:               domain.MoneyValue{},
 			TotalYieldRelative:       domain.Quotation{},
 		}
 	}

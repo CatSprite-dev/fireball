@@ -63,7 +63,7 @@ func main() {
 
 	if cfg.DemoToken != "" {
 		demoClient := demo.NewDemoClient(apiClient, cfg.DemoToken)
-		demoCalculator := service.NewCalculator(demoClient, candleRepository, operationsRepository)
+		demoCalculator := service.NewCalculator(demoClient, candleRepository, nil)
 		demoCacheManager := storage.NewCacheManager(store, 24*time.Hour, 24*time.Hour)
 		demoService := service.NewPortfolioService(demoCalculator, demoCacheManager)
 		demoHandler := handlers.NewDemoHandler(demoService)
