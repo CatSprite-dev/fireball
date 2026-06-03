@@ -69,14 +69,12 @@ type Item struct {
 }
 
 type ClosePrice struct {
-	Figi                    string    `json:"figi"`
-	InstrumentUID           string    `json:"instrumentUid"`
-	Ticker                  string    `json:"ticker"`
-	ClassCode               string    `json:"classCode"`
-	ClosePrice              Quotation `json:"price"`
-	EveningSessionPrice     Quotation `json:"eveningSessionPrice"`
-	Time                    time.Time `json:"time"`
-	EveningSessionPriceTime time.Time `json:"eveningSessionPriceTime"`
+	Figi          string    `json:"figi"`
+	InstrumentUID string    `json:"instrumentUid"`
+	Ticker        string    `json:"ticker"`
+	ClassCode     string    `json:"classCode"`
+	ClosePrice    Quotation `json:"price"`
+	Time          time.Time `json:"time"`
 }
 
 type Currency struct {

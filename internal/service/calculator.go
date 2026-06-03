@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/api"
@@ -229,6 +230,9 @@ func (calc *Calculator) GetTotalReturn(
 	}
 
 	for _, item := range operations.Items {
+		if item.Payment.Currency != "rub" {
+			totalInvested = calc.ConvertLastPriceToRUB(ctx, token, totalInvested)
+		}
 		totalInvested = AddMoneyValue(totalInvested, domain.MoneyValue(item.Payment))
 	}
 
@@ -740,4 +744,36 @@ func (calc *Calculator) getPaymentsByInterval(
 		}
 	}
 	return result, nil
+}
+
+func (calc *Calculator) GetClosePrices(ctx context.Context, token string, instrumentIDs []string, instrumentStatus pkg.InstrumentStatus) ([]domain.ClosePrice, error) {
+	raw, err := calc.APIClient.GetClosePrices(ctx, token, instrumentIDs, instrumentStatus)
+	if err != nil {
+		return []domain.ClosePrice{}, err
+	}
+	return convertClosePrices(raw), nil
+}
+
+func (calc *Calculator) ConvertLastPriceToRUB(ctx context.Context, token string, amount domain.MoneyValue) domain.MoneyValue {
+	if amount.Currency == "rub" {
+		return amount
+	}
+
+	currency := amount.Currency
+	currencyID := strings.ToUpper(currency) + strings.ToUpper("rub") + "_" + string(pkg.ClassCodeEES_CETS)
+	lastPrices, err := calc.GetClosePrices(ctx, token, []string{currencyID}, pkg.InstrumentStatusAll)
+	if err != nil {
+		log.Println(err.Error())
+	}
+
+	rate := domain.MoneyValue{
+		Units: lastPrices[0].ClosePrice.Units,
+		Nano:  lastPrices[0].ClosePrice.Nano,
+	}
+
+	result := MultiplyMoneyValue(amount, rate)
+	result.Currency = "rub"
+
+	return result
+
 }

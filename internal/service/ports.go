@@ -31,7 +31,7 @@ type APIClient interface {
 		instrumentId string,
 		candleSourceType pkg.CandleSource,
 		limit int) (api.Candles, error)
-	GetClosePrices(ctx context.Context, token string, instrumentID string, instrumentStatus pkg.InstrumentStatus) (api.ClosePrices, error)
+	GetClosePrices(ctx context.Context, token string, instrumentIDs []string, instrumentStatus pkg.InstrumentStatus) (api.ClosePrices, error)
 	Currencies(
 		ctx context.Context,
 		token string,
