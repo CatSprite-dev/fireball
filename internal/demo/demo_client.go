@@ -18,53 +18,51 @@ func NewDemoClient(real service.APIClient, token string) *DemoClient {
 	return &DemoClient{real: real, token: token}
 }
 
-func (d *DemoClient) GetPortfolio(ctx context.Context, token string, accountID string) (api.UserPortfolio, error) {
-
-	return api.UserPortfolio{}, nil
+func (d *DemoClient) GetPortfolio(_ context.Context, _ string, _ string) (api.UserPortfolio, error) {
+	return demoPortfolio(), nil
 }
 
 func (d *DemoClient) GetOperationsByCursor(
-	ctx context.Context,
-	token string,
-	accountId string,
-	instrumentId string,
-	from *time.Time,
-	to *time.Time,
-	operationTypes []pkg.OperationType,
-	operationState pkg.OperationState,
-	WithoutCommissions bool,
+	_ context.Context,
+	_ string,
+	_ string,
+	_ string,
+	_ *time.Time,
+	_ *time.Time,
+	_ []pkg.OperationType,
+	_ pkg.OperationState,
+	_ bool,
 ) ([]api.UserOperations, error) {
-
-	return nil, nil
+	return demoOperations(), nil
 }
 
 func (d *DemoClient) BondBy(
 	ctx context.Context,
-	token string,
+	_ string,
 	idType pkg.InstrumentIdType,
 	classCode pkg.ClassCode,
 	id string,
 ) (api.InstrumentBond, error) {
-	return d.real.BondBy(ctx, token, idType, classCode, id)
+	return d.real.BondBy(ctx, d.token, idType, classCode, id)
 }
 
 func (d *DemoClient) GetInstrumentBy(
 	ctx context.Context,
-	token string,
+	_ string,
 	idType pkg.InstrumentIdType,
 	classCode pkg.ClassCode,
 	id string,
 ) (api.InstrumentResponse, error) {
-	return d.real.GetInstrumentBy(ctx, token, idType, classCode, id)
+	return d.real.GetInstrumentBy(ctx, d.token, idType, classCode, id)
 }
 
-func (d *DemoClient) Indicatives(ctx context.Context, token string) (api.IndicativeInstruments, error) {
-	return d.real.Indicatives(ctx, token)
+func (d *DemoClient) Indicatives(ctx context.Context, _ string) (api.IndicativeInstruments, error) {
+	return d.real.Indicatives(ctx, d.token)
 }
 
 func (d *DemoClient) GetCandles(
 	ctx context.Context,
-	token string,
+	_ string,
 	from *time.Time,
 	to *time.Time,
 	interval pkg.CandleInterval,
@@ -72,23 +70,23 @@ func (d *DemoClient) GetCandles(
 	candleSourceType pkg.CandleSource,
 	limit int,
 ) (api.Candles, error) {
-	return d.real.GetCandles(ctx, token, from, to, interval, instrumentId, candleSourceType, limit)
+	return d.real.GetCandles(ctx, d.token, from, to, interval, instrumentId, candleSourceType, limit)
 }
 
 func (d *DemoClient) GetClosePrices(
 	ctx context.Context,
-	token string,
+	_ string,
 	instrumentID string,
 	instrumentStatus pkg.InstrumentStatus,
 ) (api.ClosePrices, error) {
-	return d.real.GetClosePrices(ctx, token, instrumentID, instrumentStatus)
+	return d.real.GetClosePrices(ctx, d.token, instrumentID, instrumentStatus)
 }
 
 func (d *DemoClient) Currencies(
 	ctx context.Context,
-	token string,
+	_ string,
 	instrumentStatus pkg.InstrumentStatus,
 	instrumentExhange pkg.InstrumentExchange,
 ) (api.Currencies, error) {
-	return d.real.Currencies(ctx, token, instrumentStatus, instrumentExhange)
+	return d.real.Currencies(ctx, d.token, instrumentStatus, instrumentExhange)
 }

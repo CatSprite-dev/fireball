@@ -12,6 +12,7 @@ import (
 
 	"github.com/CatSprite-dev/fireball/internal/api"
 	"github.com/CatSprite-dev/fireball/internal/config"
+	"github.com/CatSprite-dev/fireball/internal/demo"
 	"github.com/CatSprite-dev/fireball/internal/handlers"
 	"github.com/CatSprite-dev/fireball/internal/service"
 	"github.com/CatSprite-dev/fireball/internal/storage"
@@ -50,16 +51,26 @@ func main() {
 
 	portfolioService := service.NewPortfolioService(calculator, cacheManager)
 
-	loginHandler := handlers.NewLoginHandler(sessionManager, cacheManager, apiClient, cfg.IsProduction)
-
 	loginRateLimiter := handlers.NewRateLimiter(10)
 	authRateLimiter := handlers.NewRateLimiter(200)
 
+	loginHandler := handlers.NewLoginHandler(sessionManager, cacheManager, apiClient, cfg.IsProduction)
 	portfolioHandler := handlers.NewPortfolioHandler(portfolioService)
 	chartHandler := handlers.NewChartHandler(portfolioService)
 
 	mux := http.NewServeMux()
 	fileServer := http.FileServer(http.Dir("frontend/dist"))
+
+	if cfg.DemoToken != "" {
+		demoClient := demo.NewDemoClient(apiClient, cfg.DemoToken)
+		demoCalculator := service.NewCalculator(demoClient, candleRepository, operationsRepository)
+		demoCacheManager := storage.NewCacheManager(store, 24*time.Hour, 24*time.Hour)
+		demoService := service.NewPortfolioService(demoCalculator, demoCacheManager)
+		demoHandler := handlers.NewDemoHandler(demoService)
+
+		mux.HandleFunc("GET /api/demo/portfolio", authRateLimiter.LimiterMiddleware(demoHandler.HandlerDemoPortfolio))
+		mux.HandleFunc("GET /api/demo/chart", authRateLimiter.LimiterMiddleware(demoHandler.HandlerDemoChart))
+	}
 
 	mux.HandleFunc("GET /api/ping", authRateLimiter.LimiterMiddleware(handlers.AuthMiddleware(sessionManager, portfolioHandler.HandlerPing)))
 	mux.HandleFunc("POST /api/login", loginRateLimiter.LimiterMiddleware(loginHandler.HandlerLogin))
