@@ -41,12 +41,13 @@ func unitsStr(units, nano int64) string {
 }
 
 func AddMoneyValue(a, b domain.MoneyValue) domain.MoneyValue {
-	switch {
-	case a.Currency == "":
+	if a.Currency == "" {
 		return b
-	case b.Currency == "":
+	}
+	if b.Currency == "" {
 		return a
-	case a.Currency != b.Currency:
+	}
+	if a.Currency != b.Currency {
 		panic(fmt.Sprintf(
 			"currency mismatch: %s != %s",
 			a.Currency,

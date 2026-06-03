@@ -229,7 +229,7 @@ func (calc *Calculator) GetTotalReturn(
 		return domain.MoneyValue{}, domain.Quotation{}, domain.MoneyValue{}, err
 	}
 
-	candles := []domain.Candle{}
+	/*candles := []domain.Candle{}
 	candles = append(candles, domain.Candle{
 		Time: time.Now(),
 		Close: domain.Quotation{
@@ -238,15 +238,15 @@ func (calc *Calculator) GetTotalReturn(
 		Open: domain.Quotation{
 			Units: "80", Nano: 0,
 		},
-	})
+	})*/
 	for _, item := range operations.Items {
 		payment := item.Payment
-		if payment.Currency != "rub" {
+		/*if payment.Currency != "rub" {
 			payment, err = convertToRUB(item.Payment, time.Now(), candles)
 			if err != nil {
 				log.Printf("cannot convert dividend to rub:%v", err)
 			}
-		}
+		}*/
 		totalInvested = AddMoneyValue(totalInvested, payment)
 	}
 
