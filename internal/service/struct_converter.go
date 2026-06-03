@@ -171,3 +171,19 @@ func converCurrencies(raw api.Currencies) []domain.Currency {
 	}
 	return currencies
 }
+
+func convertClosePrices(raw api.ClosePrices) []domain.ClosePrice {
+	closePrices := []domain.ClosePrice{}
+	for _, rawClosePrice := range raw.ClosePrices {
+		closePrice := domain.ClosePrice{
+			Figi:          rawClosePrice.Figi,
+			InstrumentUID: rawClosePrice.InstrumentUID,
+			Ticker:        rawClosePrice.Ticker,
+			ClassCode:     rawClosePrice.ClassCode,
+			ClosePrice:    domain.Quotation(rawClosePrice.Price),
+			Time:          rawClosePrice.Time,
+		}
+		closePrices = append(closePrices, closePrice)
+	}
+	return closePrices
+}

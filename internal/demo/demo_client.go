@@ -76,10 +76,10 @@ func (d *DemoClient) GetCandles(
 func (d *DemoClient) GetClosePrices(
 	ctx context.Context,
 	_ string,
-	instrumentID string,
+	instrumentIDs []string,
 	instrumentStatus pkg.InstrumentStatus,
 ) (api.ClosePrices, error) {
-	return d.real.GetClosePrices(ctx, d.token, instrumentID, instrumentStatus)
+	return d.real.GetClosePrices(ctx, d.token, instrumentIDs, instrumentStatus)
 }
 
 func (d *DemoClient) Currencies(
