@@ -29,10 +29,10 @@ stop-deps:
 	@docker compose down
 
 migrate-up:
-	@export POSTGRES_URL=$$(grep POSTGRES_URL .env | cut -d '=' -f2 | tr -d '"') && goose -dir migrations postgres "$$POSTGRES_URL" up
+	@export DB_URL=$$(grep DB_URL .env | cut -d '=' -f2 | tr -d '"') && goose -dir migrations postgres "$$DB_URL" up
 
 migrate-down:
-	@export POSTGRES_URL=$$(grep POSTGRES_URL .env | cut -d '=' -f2 | tr -d '"') && goose -dir migrations postgres "$$POSTGRES_URL" down
+	@export DB_URL=$$(grep DB_URL .env | cut -d '=' -f2 | tr -d '"') && goose -dir migrations postgres "$$DB_URL" down
 
 
 reset:

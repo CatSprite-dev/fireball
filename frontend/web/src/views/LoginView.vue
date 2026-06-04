@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { login } from '../api/login'
+import { useTheme } from '../composables/useTheme'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -34,6 +35,12 @@ async function submit() {
         isLoading.value = false
     }
 }
+
+function tryDemo() {
+  auth.isDemo = true
+  auth.isLoggedIn = true
+  router.push('/')
+}
 </script>
 
 <template>
@@ -64,6 +71,12 @@ async function submit() {
 
                 <button :disabled="isLoading" @click="submit">
                     {{ isLoading ? 'Connecting...' : 'Access Portfolio' }}
+                </button>
+                <div class="divider">
+                    <span>or</span>
+                </div>
+                <button class="demo-btn" :disabled="isLoading" @click="tryDemo">
+                    Try Demo
                 </button>
             </div>
         </div>
@@ -181,6 +194,42 @@ button:hover:not(:disabled) {
 }
 
 button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+.demo-btn {
+    height: 40px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--foreground);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.demo-btn:hover:not(:disabled) {
+    background: var(--muted);
+}
+
+.demo-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }

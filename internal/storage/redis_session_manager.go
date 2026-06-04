@@ -21,6 +21,7 @@ type SessionManager struct {
 }
 
 type SessionData struct {
+	ID         string    `json:"id"`
 	Token      string    `json:"token"`
 	AccountID  string    `json:"account_id"`
 	OpenedDate time.Time `json:"opened_date"`
@@ -87,7 +88,10 @@ func (m *SessionManager) CreateSession(ctx context.Context, token string, accoun
 		return "", fmt.Errorf("failed to encrypt token: %w", err)
 	}
 
+	sessionID := uuid.New().String()
+
 	session := SessionData{
+		ID:         sessionID,
 		Token:      encrypted,
 		AccountID:  accountID,
 		OpenedDate: openedDate,
@@ -97,7 +101,6 @@ func (m *SessionManager) CreateSession(ctx context.Context, token string, accoun
 		return "", err
 	}
 
-	sessionID := uuid.New().String()
 	if err := m.store.Set(ctx, "session:"+sessionID, sessionJSON, m.RedisTTL); err != nil {
 		return "", fmt.Errorf("failed to store session: %w", err)
 	}

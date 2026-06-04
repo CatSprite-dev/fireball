@@ -7,18 +7,15 @@ import (
 
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 	"github.com/CatSprite-dev/fireball/internal/service"
-	"github.com/CatSprite-dev/fireball/internal/storage"
 )
 
 type ChartHandler struct {
 	portfolioService *service.PortfolioService
-	sessionManager   *storage.SessionManager
 }
 
-func NewChartHandler(sm *storage.SessionManager, ps *service.PortfolioService) *ChartHandler {
+func NewChartHandler(ps *service.PortfolioService) *ChartHandler {
 	return &ChartHandler{
 		portfolioService: ps,
-		sessionManager:   sm,
 	}
 }
 
@@ -29,17 +26,8 @@ func (h *ChartHandler) HandlerChart(w http.ResponseWriter, r *http.Request) {
 		log.Println("'force' param incorrect, the default false param is set")
 		force = false
 	}
-	sessionID, err := getSessionFromCookie(r)
-	if err != nil {
-		pkg.RespondWithError(w, http.StatusBadRequest, err.Error(), err)
-		return
-	}
 
-	sessionData, err := h.sessionManager.GetSession(r.Context(), sessionID)
-	if err != nil {
-		pkg.RespondWithError(w, http.StatusUnauthorized, "invalid session", err)
-		return
-	}
+	sessionData := SessionFromContext(r.Context())
 
 	request := service.PortfolioRequest{
 		Token:      sessionData.Token,
@@ -47,8 +35,11 @@ func (h *ChartHandler) HandlerChart(w http.ResponseWriter, r *http.Request) {
 		OpenedDate: sessionData.OpenedDate,
 	}
 
-	userPortfolio, err := h.portfolioService.GetOrFetchPortfolio(r.Context(), force, sessionID, request)
+	userPortfolio, err := h.portfolioService.GetOrFetchPortfolio(r.Context(), force, sessionData.ID, request)
 	if err != nil {
+		if r.Context().Err() != nil {
+			return
+		}
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
 		return
 	}
@@ -59,13 +50,16 @@ func (h *ChartHandler) HandlerChart(w http.ResponseWriter, r *http.Request) {
 
 	chartData, err := h.portfolioService.GetOrFetchChartData(r.Context(),
 		force,
-		sessionID,
+		request.ID,
 		request.Token,
 		userPortfolio,
 		period,
 		index,
 		pkg.CandleSourceExchange)
 	if err != nil {
+		if r.Context().Err() != nil {
+			return
+		}
 		log.Printf("GetChartData error: %v", err)
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
 		return

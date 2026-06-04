@@ -35,7 +35,7 @@ func convertFullPortfolio(raw api.UserPortfolio) domain.Portfolio {
 			InstrumentType:           pos.InstrumentType,
 			Quantity:                 domain.Quotation(pos.Quantity),
 			AveragePositionPrice:     domain.MoneyValue(pos.AveragePositionPrice),
-			ExpectedYield:            domain.MoneyValue{Units: pos.ExpectedYield.Units, Nano: pos.ExpectedYield.Nano, Currency: "rub"},
+			ExpectedYield:            domain.MoneyValue{Units: pos.ExpectedYield.Units, Nano: pos.ExpectedYield.Nano, Currency: pos.AveragePositionPrice.Currency},
 			ExpectedYieldRelative:    domain.Quotation{},
 			AveragePositionPricePt:   domain.Quotation(pos.AveragePositionPricePt),
 			CurrentPrice:             domain.MoneyValue(pos.CurrentPrice),

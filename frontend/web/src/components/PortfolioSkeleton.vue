@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import SkeletonBlock from './SkeletonBlock.vue'
 
-const activeTab = ref<'overview' | 'holdings'>('overview')
+const props = defineProps<{ activeTab: 'overview' | 'holdings' }>()
+const emit = defineEmits<{ 'update:activeTab': ['overview' | 'holdings'] }>()
 </script>
 
 <template>
@@ -24,14 +24,14 @@ const activeTab = ref<'overview' | 'holdings'>('overview')
                 <button
                     class="tab-btn"
                     :class="{ active: activeTab === 'overview'}"
-                    @click="activeTab = 'overview'"  
+                    @click="emit('update:activeTab', 'overview')"  
                 >
                     Overview
                 </button>
                 <button
                     class="tab-btn"
                     :class="{ active: activeTab === 'holdings' }"
-                    @click="activeTab = 'holdings'"
+                    @click="emit('update:activeTab', 'holdings')"
                 >
                     Holdings
                 </button>

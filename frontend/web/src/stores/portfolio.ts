@@ -71,13 +71,14 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         ctrl.value?.abort()
         ctrl.value = new AbortController()
 
+        const auth = useAuthStore()
+
         try {
-            portfolio.value = await fetchPortfolio(force, ctrl.value)
+            portfolio.value = await fetchPortfolio(force, ctrl.value, auth.isDemo)
         } catch (e) {
             if (e instanceof DOMException && e.name === 'AbortError') {
                 return
             } else if (e instanceof Error && e.message === 'UNAUTHORIZED') {
-                const auth = useAuthStore()
                 auth.isLoggedIn = false
                 router.push('/login')
             } else {

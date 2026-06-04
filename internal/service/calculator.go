@@ -16,6 +16,7 @@ import (
 )
 
 type PortfolioRequest struct {
+	ID         string
 	Token      string
 	AccountID  string
 	OpenedDate time.Time
@@ -230,10 +231,11 @@ func (calc *Calculator) GetTotalReturn(
 	}
 
 	for _, item := range operations.Items {
-		if item.Payment.Currency != "rub" {
-			totalInvested = calc.ConvertLastPriceToRUB(ctx, token, totalInvested)
+		payment := domain.MoneyValue(item.Payment)
+		if payment.Currency != "rub" {
+			totalInvested = calc.ConvertLastPriceToRUB(ctx, token, payment)
 		}
-		totalInvested = AddMoneyValue(totalInvested, domain.MoneyValue(item.Payment))
+		totalInvested = AddMoneyValue(totalInvested, payment)
 	}
 
 	totalReturn = SubtractMoneyValue(portfolio.TotalAmountPortfolio, totalInvested)
@@ -762,8 +764,9 @@ func (calc *Calculator) ConvertLastPriceToRUB(ctx context.Context, token string,
 	currency := amount.Currency
 	currencyID := strings.ToUpper(currency) + strings.ToUpper("rub") + "_" + string(pkg.ClassCodeEES_CETS)
 	lastPrices, err := calc.GetClosePrices(ctx, token, []string{currencyID}, pkg.InstrumentStatusAll)
-	if err != nil {
-		log.Println(err.Error())
+	if err != nil || len(lastPrices) == 0 {
+		log.Printf("ConvertLastPriceToRUB: failed to get rate for %s: %v", currency, err)
+		return amount
 	}
 
 	rate := domain.MoneyValue{
@@ -771,7 +774,11 @@ func (calc *Calculator) ConvertLastPriceToRUB(ctx context.Context, token string,
 		Nano:  lastPrices[0].ClosePrice.Nano,
 	}
 
-	result := MultiplyMoneyValue(amount, rate)
+	result := MultiplyMoneyValue(amount, domain.MoneyValue{
+		Currency: amount.Currency,
+		Units:    rate.Units,
+		Nano:     rate.Nano,
+	})
 	result.Currency = "rub"
 
 	return result
