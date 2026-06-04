@@ -64,5 +64,11 @@ export const useChartStore = defineStore('chart', () => {
         ctrl.value?.abort()
     }
 
-    return { chartSeries, isLoading, error, load, abort }
+    function reset() {
+        chartData.value = null
+        isLoading.value = false
+        error.value = ''
+    }
+
+    return { chartSeries, isLoading, error, load, abort, reset }
 })

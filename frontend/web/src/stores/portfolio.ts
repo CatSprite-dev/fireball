@@ -93,5 +93,11 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         ctrl.value?.abort()
     }
 
-    return { raw: portfolio, investments, metrics, isLoading, error, load, abort }
+    function reset() {
+        portfolio.value = null
+        isLoading.value = false
+        error.value = ''
+    }
+
+    return { raw: portfolio, investments, metrics, isLoading, error, load, abort, reset }
 })
