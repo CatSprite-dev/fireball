@@ -37,6 +37,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     env_file:
       - .env
     restart: unless-stopped
@@ -70,6 +72,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
+  
+  migrate: 
+    image: catspritedev/fireball-server:latest
+    command: goose -dir migrations postgres "host=postgres user=${DB_USER} password=${DB_PASSWORD} dbname=${DB_NAME} sslmode=disable" up
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    env_file:
+      - .env
 
 volumes:
   redis_storage:
