@@ -17,7 +17,7 @@ func TestRateLimiter(t *testing.T) {
 	}
 
 	testLimiter := handlers.NewRateLimiter(2)
-	next := http.HandlerFunc(testLimiter.Middleware(dummy))
+	next := http.HandlerFunc(testLimiter.LimiterMiddleware(dummy))
 
 	next(w, r)
 	respCode := w.Result().StatusCode
@@ -52,7 +52,7 @@ func TestRateLimiterDifferentIPs(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}
 	testLimiter := handlers.NewRateLimiter(2)
-	next := http.HandlerFunc(testLimiter.Middleware(dummy))
+	next := http.HandlerFunc(testLimiter.LimiterMiddleware(dummy))
 
 	next(w, r1)
 	respCode := w.Result().StatusCode

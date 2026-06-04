@@ -357,15 +357,25 @@ func (client *Client) GetBrokerReport(ctx context.Context, token string, taskId 
 	return response, nil
 }
 
-func (client *Client) GetClosePrices(ctx context.Context, token string, instrumentID string, instrumentStatus pkg.InstrumentStatus) (ClosePrices, error) {
+func (client *Client) GetClosePrices(ctx context.Context, token string, instrumentIDs []string, instrumentStatus pkg.InstrumentStatus) (ClosePrices, error) {
+	type InstrumentInfo struct {
+		InstrumentId string `json:"instrumentId"`
+	}
+
 	type GetClosePricesRequest struct {
-		InstrumentID     string               `json:"instrumentId"`
+		Instruments      []InstrumentInfo     `json:"instruments"`
 		InstrumentStatus pkg.InstrumentStatus `json:"instrumentStatus,omitempty"`
 	}
 
 	url := client.baseURL + "/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetClosePrices"
+
+	instruments := make([]InstrumentInfo, len(instrumentIDs))
+	for i, id := range instrumentIDs {
+		instruments[i] = InstrumentInfo{InstrumentId: id}
+	}
+
 	payload := GetClosePricesRequest{
-		InstrumentID:     instrumentID,
+		Instruments:      instruments,
 		InstrumentStatus: instrumentStatus,
 	}
 

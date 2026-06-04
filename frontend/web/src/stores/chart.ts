@@ -26,7 +26,7 @@ export const useChartStore = defineStore('chart', () => {
 
         try {
             console.log('fetching chart data')
-            chartData.value = await fetchChart(force, ctrl.value, period, index)
+            chartData.value = await fetchChart(force, ctrl.value, period, index, auth.isDemo)
         } catch (e) {
             if (e instanceof DOMException && e.name === 'AbortError') {
                 return

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -25,6 +26,9 @@ type Config struct {
 	WriteTimeout time.Duration
 	IdleTimeout  time.Duration
 
+	IsProduction bool
+	DemoToken    string
+
 	sessionSecret string
 }
 
@@ -39,12 +43,12 @@ func NewConfig() (*Config, error) {
 	investURL := os.Getenv("T_INVEST_URL")
 	if investURL == "" {
 		log.Println("T_INVEST_URL variable is not found in environment")
-		return nil, err
+		return nil, errors.New("T_INVEST_URL is required")
 	}
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
 		log.Println("REDIS_URL variable is not found in environment")
-		return nil, err
+		return nil, errors.New("REDIS_URL is required")
 	}
 	redisTTLStr := os.Getenv("REDIS_TTL")
 	if redisTTLStr == "" {
@@ -64,7 +68,7 @@ func NewConfig() (*Config, error) {
 	secret := os.Getenv("SESSION_SECRET")
 	if secret == "" {
 		log.Println("SESSION_SECRET variable is not found in environment")
-		return nil, err
+		return nil, errors.New("SESSION_SECRET is required")
 	}
 	db_user := os.Getenv("DB_USER")
 	if db_user == "" {
@@ -145,6 +149,12 @@ func NewConfig() (*Config, error) {
 		idleTimeout = 30
 	}
 
+	isProduction := os.Getenv("ENV") == "production"
+	demoToken := os.Getenv("DEMO_TOKEN")
+	if demoToken == "" {
+		log.Println("DEMO_TOKEN variable is not found in environment\nDemo mode will be unavailable")
+	}
+
 	return &Config{
 		BaseURL: investURL,
 
@@ -159,6 +169,9 @@ func NewConfig() (*Config, error) {
 		ReadTimeout:  time.Duration(readTimeout) * time.Second,
 		WriteTimeout: time.Duration(writeTimeout) * time.Second,
 		IdleTimeout:  time.Duration(idleTimeout) * time.Second,
+
+		IsProduction: isProduction,
+		DemoToken:    demoToken,
 
 		sessionSecret: secret,
 	}, nil

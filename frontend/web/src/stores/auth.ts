@@ -5,6 +5,7 @@ export const useAuthStore = defineStore('auth', () => {
     const isLoggedIn = ref(false)
     const isReady = ref(false)
     const error = ref('')
+    const isDemo = ref(false)
 
     let authPromise: Promise<void> | null = null
 
@@ -21,12 +22,16 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     async function logout() {
-        const response = await fetch('/api/logout', { method: 'POST' })
-        if (!response.ok) {
-            console.warn('Logout request failed, clearing local state anyway')
+        if (!isDemo.value) {
+            const response = await fetch('/api/logout', { method: 'POST' })
+            if (!response.ok) {
+                console.warn('Logout request failed, clearing local state anyway')
+            }
         }
         isLoggedIn.value = false
+        isDemo.value = false
     }
 
-    return { isLoggedIn, isReady, checkAuth, logout, error }
+
+    return { isLoggedIn, isReady, isDemo, checkAuth, logout, error }
 })

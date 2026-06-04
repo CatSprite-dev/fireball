@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/internal/api"
@@ -15,6 +16,7 @@ import (
 )
 
 type PortfolioRequest struct {
+	ID         string
 	Token      string
 	AccountID  string
 	OpenedDate time.Time
@@ -229,7 +231,11 @@ func (calc *Calculator) GetTotalReturn(
 	}
 
 	for _, item := range operations.Items {
-		totalInvested = AddMoneyValue(totalInvested, domain.MoneyValue(item.Payment))
+		payment := domain.MoneyValue(item.Payment)
+		if payment.Currency != "rub" {
+			totalInvested = calc.ConvertLastPriceToRUB(ctx, token, payment)
+		}
+		totalInvested = AddMoneyValue(totalInvested, payment)
 	}
 
 	totalReturn = SubtractMoneyValue(portfolio.TotalAmountPortfolio, totalInvested)
@@ -740,4 +746,41 @@ func (calc *Calculator) getPaymentsByInterval(
 		}
 	}
 	return result, nil
+}
+
+func (calc *Calculator) GetClosePrices(ctx context.Context, token string, instrumentIDs []string, instrumentStatus pkg.InstrumentStatus) ([]domain.ClosePrice, error) {
+	raw, err := calc.APIClient.GetClosePrices(ctx, token, instrumentIDs, instrumentStatus)
+	if err != nil {
+		return []domain.ClosePrice{}, err
+	}
+	return convertClosePrices(raw), nil
+}
+
+func (calc *Calculator) ConvertLastPriceToRUB(ctx context.Context, token string, amount domain.MoneyValue) domain.MoneyValue {
+	if amount.Currency == "rub" {
+		return amount
+	}
+
+	currency := amount.Currency
+	currencyID := strings.ToUpper(currency) + strings.ToUpper("rub") + "_" + string(pkg.ClassCodeEES_CETS)
+	lastPrices, err := calc.GetClosePrices(ctx, token, []string{currencyID}, pkg.InstrumentStatusAll)
+	if err != nil || len(lastPrices) == 0 {
+		log.Printf("ConvertLastPriceToRUB: failed to get rate for %s: %v", currency, err)
+		return amount
+	}
+
+	rate := domain.MoneyValue{
+		Units: lastPrices[0].ClosePrice.Units,
+		Nano:  lastPrices[0].ClosePrice.Nano,
+	}
+
+	result := MultiplyMoneyValue(amount, domain.MoneyValue{
+		Currency: amount.Currency,
+		Units:    rate.Units,
+		Nano:     rate.Nano,
+	})
+	result.Currency = "rub"
+
+	return result
+
 }

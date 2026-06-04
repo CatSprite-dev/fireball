@@ -5,8 +5,10 @@ export async function fetchChart(
     ctrl: AbortController,
     period: string = '1y',
     index: string = 'IMOEX',
+    isDemo = false,
 ): Promise<ChartData> {
-    const response = await fetch(`/api/chart?period=${period}&index=${index}&force=${force}`, {
+    const endpoint = isDemo ? '/api/demo/chart' : '/api/chart'
+    const response = await fetch(`${endpoint}?period=${period}&index=${index}&force=${force}`, {
         method: 'GET',
         signal: ctrl.signal,
     })

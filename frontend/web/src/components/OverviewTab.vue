@@ -276,7 +276,7 @@ const chartOptions = computed(() => ({
 
 .ticker {
     font-size: 0.75rem;
-    columns: var(--muted-foreground);
+    color: var(--muted-foreground);
 }
 
 .performer-gain {

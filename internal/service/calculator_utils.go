@@ -62,17 +62,19 @@ func enrichPortfolioMetrics(portfolio domain.Portfolio) (domain.Portfolio, error
 func enrichPositions(ctx context.Context, portfolio domain.Portfolio, calc *Calculator, token string) domain.Portfolio {
 	var wg sync.WaitGroup
 	for i := range portfolio.Positions {
-		wg.Add(2)
 		pos := &portfolio.Positions[i]
-		go getPositionInfo(ctx, &wg, pos, calc, token)
-		go getPositionMetrics(&wg, portfolio.AllDividends, pos)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			getPositionInfo(ctx, token, pos, calc)
+			getPositionMetrics(ctx, token, portfolio.AllDividends, pos, calc)
+		}()
 	}
 	wg.Wait()
 	return portfolio
 }
 
-func getPositionInfo(ctx context.Context, wg *sync.WaitGroup, p *domain.Position, calc *Calculator, token string) {
-	defer wg.Done()
+func getPositionInfo(ctx context.Context, token string, p *domain.Position, calc *Calculator) {
 	instrument, err := calc.GetInstrument(ctx, token, pkg.InstrumentIdTypePositionUid, "", p.PositionUID)
 	if errors.Is(err, ErrNotFound) {
 		instrument, err = calc.GetInstrument(ctx, token, pkg.InstrumentIdTypeFigi, "", p.Figi)
@@ -85,9 +87,7 @@ func getPositionInfo(ctx context.Context, wg *sync.WaitGroup, p *domain.Position
 	p.Type = instrument.InstrumentType
 }
 
-func getPositionMetrics(wg *sync.WaitGroup, allDividends map[string]domain.MoneyValue, pos *domain.Position) {
-	defer wg.Done()
-
+func getPositionMetrics(ctx context.Context, token string, allDividends map[string]domain.MoneyValue, pos *domain.Position, calc *Calculator) {
 	posAmount := MultiplyMoneyValue(pos.AveragePositionPrice, domain.MoneyValue{Units: pos.Quantity.Units, Nano: pos.Quantity.Nano, Currency: pos.AveragePositionPrice.Currency})
 
 	var err error
@@ -101,8 +101,15 @@ func getPositionMetrics(wg *sync.WaitGroup, allDividends map[string]domain.Money
 	}
 	pos.ExpectedYieldRelative = MultiplyQuotation(pos.ExpectedYieldRelative, domain.Quotation{Units: "100", Nano: 0})
 
+	expectedYield := pos.ExpectedYield
+	if expectedYield.Currency != "rub" {
+		expectedYield = calc.ConvertLastPriceToRUB(ctx, token, expectedYield)
+	}
 	pos.Dividends = allDividends[pos.Ticker]
-	pos.TotalYield = AddMoneyValue(pos.ExpectedYield, pos.Dividends)
+	if pos.Dividends.Currency != "rub" {
+		pos.Dividends = calc.ConvertLastPriceToRUB(ctx, token, pos.Dividends)
+	}
+	pos.TotalYield = AddMoneyValue(expectedYield, pos.Dividends)
 
 	pos.TotalYieldRelative, err = DivideQuotation(
 		domain.Quotation{Units: pos.TotalYield.Units, Nano: pos.TotalYield.Nano},
