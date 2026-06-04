@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/CatSprite-dev/fireball/internal/middleware"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 	"github.com/CatSprite-dev/fireball/internal/service"
 )
@@ -31,7 +32,7 @@ func (h *PortfolioHandler) HandlerPortfolio(w http.ResponseWriter, r *http.Reque
 		force = false
 	}
 
-	sessionData := SessionFromContext(r.Context())
+	sessionData := middleware.SessionFromContext(r.Context())
 
 	request := service.PortfolioRequest{
 		Token:      sessionData.Token,

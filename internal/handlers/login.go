@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/CatSprite-dev/fireball/internal/api"
+	"github.com/CatSprite-dev/fireball/internal/middleware"
 	"github.com/CatSprite-dev/fireball/internal/pkg"
 	"github.com/CatSprite-dev/fireball/internal/storage"
 )
@@ -64,13 +65,13 @@ func (h *LoginHandler) HandlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setSessionCookie(w, sessionID, h.sessionManager.RedisTTL, false, h.secure)
+	middleware.SetSessionCookie(w, sessionID, h.sessionManager.RedisTTL, false, h.secure)
 	log.Printf("Cookie for %s is set, session: %s\n", accountID, sessionID)
 	pkg.RespondWithJSON(w, http.StatusOK, struct{}{})
 }
 
 func (h *LoginHandler) HandlerLogout(w http.ResponseWriter, r *http.Request) {
-	sessionID, err := getSessionFromCookie(r)
+	sessionID, err := middleware.GetSessionFromCookie(r)
 	if err != nil {
 		pkg.RespondWithError(w, http.StatusBadRequest, "missing session cookie", err)
 		return
@@ -90,7 +91,7 @@ func (h *LoginHandler) HandlerLogout(w http.ResponseWriter, r *http.Request) {
 		pkg.RespondWithError(w, http.StatusInternalServerError, err.Error(), err)
 		return
 	}
-	setSessionCookie(w, sessionID, h.sessionManager.RedisTTL, true, h.secure)
+	middleware.SetSessionCookie(w, sessionID, h.sessionManager.RedisTTL, true, h.secure)
 
 	log.Printf("Cookie for %s is deleted\n", sessionID)
 

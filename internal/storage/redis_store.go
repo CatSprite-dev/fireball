@@ -78,3 +78,7 @@ func (s *Store) DeleteByPattern(ctx context.Context, pattern string) error {
 	}
 	return nil
 }
+
+func (s *Store) Client() *redis.Client {
+	return s.redisClient
+}
