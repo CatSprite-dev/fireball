@@ -201,6 +201,10 @@ func (calc *Calculator) GetDividends(
 		if item.Ticker == "" {
 			continue
 		}
+		payment := domain.MoneyValue(item.Payment)
+		if payment.Currency != "rub" {
+			result[item.Ticker] = calc.ConvertLastPriceToRUB(ctx, token, payment)
+		}
 		result[item.Ticker] = AddMoneyValue(result[item.Ticker], item.Payment)
 
 	}
@@ -230,8 +234,9 @@ func (calc *Calculator) GetTotalReturn(
 	}
 
 	for _, item := range operations.Items {
-		if item.Payment.Currency != "rub" {
-			totalInvested = calc.ConvertLastPriceToRUB(ctx, token, totalInvested)
+		payment := domain.MoneyValue(item.Payment)
+		if payment.Currency != "rub" {
+			totalInvested = calc.ConvertLastPriceToRUB(ctx, token, payment)
 		}
 		totalInvested = AddMoneyValue(totalInvested, domain.MoneyValue(item.Payment))
 	}
