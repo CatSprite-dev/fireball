@@ -202,7 +202,11 @@ func (calc *Calculator) GetDividends(
 		if item.Ticker == "" {
 			continue
 		}
-		result[item.Ticker] = AddMoneyValue(result[item.Ticker], item.Payment)
+		payment, err := calc.ConvertLastPriceToRUB(ctx, token, domain.MoneyValue(item.Payment))
+		if err != nil {
+			return nil, err
+		}
+		result[item.Ticker] = AddMoneyValue(result[item.Ticker], payment)
 
 	}
 	return result, nil
@@ -231,9 +235,9 @@ func (calc *Calculator) GetTotalReturn(
 	}
 
 	for _, item := range operations.Items {
-		payment := domain.MoneyValue(item.Payment)
-		if payment.Currency != "rub" {
-			totalInvested = calc.ConvertLastPriceToRUB(ctx, token, payment)
+		payment, err := calc.ConvertLastPriceToRUB(ctx, token, domain.MoneyValue(item.Payment))
+		if err != nil {
+			return domain.MoneyValue{}, domain.Quotation{}, domain.MoneyValue{}, err
 		}
 		totalInvested = AddMoneyValue(totalInvested, payment)
 	}
@@ -756,22 +760,26 @@ func (calc *Calculator) GetClosePrices(ctx context.Context, token string, instru
 	return convertClosePrices(raw), nil
 }
 
-func (calc *Calculator) ConvertLastPriceToRUB(ctx context.Context, token string, amount domain.MoneyValue) domain.MoneyValue {
-	if amount.Currency == "rub" {
-		return amount
+// ConvertLastPriceToRUB converts amount to rub at the last close price of its currency.
+// An empty currency means a zero value and is returned as is.
+func (calc *Calculator) ConvertLastPriceToRUB(ctx context.Context, token string, amount domain.MoneyValue) (domain.MoneyValue, error) {
+	if amount.Currency == "rub" || amount.Currency == "" {
+		return amount, nil
 	}
 
 	currency := amount.Currency
 	currencyID := strings.ToUpper(currency) + strings.ToUpper("rub") + "_" + string(pkg.ClassCodeEES_CETS)
 	lastPrices, err := calc.GetClosePrices(ctx, token, []string{currencyID}, pkg.InstrumentStatusAll)
-	if err != nil || len(lastPrices) == 0 {
-		log.Printf("ConvertLastPriceToRUB: failed to get rate for %s: %v", currency, err)
-		return amount
+	if err != nil {
+		return domain.MoneyValue{}, fmt.Errorf("failed to get rate for %s: %w", currency, err)
+	}
+	if len(lastPrices) == 0 {
+		return domain.MoneyValue{}, fmt.Errorf("no rate found for %s (%s)", currency, currencyID)
 	}
 
-	rate := domain.MoneyValue{
-		Units: lastPrices[0].ClosePrice.Units,
-		Nano:  lastPrices[0].ClosePrice.Nano,
+	rate := lastPrices[0].ClosePrice
+	if parseDecimal(rate.Units, rate.Nano).IsZero() {
+		return domain.MoneyValue{}, fmt.Errorf("zero rate for %s (%s)", currency, currencyID)
 	}
 
 	result := MultiplyMoneyValue(amount, domain.MoneyValue{
@@ -781,6 +789,5 @@ func (calc *Calculator) ConvertLastPriceToRUB(ctx context.Context, token string,
 	})
 	result.Currency = "rub"
 
-	return result
-
+	return result, nil
 }
