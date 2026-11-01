@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const headerTrackingID = "Grpc-Metadata-X-Tracking-Id"
+
 type Client struct {
 	baseURL    string
 	token      string
@@ -72,7 +74,7 @@ func (c *Client) DoRequest(ctx context.Context, method string, payload any) ([]b
 		"method", method,
 		"status", res.StatusCode,
 		"duration", time.Since(start),
-		"tracking_id", res.Header.Get("x-tracking-id"),
+		"tracking_id", res.Header.Get(headerTrackingID),
 	)
 
 	data, err := io.ReadAll(res.Body)
