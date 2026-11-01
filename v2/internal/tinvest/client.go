@@ -31,18 +31,18 @@ func New(token string, logger *slog.Logger) *Client {
 	}
 }
 
-func (client *Client) DoRequest(ctx context.Context, method string, payload any) ([]byte, error) {
+func (c *Client) DoRequest(ctx context.Context, method string, payload any) ([]byte, error) {
 	waitStart := time.Now()
-	if err := client.limiter.Wait(ctx, method); err != nil {
+	if err := c.limiter.Wait(ctx, method); err != nil {
 		return nil, fmt.Errorf("%s: rate limit: %w", method, err)
 	}
 	if waited := time.Since(waitStart); waited > 100*time.Millisecond {
-		client.logger.Debug("rate limit wait", "method", method, "waited", waited)
+		c.logger.Debug("rate limit wait", "method", method, "waited", waited)
 	}
 
 	select {
-	case client.semaphore <- struct{}{}:
-		defer func() { <-client.semaphore }()
+	case c.semaphore <- struct{}{}:
+		defer func() { <-c.semaphore }()
 	case <-ctx.Done():
 		return nil, fmt.Errorf("%s: wait for slot: %w", method, ctx.Err())
 	}
@@ -52,23 +52,23 @@ func (client *Client) DoRequest(ctx context.Context, method string, payload any)
 		return nil, fmt.Errorf("%s: marshal payload: %w", method, err)
 	}
 
-	url := client.baseURL + "." + method
+	url := c.baseURL + "." + method
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("%s: create request: %w", method, err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Authorization", "Bearer "+client.token)
+	req.Header.Add("Authorization", "Bearer "+c.token)
 
 	start := time.Now()
-	res, err := client.httpClient.Do(req)
+	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%s: send request: %w", method, err)
 	}
 	defer res.Body.Close()
 
-	client.logger.Debug("request",
+	c.logger.Debug("request",
 		"method", method,
 		"status", res.StatusCode,
 		"duration", time.Since(start),
