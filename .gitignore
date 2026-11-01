@@ -34,3 +34,5 @@ go.work.sum
 **/.DS_Store
 *.json
 certs
+
+fireball-v2-plan-2.md
