@@ -7,12 +7,27 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"time"
+
+	"github.com/joho/godotenv"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/CatSprite-dev/fireball/v2/internal/tinvest"
-	"github.com/joho/godotenv"
 )
 
 const baseCurrency = "RUB"
+
+// Типы счетов, которые программа не показывает.
+var excludedAccountTypes = map[string]bool{
+	"ACCOUNT_TYPE_INVEST_BOX": true,
+	"ACCOUNT_TYPE_DFA":        true,
+}
+
+type accountData struct {
+	Account    tinvest.Account
+	Operations []tinvest.Operation
+	Portfolio  *tinvest.Portfolio
+}
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
@@ -30,9 +45,9 @@ func run(logger *slog.Logger) error {
 		}
 	}
 
-	token := os.Getenv("T_INVEST_TOKEN")
+	token := os.Getenv("T_INVEST_TOKEN_ALL")
 	if token == "" {
-		return errors.New("T_INVEST_TOKEN environment variable is not set")
+		return errors.New("T_INVEST_TOKEN_ALL environment variable is not set")
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -45,39 +60,63 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("get accounts: %w", err)
 	}
 
+	accounts = filterAccounts(accounts)
 	if len(accounts) == 0 {
-		return errors.New("no open accounts")
+		return errors.New("no supported accounts")
 	}
 
-	for _, a := range accounts {
-		logger.Info("account", "id", a.ID, "name", a.Name, "type", a.Type, "status", a.Status)
-	}
-
-	ops, err := client.GetOperationsByCursor(ctx, tinvest.OperationsFilter{
-		AccountID: accounts[0].ID,
-	})
+	start := time.Now()
+	data, err := loadAccounts(ctx, client, accounts)
 	if err != nil {
-		return fmt.Errorf("get operations: %w", err)
+		return fmt.Errorf("load accounts: %w", err)
 	}
-	logger.Info("operations loaded", "count", len(ops))
+	logger.Info("all accounts loaded", "accounts", len(data), "duration", time.Since(start))
 
-	portfolio, err := client.GetPortfolio(ctx, accounts[0].ID, baseCurrency)
-	if err != nil {
-		return fmt.Errorf("get portfolio: %w", err)
-	}
-	logger.Info("portfolio loaded",
-		"total", portfolio.TotalAmountPortfolio,
-		"positions", len(portfolio.Positions),
-	)
-
-	for _, p := range portfolio.Positions {
-		logger.Info("position",
-			"ticker", p.Ticker,
-			"type", p.InstrumentType,
-			"quantity", p.Quantity,
-			"price", p.CurrentPrice,
+	for _, d := range data {
+		logger.Info("account",
+			"name", d.Account.Name,
+			"operations", len(d.Operations),
+			"total", d.Portfolio.TotalAmountPortfolio,
 		)
 	}
-
 	return nil
+}
+
+// filterAccounts оставляет только счета, которые программа показывает.
+func filterAccounts(accounts []tinvest.Account) []tinvest.Account {
+	var supported []tinvest.Account
+	for _, acc := range accounts {
+		if excludedAccountTypes[acc.Type] {
+			continue
+		}
+		supported = append(supported, acc)
+	}
+	return supported
+}
+
+// loadAccounts загружает операции и портфель всех счетов параллельно.
+// Если хоть один счёт не загрузился, возвращает ошибку: неполная сводка хуже честной ошибки.
+func loadAccounts(ctx context.Context, client *tinvest.Client, accounts []tinvest.Account) ([]accountData, error) {
+	results := make([]accountData, len(accounts))
+
+	g, gctx := errgroup.WithContext(ctx)
+	for i, acc := range accounts {
+		g.Go(func() error {
+			ops, err := client.GetOperationsByCursor(gctx, tinvest.OperationsFilter{AccountID: acc.ID})
+			if err != nil {
+				return fmt.Errorf("account %s: %w", acc.ID, err)
+			}
+			portfolio, err := client.GetPortfolio(gctx, acc.ID, baseCurrency)
+			if err != nil {
+				return fmt.Errorf("account %s: %w", acc.ID, err)
+			}
+			results[i] = accountData{Account: acc, Operations: ops, Portfolio: portfolio}
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+	return results, nil
 }
