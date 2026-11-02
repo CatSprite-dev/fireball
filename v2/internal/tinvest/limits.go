@@ -10,7 +10,7 @@ const (
 )
 
 const (
-	limitAccounts    = 100 // запросов в минуту
+	limitAccounts    = 50 // запросов в минуту, шлюз REST режет до 50, хотя в документации 100
 	limitOperations  = 200
 	limitInstruments = 200
 	limitMarketData  = 600

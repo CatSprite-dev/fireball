@@ -70,17 +70,18 @@ func (c *Client) DoRequest(ctx context.Context, method string, payload any) ([]b
 	}
 	defer res.Body.Close()
 
-	c.logger.Debug("request",
-		"method", method,
-		"status", res.StatusCode,
-		"duration", time.Since(start),
-		"tracking_id", res.Header.Get(headerTrackingID),
-	)
-
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("%s: read response: %w", method, err)
 	}
+
+	c.logger.Debug("request",
+		"method", method,
+		"status", res.StatusCode,
+		"duration", time.Since(start),
+		"bytes", len(data),
+		"tracking_id", res.Header.Get(headerTrackingID),
+	)
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return nil, newAPIError(res, data)
