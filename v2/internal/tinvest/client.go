@@ -34,6 +34,14 @@ func New(token string, logger *slog.Logger) *Client {
 }
 
 func (c *Client) DoRequest(ctx context.Context, method string, payload any) ([]byte, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("%s: marshal payload: %w", method, err)
+	}
+	return c.doOnce(ctx, method, body)
+}
+
+func (c *Client) doOnce(ctx context.Context, method string, body []byte) ([]byte, error) {
 	waitStart := time.Now()
 	if err := c.limiter.Wait(ctx, method); err != nil {
 		return nil, fmt.Errorf("%s: rate limit: %w", method, err)
@@ -47,11 +55,6 @@ func (c *Client) DoRequest(ctx context.Context, method string, payload any) ([]b
 		defer func() { <-c.semaphore }()
 	case <-ctx.Done():
 		return nil, fmt.Errorf("%s: wait for slot: %w", method, ctx.Err())
-	}
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("%s: marshal payload: %w", method, err)
 	}
 
 	url := c.baseURL + "." + method
