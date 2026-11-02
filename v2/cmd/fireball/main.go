@@ -12,6 +12,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const baseCurrency = "RUB"
+
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
@@ -58,6 +60,24 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("get operations: %w", err)
 	}
 	logger.Info("operations loaded", "count", len(ops))
+
+	portfolio, err := client.GetPortfolio(ctx, accounts[0].ID, baseCurrency)
+	if err != nil {
+		return fmt.Errorf("get portfolio: %w", err)
+	}
+	logger.Info("portfolio loaded",
+		"total", portfolio.TotalAmountPortfolio,
+		"positions", len(portfolio.Positions),
+	)
+
+	for _, p := range portfolio.Positions {
+		logger.Info("position",
+			"ticker", p.Ticker,
+			"type", p.InstrumentType,
+			"quantity", p.Quantity,
+			"price", p.CurrentPrice,
+		)
+	}
 
 	return nil
 }
