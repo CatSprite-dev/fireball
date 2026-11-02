@@ -22,14 +22,14 @@ type getAccountsResponse struct {
 }
 
 func (c *Client) GetAccounts(ctx context.Context) ([]Account, error) {
-	type getAccountsRequest struct {
+	type request struct {
 		Status string `json:"status"`
 	}
 
-	method := "UsersService/GetAccounts"
+	const method = "UsersService/GetAccounts"
 
 	var response getAccountsResponse
-	res, err := c.DoRequest(ctx, method, getAccountsRequest{Status: "ACCOUNT_STATUS_OPEN"})
+	res, err := c.DoRequest(ctx, method, request{Status: "ACCOUNT_STATUS_OPEN"})
 	if err != nil {
 		return nil, err
 	}
