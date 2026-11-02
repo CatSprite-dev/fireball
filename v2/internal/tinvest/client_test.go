@@ -20,6 +20,7 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) *Client {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	c := New("test-token", logger)
 	c.baseURL = server.URL + "/rest/test.v1"
+	c.backoffBase = time.Millisecond
 	return c
 }
 

@@ -24,22 +24,24 @@ const (
 )
 
 type Client struct {
-	baseURL    string
-	token      string
-	httpClient *http.Client
-	limiter    *Limiter
-	logger     *slog.Logger
-	semaphore  chan struct{}
+	baseURL     string
+	token       string
+	httpClient  *http.Client
+	limiter     *Limiter
+	logger      *slog.Logger
+	semaphore   chan struct{}
+	backoffBase time.Duration
 }
 
 func New(token string, logger *slog.Logger) *Client {
 	return &Client{
-		baseURL:    "https://invest-public-api.tbank.ru/rest/tinkoff.public.invest.api.contract.v1",
-		token:      token,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
-		limiter:    NewLimiter(),
-		logger:     logger.With("component", "tinvest"),
-		semaphore:  make(chan struct{}, 10), // не больше 10 запросов одновременно
+		baseURL:     "https://invest-public-api.tbank.ru/rest/tinkoff.public.invest.api.contract.v1",
+		token:       token,
+		httpClient:  &http.Client{Timeout: 30 * time.Second},
+		limiter:     NewLimiter(),
+		logger:      logger.With("component", "tinvest"),
+		semaphore:   make(chan struct{}, 10), // не больше 10 запросов одновременно
+		backoffBase: baseBackoff,
 	}
 }
 
@@ -60,7 +62,7 @@ func (c *Client) DoRequest(ctx context.Context, method string, payload any) ([]b
 
 		wait := retryAfter
 		if wait == 0 {
-			wait = backoff(attempt)
+			wait = backoff(c.backoffBase, attempt)
 		}
 		c.logger.Warn("request failed, retrying",
 			"method", method, "attempt", attempt, "wait", wait, "error", err)
@@ -141,8 +143,8 @@ func (c *Client) retryable(ctx context.Context, err error) bool {
 	return true
 }
 
-func backoff(attempt int) time.Duration {
-	d := baseBackoff << (attempt - 1)
+func backoff(base time.Duration, attempt int) time.Duration {
+	d := base << (attempt - 1)
 	if d > maxBackoff {
 		d = maxBackoff
 	}
