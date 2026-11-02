@@ -4,14 +4,21 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"time"
 )
 
-const headerTrackingID = "Grpc-Metadata-X-Tracking-Id"
+const (
+	headerTrackingID = "Grpc-Metadata-X-Tracking-Id"
+	maxAttempts      = 5
+	baseBackoff      = 500 * time.Millisecond
+	maxBackoff       = 10 * time.Second
+)
 
 type Client struct {
 	baseURL    string
@@ -36,9 +43,26 @@ func New(token string, logger *slog.Logger) *Client {
 func (c *Client) DoRequest(ctx context.Context, method string, payload any) ([]byte, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("%s: marshal payload: %w", method, err)
+		return nil, fmt.Errorf("%s: marshal request: %w", method, err)
 	}
-	return c.doOnce(ctx, method, body)
+
+	for attempt := 1; ; attempt++ {
+		data, err := c.doOnce(ctx, method, body)
+		if err == nil {
+			return data, nil
+		}
+		if attempt >= maxAttempts || !c.retryable(ctx, err) {
+			return nil, err
+		}
+
+		wait := backoff(attempt)
+		c.logger.Warn("request failed, retrying",
+			"method", method, "attempt", attempt, "wait", wait, "error", err)
+
+		if err := sleep(ctx, wait); err != nil {
+			return nil, fmt.Errorf("%s: wait before retry: %w", method, err)
+		}
+	}
 }
 
 func (c *Client) doOnce(ctx context.Context, method string, body []byte) ([]byte, error) {
@@ -91,4 +115,37 @@ func (c *Client) doOnce(ctx context.Context, method string, body []byte) ([]byte
 	}
 
 	return data, nil
+}
+
+func (c *Client) retryable(ctx context.Context, err error) bool {
+	if ctx.Err() != nil {
+		return false
+	}
+	if errors.Is(err, ErrUnknownMethod) {
+		return false
+	}
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.StatusCode == http.StatusTooManyRequests || apiErr.StatusCode >= 500
+	}
+	return true
+}
+
+func backoff(attempt int) time.Duration {
+	d := baseBackoff << (attempt - 1)
+	if d > maxBackoff {
+		d = maxBackoff
+	}
+	return rand.N(d)
+}
+
+func sleep(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
