@@ -10,14 +10,17 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 )
 
 const (
-	headerTrackingID = "Grpc-Metadata-X-Tracking-Id"
-	maxAttempts      = 5
-	baseBackoff      = 500 * time.Millisecond
-	maxBackoff       = 10 * time.Second
+	headerTrackingID     = "Grpc-Metadata-X-Tracking-Id"
+	headerRateLimitReset = "X-Ratelimit-Reset"
+	maxAttempts          = 5
+	baseBackoff          = 500 * time.Millisecond
+	maxBackoff           = 10 * time.Second
 )
 
 type Client struct {
@@ -47,7 +50,7 @@ func (c *Client) DoRequest(ctx context.Context, method string, payload any) ([]b
 	}
 
 	for attempt := 1; ; attempt++ {
-		data, err := c.doOnce(ctx, method, body)
+		data, retryAfter, err := c.doOnce(ctx, method, body)
 		if err == nil {
 			return data, nil
 		}
@@ -55,7 +58,10 @@ func (c *Client) DoRequest(ctx context.Context, method string, payload any) ([]b
 			return nil, err
 		}
 
-		wait := backoff(attempt)
+		wait := retryAfter
+		if wait == 0 {
+			wait = backoff(attempt)
+		}
 		c.logger.Warn("request failed, retrying",
 			"method", method, "attempt", attempt, "wait", wait, "error", err)
 
@@ -65,10 +71,10 @@ func (c *Client) DoRequest(ctx context.Context, method string, payload any) ([]b
 	}
 }
 
-func (c *Client) doOnce(ctx context.Context, method string, body []byte) ([]byte, error) {
+func (c *Client) doOnce(ctx context.Context, method string, body []byte) ([]byte, time.Duration, error) {
 	waitStart := time.Now()
 	if err := c.limiter.Wait(ctx, method); err != nil {
-		return nil, fmt.Errorf("%s: rate limit: %w", method, err)
+		return nil, 0, fmt.Errorf("%s: rate limit: %w", method, err)
 	}
 	if waited := time.Since(waitStart); waited > 100*time.Millisecond {
 		c.logger.Debug("rate limit wait", "method", method, "waited", waited)
@@ -78,13 +84,13 @@ func (c *Client) doOnce(ctx context.Context, method string, body []byte) ([]byte
 	case c.semaphore <- struct{}{}:
 		defer func() { <-c.semaphore }()
 	case <-ctx.Done():
-		return nil, fmt.Errorf("%s: wait for slot: %w", method, ctx.Err())
+		return nil, 0, fmt.Errorf("%s: wait for slot: %w", method, ctx.Err())
 	}
 
 	url := c.baseURL + "." + method
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("%s: create request: %w", method, err)
+		return nil, 0, fmt.Errorf("%s: create request: %w", method, err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
@@ -93,13 +99,13 @@ func (c *Client) doOnce(ctx context.Context, method string, body []byte) ([]byte
 	start := time.Now()
 	res, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("%s: send request: %w", method, err)
+		return nil, 0, fmt.Errorf("%s: send request: %w", method, err)
 	}
 	defer res.Body.Close()
 
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("%s: read response: %w", method, err)
+		return nil, 0, fmt.Errorf("%s: read response: %w", method, err)
 	}
 
 	c.logger.Debug("request",
@@ -111,10 +117,14 @@ func (c *Client) doOnce(ctx context.Context, method string, body []byte) ([]byte
 	)
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, newAPIError(res, data)
+		var retryAfter time.Duration
+		if res.StatusCode == http.StatusTooManyRequests {
+			retryAfter = parseResetSeconds(res.Header.Get(headerRateLimitReset))
+		}
+		return nil, retryAfter, newAPIError(res, data)
 	}
 
-	return data, nil
+	return data, 0, nil
 }
 
 func (c *Client) retryable(ctx context.Context, err error) bool {
@@ -148,4 +158,12 @@ func sleep(ctx context.Context, d time.Duration) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func parseResetSeconds(s string) time.Duration {
+	n, err := strconv.Atoi(strings.TrimSpace(s))
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return time.Duration(n) * time.Second
 }
