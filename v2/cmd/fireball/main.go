@@ -43,8 +43,21 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("get accounts: %w", err)
 	}
 
+	if len(accounts) == 0 {
+		return errors.New("no open accounts")
+	}
+
 	for _, a := range accounts {
 		logger.Info("account", "id", a.ID, "name", a.Name, "type", a.Type, "status", a.Status)
 	}
+
+	ops, err := client.GetOperationsByCursor(ctx, tinvest.OperationsFilter{
+		AccountID: accounts[0].ID,
+	})
+	if err != nil {
+		return fmt.Errorf("get operations: %w", err)
+	}
+	logger.Info("operations loaded", "count", len(ops))
+
 	return nil
 }
