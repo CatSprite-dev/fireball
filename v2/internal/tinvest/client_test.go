@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func newTestClient(t *testing.T, handler http.HandlerFunc) *Client {
@@ -76,5 +77,30 @@ func TestNoRetryOn401(t *testing.T) {
 	}
 	if got := calls.Load(); got != 1 {
 		t.Fatalf("server got %d calls, want 1", got)
+	}
+}
+
+func TestRetryOn429UsesResetHeader(t *testing.T) {
+	var calls atomic.Int32
+
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if calls.Add(1) == 1 {
+			w.Header().Set("X-Ratelimit-Reset", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.Write([]byte(`{"accounts":[]}`))
+	})
+
+	start := time.Now()
+	if _, err := c.GetAccounts(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("server got %d calls, want 2", got)
+	}
+	if waited := time.Since(start); waited < time.Second {
+		t.Fatalf("waited %v, want at least 1s from X-Ratelimit-Reset", waited)
 	}
 }
