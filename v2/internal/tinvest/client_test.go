@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -89,5 +90,48 @@ func TestRetryOn429UsesResetHeader(t *testing.T) {
 	}
 	if waited := time.Since(start); waited < time.Second {
 		t.Fatalf("waited %v, want at least 1s from X-Ratelimit-Reset", waited)
+	}
+}
+
+func TestAPIErrorNonJSONBody(t *testing.T) {
+	var calls atomic.Int32
+
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusBadGateway)
+		w.Write([]byte("<html><body>502 Bad Gateway</body></html>"))
+	})
+
+	_, err := c.GetAccounts(context.Background())
+
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("want *APIError, got %v", err)
+	}
+	if apiErr.StatusCode != http.StatusBadGateway || !strings.Contains(apiErr.Message, "Bad Gateway") {
+		t.Fatalf("got %+v", apiErr)
+	}
+	if got := calls.Load(); got != maxAttempts {
+		t.Fatalf("server got %d calls, want %d", got, maxAttempts)
+	}
+}
+
+func TestRetryOnConnectionDrop(t *testing.T) {
+	var calls atomic.Int32
+
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if calls.Add(1) == 1 {
+			conn, _, _ := w.(http.Hijacker).Hijack()
+			conn.Close()
+			return
+		}
+		w.Write([]byte(`{"accounts":[]}`))
+	})
+
+	if _, err := c.GetAccounts(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("server got %d calls, want 2", got)
 	}
 }
