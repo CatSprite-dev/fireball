@@ -17,7 +17,6 @@ import (
 
 const baseCurrency = "RUB"
 
-// Типы счетов, которые программа не показывает.
 var excludedAccountTypes = map[string]bool{
 	"ACCOUNT_TYPE_INVEST_BOX": true,
 	"ACCOUNT_TYPE_DFA":        true,
@@ -79,10 +78,10 @@ func run(logger *slog.Logger) error {
 			"total", d.Portfolio.TotalAmountPortfolio,
 		)
 	}
+
 	return nil
 }
 
-// filterAccounts оставляет только счета, которые программа показывает.
 func filterAccounts(accounts []tinvest.Account) []tinvest.Account {
 	var supported []tinvest.Account
 	for _, acc := range accounts {
@@ -94,8 +93,6 @@ func filterAccounts(accounts []tinvest.Account) []tinvest.Account {
 	return supported
 }
 
-// loadAccounts загружает операции и портфель всех счетов параллельно.
-// Если хоть один счёт не загрузился, возвращает ошибку: неполная сводка хуже честной ошибки.
 func loadAccounts(ctx context.Context, client *tinvest.Client, accounts []tinvest.Account) ([]accountData, error) {
 	results := make([]accountData, len(accounts))
 
