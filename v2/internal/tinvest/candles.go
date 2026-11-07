@@ -32,7 +32,7 @@ const (
 	CandleIntervalMonth CandleInterval = "CANDLE_INTERVAL_MONTH"
 )
 
-func (c *Client) GetCandles(ctx context.Context, instrumentUID string, from, to time.Time, interval CandleInterval) (*Candles, error) {
+func (c *Client) getCandlesOnce(ctx context.Context, instrumentUID string, from, to time.Time, interval CandleInterval) (*Candles, error) {
 	type request struct {
 		InstrumentID     string         `json:"instrumentId"`
 		From             time.Time      `json:"from"`
@@ -60,4 +60,33 @@ func (c *Client) GetCandles(ctx context.Context, instrumentUID string, from, to 
 	}
 
 	return &candles, nil
+}
+
+func (c *Client) GetCandles(ctx context.Context, instrumentUID string, from, to time.Time, interval CandleInterval) (*Candles, error) {
+	result := &Candles{}
+	var last time.Time
+
+	for start := from; start.Before(to); start = start.AddDate(1, 0, 0) {
+		end := start.AddDate(1, 0, 0)
+		if end.After(to) {
+			end = to
+		}
+
+		chunk, err := c.getCandlesOnce(ctx, instrumentUID, start, end, interval)
+		if err != nil {
+			return nil, err
+		}
+
+		if chunk.PriceCurrency != "" {
+			result.PriceCurrency = chunk.PriceCurrency
+		}
+		for _, candle := range chunk.Candles {
+			if !candle.Time.After(last) {
+				continue
+			}
+			result.Candles = append(result.Candles, candle)
+			last = candle.Time
+		}
+	}
+	return result, nil
 }

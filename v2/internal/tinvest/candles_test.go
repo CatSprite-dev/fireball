@@ -23,7 +23,7 @@ func TestGetCandlesRequest(t *testing.T) {
 		if req.InstrumentID != "uid-1" || req.Interval != "CANDLE_INTERVAL_DAY" {
 			t.Errorf("got %+v", req)
 		}
-		w.Write([]byte(`{"priceCurrency":"rub","candles":[{"close":{"units":"100","nano":0}}]}`))
+		w.Write([]byte(`{"priceCurrency":"rub","candles":[{"time":"2026-11-01T00:00:00Z","close":{"units":"100","nano":0}}]}`))
 	})
 
 	to := time.Now()
