@@ -12,6 +12,8 @@ import (
 	"github.com/joho/godotenv"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/CatSprite-dev/fireball/v2/internal/convert"
+	"github.com/CatSprite-dev/fireball/v2/internal/ledger"
 	"github.com/CatSprite-dev/fireball/v2/internal/tinvest"
 )
 
@@ -29,7 +31,7 @@ type accountData struct {
 }
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	if err := run(logger); err != nil {
 		logger.Error("fatal", "error", err)
@@ -71,15 +73,61 @@ func run(logger *slog.Logger) error {
 	}
 	logger.Info("all accounts loaded", "accounts", len(data), "duration", time.Since(start))
 
+	checkConversion(logger, data)
+	return nil
+}
+
+// checkConversion — временная проверка: прогоняет все операции через конвертер
+// и показывает, что получилось. Ошибки не останавливают проверку.
+func checkConversion(logger *slog.Logger, data []accountData) {
+	kinds := make(map[ledger.Kind]int)
+	unknownTypes := make(map[string]int)
+	skippedBy := make(map[string]int)
+	var total, converted, skipped, failed int
+
 	for _, d := range data {
-		logger.Info("account",
-			"name", d.Account.Name,
-			"operations", len(d.Operations),
-			"total", d.Portfolio.TotalAmountPortfolio,
-		)
+		for _, op := range d.Operations {
+			total++
+
+			_, err := convert.ToEvent(d.Account.ID, op)
+			switch {
+			case err == nil:
+				converted++
+				event, _ := convert.ToEvent(d.Account.ID, op)
+				kinds[event.Kind]++
+			case errors.Is(err, convert.ErrSkipped):
+				skipped++
+				skippedBy[op.State+" "+op.Type]++
+			case errors.Is(err, convert.ErrUnknownOperationType):
+				failed++
+				unknownTypes[op.Type]++
+			default:
+				failed++
+				logger.Warn("conversion failed",
+					"account", d.Account.Name,
+					"type", op.Type,
+					"name", op.Name,
+					"error", err,
+				)
+			}
+		}
 	}
 
-	return nil
+	logger.Info("conversion summary",
+		"total", total,
+		"converted", converted,
+		"skipped", skipped,
+		"failed", failed,
+	)
+	for kind, n := range kinds {
+		logger.Info("kind", "kind", kind, "count", n)
+	}
+	for opType, n := range unknownTypes {
+		logger.Warn("unknown operation type", "type", opType, "count", n)
+	}
+	for key, n := range skippedBy {
+		logger.Info("skipped", "state_type", key, "count", n)
+	}
 }
 
 func filterAccounts(accounts []tinvest.Account) []tinvest.Account {
