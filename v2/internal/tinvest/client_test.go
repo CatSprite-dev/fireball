@@ -36,7 +36,7 @@ func TestRetryOn503(t *testing.T) {
 		w.Write([]byte(`{"accounts":[]}`))
 	})
 
-	_, err := c.GetAccounts(context.Background())
+	_, err := c.GetAccounts(context.Background(), AccountStatusAll)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestNoRetryOn401(t *testing.T) {
 		w.Write([]byte(`{"code":16,"message":"Authentication token is missing or invalid","description":"40003"}`))
 	})
 
-	_, err := c.GetAccounts(context.Background())
+	_, err := c.GetAccounts(context.Background(), AccountStatusAll)
 
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) {
@@ -81,7 +81,7 @@ func TestRetryOn429UsesResetHeader(t *testing.T) {
 	})
 
 	start := time.Now()
-	if _, err := c.GetAccounts(context.Background()); err != nil {
+	if _, err := c.GetAccounts(context.Background(), AccountStatusAll); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -102,7 +102,7 @@ func TestAPIErrorNonJSONBody(t *testing.T) {
 		w.Write([]byte("<html><body>502 Bad Gateway</body></html>"))
 	})
 
-	_, err := c.GetAccounts(context.Background())
+	_, err := c.GetAccounts(context.Background(), AccountStatusAll)
 
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) {
@@ -128,7 +128,7 @@ func TestRetryOnConnectionDrop(t *testing.T) {
 		w.Write([]byte(`{"accounts":[]}`))
 	})
 
-	if _, err := c.GetAccounts(context.Background()); err != nil {
+	if _, err := c.GetAccounts(context.Background(), AccountStatusAll); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got := calls.Load(); got != 2 {
