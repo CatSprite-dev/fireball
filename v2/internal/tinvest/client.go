@@ -123,7 +123,7 @@ func (c *Client) doOnce(ctx context.Context, method string, body []byte) ([]byte
 		if res.StatusCode == http.StatusTooManyRequests {
 			retryAfter = parseResetSeconds(res.Header.Get(headerRateLimitReset))
 		}
-		return nil, retryAfter, newAPIError(res, data)
+		return nil, retryAfter, fmt.Errorf("%s: %w", method, newAPIError(res, data))
 	}
 
 	return data, 0, nil
