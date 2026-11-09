@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/shopspring/decimal"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/CatSprite-dev/fireball/v2/internal/convert"
@@ -56,7 +57,7 @@ func run(logger *slog.Logger) error {
 
 	client := tinvest.New(token, logger)
 
-	accounts, err := client.GetAccounts(ctx)
+	accounts, err := client.GetAccounts(ctx, tinvest.AccountStatusAll)
 	if err != nil {
 		return fmt.Errorf("get accounts: %w", err)
 	}
@@ -73,61 +74,53 @@ func run(logger *slog.Logger) error {
 	}
 	logger.Info("all accounts loaded", "accounts", len(data), "duration", time.Since(start))
 
-	checkConversion(logger, data)
+	if err := checkTransfers(logger, data); err != nil {
+		return err
+	}
 	return nil
 }
 
-// checkConversion — временная проверка: прогоняет все операции через конвертер
-// и показывает, что получилось. Ошибки не останавливают проверку.
-func checkConversion(logger *slog.Logger, data []accountData) {
-	kinds := make(map[ledger.Kind]int)
-	unknownTypes := make(map[string]int)
-	skippedBy := make(map[string]int)
-	var total, converted, skipped, failed int
-
+// checkTransfers — временная проверка: переводы между выбранными счетами
+// должны взаимно гаситься. Показывает переводы, у которых нет второй половины.
+func checkTransfers(logger *slog.Logger, data []accountData) error {
+	var all []ledger.Event
+	var accountIDs []string
 	for _, d := range data {
-		for _, op := range d.Operations {
-			total++
+		events, err := convert.ToEvents(d.Account.ID, d.Operations)
+		if err != nil {
+			return fmt.Errorf("account %s: %w", d.Account.Name, err)
+		}
+		all = append(all, events...)
+		accountIDs = append(accountIDs, d.Account.ID)
+	}
 
-			_, err := convert.ToEvent(d.Account.ID, op)
-			switch {
-			case err == nil:
-				converted++
-				event, _ := convert.ToEvent(d.Account.ID, op)
-				kinds[event.Kind]++
-			case errors.Is(err, convert.ErrSkipped):
-				skipped++
-				skippedBy[op.State+" "+op.Type]++
-			case errors.Is(err, convert.ErrUnknownOperationType):
-				failed++
-				unknownTypes[op.Type]++
-			default:
-				failed++
-				logger.Warn("conversion failed",
-					"account", d.Account.Name,
-					"type", op.Type,
-					"name", op.Name,
-					"error", err,
-				)
-			}
+	selected := ledger.Filter(all, accountIDs)
+	ledger.SortByDate(selected)
+
+	total := decimal.Zero
+	halves := make(map[string][]ledger.Event)
+	for _, e := range selected {
+		if e.Kind != ledger.KindTransferIn && e.Kind != ledger.KindTransferOut {
+			continue
+		}
+		total = total.Add(e.Amount.Amount)
+		halves[e.OperationID] = append(halves[e.OperationID], e)
+	}
+
+	logger.Info("transfers", "events", len(selected), "transfers_sum", total)
+
+	for id, h := range halves {
+		if len(h) == 1 {
+			logger.Info("unpaired transfer",
+				"id", id,
+				"account", h[0].AccountID,
+				"date", h[0].Date,
+				"kind", h[0].Kind,
+				"amount", h[0].Amount.Amount,
+			)
 		}
 	}
-
-	logger.Info("conversion summary",
-		"total", total,
-		"converted", converted,
-		"skipped", skipped,
-		"failed", failed,
-	)
-	for kind, n := range kinds {
-		logger.Info("kind", "kind", kind, "count", n)
-	}
-	for opType, n := range unknownTypes {
-		logger.Warn("unknown operation type", "type", opType, "count", n)
-	}
-	for key, n := range skippedBy {
-		logger.Info("skipped", "state_type", key, "count", n)
-	}
+	return nil
 }
 
 func filterAccounts(accounts []tinvest.Account) []tinvest.Account {
@@ -151,9 +144,12 @@ func loadAccounts(ctx context.Context, client *tinvest.Client, accounts []tinves
 			if err != nil {
 				return fmt.Errorf("account %s: %w", acc.ID, err)
 			}
-			portfolio, err := client.GetPortfolio(gctx, acc.ID, baseCurrency)
-			if err != nil {
-				return fmt.Errorf("account %s: %w", acc.ID, err)
+			var portfolio *tinvest.Portfolio
+			if acc.Status != "ACCOUNT_STATUS_CLOSED" {
+				portfolio, err = client.GetPortfolio(gctx, acc.ID, baseCurrency)
+				if err != nil {
+					return fmt.Errorf("account %s: %w", acc.ID, err)
+				}
 			}
 			results[i] = accountData{Account: acc, Operations: ops, Portfolio: portfolio}
 			return nil
