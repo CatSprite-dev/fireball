@@ -61,3 +61,18 @@ func ToEvent(accountID string, op tinvest.Operation) (ledger.Event, error) {
 
 	return event, nil
 }
+
+func ToEvents(accountID string, ops []tinvest.Operation) ([]ledger.Event, error) {
+	events := make([]ledger.Event, 0, len(ops))
+	for _, op := range ops {
+		event, err := ToEvent(accountID, op)
+		if errors.Is(err, ErrSkipped) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+	return events, nil
+}

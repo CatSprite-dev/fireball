@@ -139,3 +139,34 @@ func TestToEventEmptyPayment(t *testing.T) {
 		t.Fatalf("want ErrNoValue for empty payment, got %v", err)
 	}
 }
+
+func TestToEvents(t *testing.T) {
+	ops := []tinvest.Operation{
+		{State: stateExecuted, Type: "OPERATION_TYPE_INPUT", ID: "1", Payment: rubValue("1000")},
+		{State: "OPERATION_STATE_CANCELED", Type: "OPERATION_TYPE_BUY", ID: "2", Payment: rubValue("-500")},
+		{State: stateExecuted, Type: "OPERATION_TYPE_COUPON", ID: "3", Payment: rubValue("50")},
+	}
+
+	events, err := ToEvents("acc", ops)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(events) != 2 || events[0].OperationID != "1" || events[1].OperationID != "3" {
+		t.Fatalf("got %+v, want events 1 and 3", events)
+	}
+}
+
+func TestToEventsStopsOnError(t *testing.T) {
+	ops := []tinvest.Operation{
+		{State: stateExecuted, Type: "OPERATION_TYPE_INPUT", ID: "1", Payment: rubValue("1000")},
+		{State: stateExecuted, Type: "OPERATION_TYPE_SOMETHING_NEW", ID: "2", Payment: rubValue("1")},
+	}
+
+	events, err := ToEvents("acc", ops)
+	if !errors.Is(err, ErrUnknownOperationType) {
+		t.Fatalf("want ErrUnknownOperationType, got %v", err)
+	}
+	if events != nil {
+		t.Fatalf("want nil events on error, got %d", len(events))
+	}
+}
