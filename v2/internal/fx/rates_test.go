@@ -86,3 +86,15 @@ func TestNewDoesNotModifyInput(t *testing.T) {
 		t.Errorf("input was reordered: first date %s", input[0].Date.Format(time.DateOnly))
 	}
 }
+func TestRateUsesMoscowDay(t *testing.T) {
+	// 3 января 01:30 по Москве = 2 января 22:30 UTC
+	event := time.Date(2024, 1, 2, 22, 30, 0, 0, time.UTC)
+
+	got, err := usdRates().Rate("USD", event)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !got.Equal(decimal.RequireFromString("92")) {
+		t.Errorf("got %s, want 92 (rate of Jan 3)", got)
+	}
+}

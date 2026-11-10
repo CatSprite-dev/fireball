@@ -16,6 +16,13 @@ var (
 
 const baseCurrency = "RUB"
 
+var moscow = time.FixedZone("MSK", 3*60*60)
+
+func tradingDay(t time.Time) time.Time {
+	y, m, d := t.In(moscow).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
 type Point struct {
 	Date time.Time
 	Rate decimal.Decimal
@@ -36,6 +43,7 @@ func New(points map[string][]Point) *Rates {
 }
 
 func (r *Rates) Rate(currency string, date time.Time) (decimal.Decimal, error) {
+	day := tradingDay(date)
 	if currency == baseCurrency {
 		return decimal.NewFromInt(1), nil
 	}
@@ -47,7 +55,7 @@ func (r *Rates) Rate(currency string, date time.Time) (decimal.Decimal, error) {
 
 	var found *Point
 	for i := range list {
-		if list[i].Date.After(date) {
+		if list[i].Date.After(day) {
 			break
 		}
 		found = &list[i]
