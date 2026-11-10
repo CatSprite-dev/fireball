@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CatSprite-dev/fireball/v2/internal/money"
 	"github.com/shopspring/decimal"
 )
 
@@ -96,5 +97,17 @@ func TestRateUsesMoscowDay(t *testing.T) {
 	}
 	if !got.Equal(decimal.RequireFromString("92")) {
 		t.Errorf("got %s, want 92 (rate of Jan 3)", got)
+	}
+}
+
+func TestToRUB(t *testing.T) {
+	m := money.Money{Amount: decimal.RequireFromString("-9.2"), Currency: "USD"}
+
+	got, err := usdRates().ToRUB(m, date("2024-01-03"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Currency != "RUB" || !got.Amount.Equal(decimal.RequireFromString("-846.4")) {
+		t.Errorf("got %s %s, want -846.4 RUB", got.Amount, got.Currency)
 	}
 }

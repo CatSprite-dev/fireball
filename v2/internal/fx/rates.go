@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/CatSprite-dev/fireball/v2/internal/money"
 	"github.com/shopspring/decimal"
 )
 
@@ -65,4 +66,12 @@ func (r *Rates) Rate(currency string, date time.Time) (decimal.Decimal, error) {
 		return decimal.Zero, fmt.Errorf("%w: %s on %s", ErrNoRate, currency, date.Format(time.DateOnly))
 	}
 	return found.Rate, nil
+}
+
+func (r *Rates) ToRUB(m money.Money, date time.Time) (money.Money, error) {
+	rate, err := r.Rate(m.Currency, date)
+	if err != nil {
+		return money.Money{}, err
+	}
+	return money.Money{Amount: m.Amount.Mul(rate), Currency: baseCurrency}, nil
 }

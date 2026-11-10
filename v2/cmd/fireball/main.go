@@ -141,20 +141,18 @@ func checkRates(ctx context.Context, logger *slog.Logger, client *tinvest.Client
 		return fmt.Errorf("load rates: %w", err)
 	}
 
+	if err := ledger.ApplyRUB(events, rates); err != nil {
+		return err
+	}
 	for _, e := range events {
 		if e.Amount.Currency == baseCurrency {
 			continue
-		}
-		rate, err := rates.Rate(e.Amount.Currency, e.Date)
-		if err != nil {
-			return err
 		}
 		logger.Info("in rubles",
 			"date", e.Date.Format(time.DateOnly),
 			"amount", e.Amount.Amount,
 			"currency", e.Amount.Currency,
-			"rate", rate,
-			"rub", e.Amount.Amount.Mul(rate).Round(2),
+			"rub", e.AmountRUB.Amount.Round(2),
 		)
 	}
 	return nil
