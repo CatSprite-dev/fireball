@@ -1,0 +1,88 @@
+package fx
+
+import (
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/shopspring/decimal"
+)
+
+func date(s string) time.Time {
+	t, err := time.Parse(time.DateOnly, s)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
+func usdRates() *Rates {
+	return New(map[string][]Point{
+		"USD": {
+			{Date: date("2024-01-03"), Rate: decimal.RequireFromString("92")},
+			{Date: date("2023-12-29"), Rate: decimal.RequireFromString("90.36")},
+		},
+	})
+}
+
+func TestRate(t *testing.T) {
+	tests := []struct {
+		name     string
+		currency string
+		date     string
+		want     string
+	}{
+		{"rub is always one", "RUB", "2020-01-01", "1"},
+		{"exact date", "USD", "2024-01-03", "92"},
+		{"holiday takes previous", "USD", "2024-01-01", "90.36"},
+		{"after last takes last", "USD", "2024-06-01", "92"},
+	}
+
+	rates := usdRates()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := rates.Rate(tt.currency, date(tt.date))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !got.Equal(decimal.RequireFromString(tt.want)) {
+				t.Errorf("got %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRateErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		currency string
+		date     string
+		want     error
+	}{
+		{"before first point", "USD", "2023-12-28", ErrNoRate},
+		{"unknown currency", "CNY", "2024-01-03", ErrUnknownCurrency},
+	}
+
+	rates := usdRates()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := rates.Rate(tt.currency, date(tt.date))
+			if !errors.Is(err, tt.want) {
+				t.Errorf("got error %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewDoesNotModifyInput(t *testing.T) {
+	input := []Point{
+		{Date: date("2024-01-03"), Rate: decimal.RequireFromString("92")},
+		{Date: date("2023-12-29"), Rate: decimal.RequireFromString("90.36")},
+	}
+
+	New(map[string][]Point{"USD": input})
+
+	if !input[0].Date.Equal(date("2024-01-03")) {
+		t.Errorf("input was reordered: first date %s", input[0].Date.Format(time.DateOnly))
+	}
+}
