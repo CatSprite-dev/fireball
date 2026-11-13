@@ -15,8 +15,6 @@ var (
 	ErrNoRate          = errors.New("fx: no rate for date")
 )
 
-const baseCurrency = "RUB"
-
 var moscow = time.FixedZone("MSK", 3*60*60)
 
 func tradingDay(t time.Time) time.Time {
@@ -30,22 +28,22 @@ type Point struct {
 }
 
 type Rates struct {
+	base   string
 	points map[string][]Point
 }
 
-func New(points map[string][]Point) *Rates {
+func New(base string, points map[string][]Point) *Rates {
 	sorted := make(map[string][]Point, len(points))
 	for currency, list := range points {
 		list = slices.Clone(list)
 		slices.SortFunc(list, func(a, b Point) int { return a.Date.Compare(b.Date) })
 		sorted[currency] = list
 	}
-	return &Rates{points: sorted}
+	return &Rates{base: base, points: sorted}
 }
 
 func (r *Rates) Rate(currency string, date time.Time) (decimal.Decimal, error) {
-	day := tradingDay(date)
-	if currency == baseCurrency {
+	if currency == r.base {
 		return decimal.NewFromInt(1), nil
 	}
 
@@ -54,6 +52,7 @@ func (r *Rates) Rate(currency string, date time.Time) (decimal.Decimal, error) {
 		return decimal.Zero, fmt.Errorf("%w: %s", ErrUnknownCurrency, currency)
 	}
 
+	day := tradingDay(date)
 	var found *Point
 	for i := range list {
 		if list[i].Date.After(day) {
@@ -73,5 +72,5 @@ func (r *Rates) ToBase(m money.Money, date time.Time) (money.Money, error) {
 	if err != nil {
 		return money.Money{}, err
 	}
-	return money.Money{Amount: m.Amount.Mul(rate), Currency: baseCurrency}, nil
+	return money.Money{Amount: m.Amount.Mul(rate), Currency: r.base}, nil
 }

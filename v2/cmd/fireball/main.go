@@ -198,7 +198,7 @@ func loadRates(ctx context.Context, client *tinvest.Client, currencies []tinvest
 		}
 	}
 	if len(needed) == 0 {
-		return fx.New(nil), nil
+		return fx.New(baseCurrency, nil), nil
 	}
 
 	instruments, err := convert.ExchangeCurrencies(currencies)
@@ -228,7 +228,7 @@ func loadRates(ctx context.Context, client *tinvest.Client, currencies []tinvest
 		points[currency] = currencyPoints
 	}
 
-	return fx.New(points), nil
+	return fx.New(baseCurrency, points), nil
 }
 
 // checkTotal — временная проверка: общая прибыль «сверху» и «снизу».
