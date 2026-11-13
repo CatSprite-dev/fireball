@@ -19,10 +19,10 @@ func day(d int) time.Time {
 // Два счёта и перевод между ними — как на живых данных: один id, одно время, суммы с разным знаком.
 func testEvents() []Event {
 	return []Event{
-		{AccountID: "broker", OperationID: "1", Date: day(1), Kind: KindDeposit, Amount: rub("10000")},
-		{AccountID: "robot", OperationID: "2", Date: day(2), Kind: KindDeposit, Amount: rub("5000")},
-		{AccountID: "broker", OperationID: "t1", Date: day(6), Kind: KindTransferOut, Amount: rub("-2096")},
-		{AccountID: "robot", OperationID: "t1", Date: day(6), Kind: KindTransferIn, Amount: rub("2096")},
+		{AccountID: "broker", OperationID: "1", Date: day(1), OperationKind: KindDeposit, Amount: rub("10000")},
+		{AccountID: "robot", OperationID: "2", Date: day(2), OperationKind: KindDeposit, Amount: rub("5000")},
+		{AccountID: "broker", OperationID: "t1", Date: day(6), OperationKind: KindTransferOut, Amount: rub("-2096")},
+		{AccountID: "robot", OperationID: "t1", Date: day(6), OperationKind: KindTransferIn, Amount: rub("2096")},
 	}
 }
 
@@ -64,7 +64,7 @@ func TestTransfersNetOut(t *testing.T) {
 	sumTransfers := func(events []Event) decimal.Decimal {
 		total := decimal.Zero
 		for _, e := range events {
-			if e.Kind == KindTransferIn || e.Kind == KindTransferOut {
+			if e.OperationKind == KindTransferIn || e.OperationKind == KindTransferOut {
 				total = total.Add(e.Amount.Amount)
 			}
 		}

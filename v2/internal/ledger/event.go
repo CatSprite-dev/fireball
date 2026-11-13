@@ -7,22 +7,22 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-type Kind string
+type OperationKind string
 
 const (
-	KindDeposit      Kind = "deposit"      // пополнение
-	KindWithdrawal   Kind = "withdrawal"   // вывод
-	KindTransferIn   Kind = "transfer_in"  // перевод со своего счёта
-	KindTransferOut  Kind = "transfer_out" // перевод на свой счёт
-	KindBuy          Kind = "buy"
-	KindSell         Kind = "sell"
-	KindDividend     Kind = "dividend"
-	KindCoupon       Kind = "coupon"
-	KindRedemption   Kind = "redemption"   // погашение облигации
-	KindAmortization Kind = "amortization" // частичное погашение номинала облигации
-	KindFee          Kind = "fee"          // любая комиссия
-	KindTax          Kind = "tax"          // любой налог, включая коррекцию
-	KindDerivatives  Kind = "derivatives"  // всё по срочному рынку
+	KindDeposit      OperationKind = "deposit"      // пополнение
+	KindWithdrawal   OperationKind = "withdrawal"   // вывод
+	KindTransferIn   OperationKind = "transfer_in"  // перевод со своего счёта
+	KindTransferOut  OperationKind = "transfer_out" // перевод на свой счёт
+	KindBuy          OperationKind = "buy"
+	KindSell         OperationKind = "sell"
+	KindDividend     OperationKind = "dividend"
+	KindCoupon       OperationKind = "coupon"
+	KindRedemption   OperationKind = "redemption"   // погашение облигации
+	KindAmortization OperationKind = "amortization" // частичное погашение номинала облигации
+	KindFee          OperationKind = "fee"          // любая комиссия
+	KindTax          OperationKind = "tax"          // любой налог, включая коррекцию
+	KindDerivatives  OperationKind = "derivatives"  // всё по срочному рынку
 )
 
 type InstrumentKind string
@@ -43,7 +43,7 @@ type Event struct {
 	OperationID     string
 	ParentID        string
 	Date            time.Time
-	Kind            Kind
+	OperationKind   OperationKind
 	InstrumentUID   string
 	InstrumentKind  InstrumentKind
 	Quantity        decimal.Decimal

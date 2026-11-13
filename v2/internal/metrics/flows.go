@@ -40,7 +40,7 @@ func ByInstrument(events []ledger.Event) map[string]*Flows {
 		}
 
 		amount := e.BaseAmount.Amount
-		switch e.Kind {
+		switch e.OperationKind {
 		case ledger.KindBuy:
 			f.Bought = f.Bought.Add(amount)
 			f.Quantity = f.Quantity.Add(e.Quantity)

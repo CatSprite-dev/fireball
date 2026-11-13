@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	"github.com/CatSprite-dev/fireball/v2/internal/ledger"
+	"github.com/CatSprite-dev/fireball/v2/internal/money"
 	"github.com/CatSprite-dev/fireball/v2/internal/tinvest"
+	"github.com/shopspring/decimal"
 )
 
 var (
@@ -15,24 +17,26 @@ var (
 
 const stateExecuted = "OPERATION_STATE_EXECUTED"
 
-// ToEvent переводит одну операцию брокера в событие журнала
+// ToEvent переводит одну операцию брокера в событие журнала.
 func ToEvent(accountID string, op tinvest.Operation) (ledger.Event, error) {
 	if op.State != stateExecuted {
 		return ledger.Event{}, ErrSkipped
 	}
 
-	kind, ok := operationKinds[op.Type]
+	operationKind, ok := operationKinds[op.Type]
 	if !ok {
 		return ledger.Event{}, fmt.Errorf("operation %s: %w: %s", op.ID, ErrUnknownOperationType, op.Type)
 	}
 	instrumentKind := toInstrumentKind(op.InstrumentKind)
-	if instrumentKind == ledger.InstrumentFutures || instrumentKind == ledger.InstrumentOption {
-		kind = ledger.KindDerivatives
-	}
 
 	amount, err := ToMoney(op.Payment)
 	if err != nil {
 		return ledger.Event{}, fmt.Errorf("operation %s: payment: %w", op.ID, err)
+	}
+	if isFuturesTrade(operationKind, instrumentKind) {
+		// У сделки с фьючерсом payment — размер контракта, а не деньги.
+		// Деньги по фьючерсам двигает только вариационная маржа.
+		amount = money.Money{Amount: decimal.Zero, Currency: amount.Currency}
 	}
 
 	accruedInterest, err := ToMoney(op.AccruedInt)
@@ -45,15 +49,14 @@ func ToEvent(accountID string, op tinvest.Operation) (ledger.Event, error) {
 		OperationID:     op.ID,
 		ParentID:        op.ParentOperationID,
 		Date:            op.Date.UTC(),
-		Kind:            kind,
+		OperationKind:   operationKind,
 		InstrumentUID:   op.InstrumentUID,
 		InstrumentKind:  instrumentKind,
 		Amount:          amount,
 		AccruedInterest: accruedInterest,
 	}
 
-	// Количество нужно только сделкам. Берём исполненное, а не заявленное
-	if kind == ledger.KindBuy || kind == ledger.KindSell {
+	if isTrade(operationKind) {
 		quantity, err := ToDecimal(op.QuantityDone, 0)
 		if err != nil {
 			return ledger.Event{}, fmt.Errorf("operation %s: quantity: %w", op.ID, err)
@@ -64,6 +67,7 @@ func ToEvent(accountID string, op tinvest.Operation) (ledger.Event, error) {
 	return event, nil
 }
 
+// ToEvents переводит операции одного счёта, пропуская неисполненные.
 func ToEvents(accountID string, ops []tinvest.Operation) ([]ledger.Event, error) {
 	events := make([]ledger.Event, 0, len(ops))
 	for _, op := range ops {
@@ -77,4 +81,12 @@ func ToEvents(accountID string, ops []tinvest.Operation) ([]ledger.Event, error)
 		events = append(events, event)
 	}
 	return events, nil
+}
+
+func isTrade(kind ledger.OperationKind) bool {
+	return kind == ledger.KindBuy || kind == ledger.KindSell
+}
+
+func isFuturesTrade(kind ledger.OperationKind, instrument ledger.InstrumentKind) bool {
+	return isTrade(kind) && instrument == ledger.InstrumentFutures
 }

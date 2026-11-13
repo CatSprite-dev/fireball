@@ -247,7 +247,7 @@ func checkTotal(logger *slog.Logger, holdings []ledger.Holding, events []ledger.
 	unlinked := decimal.Zero
 	for _, e := range events {
 		amount := e.BaseAmount.Amount
-		switch e.Kind {
+		switch e.OperationKind {
 		case ledger.KindDeposit, ledger.KindWithdrawal, ledger.KindTransferIn, ledger.KindTransferOut:
 			netIn = netIn.Add(amount)
 			continue
@@ -358,7 +358,7 @@ func checkFXTrades(logger *slog.Logger, holdings []ledger.Holding, events []ledg
 			totals[name] = t
 		}
 		t.rub = t.rub.Add(e.BaseAmount.Amount)
-		switch e.Kind {
+		switch e.OperationKind {
 		case ledger.KindBuy:
 			t.qty = t.qty.Add(e.Quantity)
 		case ledger.KindSell:
@@ -368,7 +368,7 @@ func checkFXTrades(logger *slog.Logger, holdings []ledger.Holding, events []ledg
 		logger.Info("fx trade",
 			"instrument", name,
 			"date", e.Date.Format(time.DateOnly),
-			"kind", e.Kind,
+			"kind", e.OperationKind,
 			"amount", e.Amount.Amount,
 			"currency", e.Amount.Currency,
 			"quantity", e.Quantity,
@@ -394,7 +394,7 @@ func checkDays(logger *slog.Logger, events []ledger.Event) {
 		logger.Info("day",
 			"date", e.Date.Format(time.DateTime),
 			"account", e.AccountID,
-			"kind", e.Kind,
+			"kind", e.OperationKind,
 			"instrument", e.InstrumentUID,
 			"op", e.OperationID,
 			"parent", e.ParentID,
@@ -410,7 +410,7 @@ func checkFutures(logger *slog.Logger, data []accountData, events []ledger.Event
 	trades := make(map[string]decimal.Decimal)
 	margin := make(map[string]decimal.Decimal)
 	for _, e := range events {
-		if e.Kind != ledger.KindDerivatives {
+		if e.OperationKind != ledger.KindDerivatives {
 			continue
 		}
 		if e.InstrumentUID != "" {

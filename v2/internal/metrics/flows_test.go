@@ -8,11 +8,11 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func ev(id, parent string, kind ledger.Kind, uid, amount, qty string) ledger.Event {
+func ev(id, parent string, kind ledger.OperationKind, uid, amount, qty string) ledger.Event {
 	e := ledger.Event{
 		OperationID:   id,
 		ParentID:      parent,
-		Kind:          kind,
+		OperationKind: kind,
 		InstrumentUID: uid,
 		BaseAmount:    money.Money{Amount: decimal.RequireFromString(amount), Currency: "RUB"},
 	}

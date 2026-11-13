@@ -18,7 +18,7 @@ func TestToEventKind(t *testing.T) {
 		name           string
 		opType         string
 		instrumentKind string
-		want           ledger.Kind
+		wantOperation  ledger.OperationKind
 		wantInstrument ledger.InstrumentKind
 	}{
 		{"покупка акции", "OPERATION_TYPE_BUY", "INSTRUMENT_TYPE_SHARE", ledger.KindBuy, ledger.InstrumentShare},
@@ -26,8 +26,9 @@ func TestToEventKind(t *testing.T) {
 		{"налог на дивиденды", "OPERATION_TYPE_DIVIDEND_TAX", "INSTRUMENT_TYPE_SHARE", ledger.KindTax, ledger.InstrumentShare},
 		{"амортизация", "OPERATION_TYPE_BOND_REPAYMENT", "INSTRUMENT_TYPE_BOND", ledger.KindAmortization, ledger.InstrumentBond},
 		{"покупка валюты", "OPERATION_TYPE_BUY", "INSTRUMENT_TYPE_CURRENCY", ledger.KindBuy, ledger.InstrumentCurrency},
-		{"покупка фьючерса", "OPERATION_TYPE_BUY", "INSTRUMENT_TYPE_FUTURES", ledger.KindDerivatives, ledger.InstrumentFutures},
-		{"комиссия по опциону", "OPERATION_TYPE_BROKER_FEE", "INSTRUMENT_TYPE_OPTION", ledger.KindDerivatives, ledger.InstrumentOption},
+		{"покупка фьючерса", "OPERATION_TYPE_BUY", "INSTRUMENT_TYPE_FUTURES", ledger.KindBuy, ledger.InstrumentFutures},
+		{"комиссия по опциону", "OPERATION_TYPE_BROKER_FEE", "INSTRUMENT_TYPE_OPTION", ledger.KindFee, ledger.InstrumentOption},
+		{"вариационная маржа", "OPERATION_TYPE_ACCRUING_VARMARGIN", "INSTRUMENT_TYPE_UNSPECIFIED", ledger.KindDerivatives, ""},
 	}
 
 	for _, tt := range tests {
@@ -43,8 +44,8 @@ func TestToEventKind(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if got.Kind != tt.want {
-				t.Errorf("kind = %q, want %q", got.Kind, tt.want)
+			if got.OperationKind != tt.wantOperation {
+				t.Errorf("operation kind = %q, want %q", got.OperationKind, tt.wantOperation)
 			}
 			if got.InstrumentKind != tt.wantInstrument {
 				t.Errorf("instrument kind = %q, want %q", got.InstrumentKind, tt.wantInstrument)
@@ -72,6 +73,41 @@ func TestToInstrumentKind(t *testing.T) {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestToEventFuturesTradeHasNoMoney(t *testing.T) {
+	// Покупка 5 фьючерсов Si-9.26 с живого счёта: payment −409 040 — это размер контракта.
+	buy := tinvest.Operation{
+		State:          stateExecuted,
+		Type:           "OPERATION_TYPE_BUY",
+		InstrumentKind: "INSTRUMENT_TYPE_FUTURES",
+		Payment:        rubValue("-409040"),
+		QuantityDone:   "5",
+	}
+	got, err := ToEvent("acc", buy)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !got.Amount.Amount.IsZero() || got.Amount.Currency != "RUB" {
+		t.Errorf("amount = %s %s, want 0 RUB", got.Amount.Amount, got.Amount.Currency)
+	}
+	if got.Quantity.String() != "5" {
+		t.Errorf("quantity = %s, want 5", got.Quantity)
+	}
+
+	// Вариационная маржа — настоящие деньги, её не трогаем.
+	margin := tinvest.Operation{
+		State:   stateExecuted,
+		Type:    "OPERATION_TYPE_ACCRUING_VARMARGIN",
+		Payment: rubValue("2885"),
+	}
+	got, err = ToEvent("acc", margin)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Amount.Amount.String() != "2885" {
+		t.Errorf("margin amount = %s, want 2885", got.Amount.Amount)
 	}
 }
 

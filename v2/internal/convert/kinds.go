@@ -2,7 +2,7 @@ package convert
 
 import "github.com/CatSprite-dev/fireball/v2/internal/ledger"
 
-var operationKinds = map[string]ledger.Kind{
+var operationKinds = map[string]ledger.OperationKind{
 	// деньги на счёт и со счёта
 	"OPERATION_TYPE_INPUT":            ledger.KindDeposit,
 	"OPERATION_TYPE_INPUT_SWIFT":      ledger.KindDeposit,
