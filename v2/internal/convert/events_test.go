@@ -233,3 +233,24 @@ func TestToEventsStopsOnError(t *testing.T) {
 		t.Fatalf("want nil events on error, got %d", len(events))
 	}
 }
+
+func TestPositionKind(t *testing.T) {
+	tests := []struct {
+		in   string
+		want ledger.InstrumentKind
+	}{
+		{"bond", ledger.InstrumentBond},
+		{"currency", ledger.InstrumentCurrency},
+		{"etf", ledger.InstrumentETF},
+		{"", ""},
+		{"sp", ledger.InstrumentOther},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			if got := positionKind(tt.in); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

@@ -3,14 +3,14 @@ package ledger
 import "github.com/shopspring/decimal"
 
 type Holding struct {
-	AccountID     string
-	InstrumentUID string
-	Ticker        string
-	Type          string
-	Quantity      decimal.Decimal
-	Price         decimal.Decimal
-	NKD           decimal.Decimal
-	BrokerYield   decimal.Decimal
+	AccountID      string
+	InstrumentUID  string
+	Ticker         string
+	InstrumentKind InstrumentKind
+	Quantity       decimal.Decimal
+	Price          decimal.Decimal
+	NKD            decimal.Decimal
+	BrokerYield    decimal.Decimal
 }
 
 func (h Holding) Value() decimal.Decimal {

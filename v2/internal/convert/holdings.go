@@ -33,14 +33,14 @@ func ToHoldings(accountID string, p *tinvest.Portfolio) ([]ledger.Holding, error
 		}
 
 		result = append(result, ledger.Holding{
-			AccountID:     accountID,
-			InstrumentUID: pos.InstrumentUID,
-			Ticker:        pos.Ticker,
-			Type:          pos.InstrumentType,
-			Quantity:      quantity,
-			Price:         price,
-			NKD:           nkd,
-			BrokerYield:   brokerYield,
+			AccountID:      accountID,
+			InstrumentUID:  pos.InstrumentUID,
+			Ticker:         pos.Ticker,
+			InstrumentKind: positionKind(pos.InstrumentType),
+			Quantity:       quantity,
+			Price:          price,
+			NKD:            nkd,
+			BrokerYield:    brokerYield,
 		})
 	}
 

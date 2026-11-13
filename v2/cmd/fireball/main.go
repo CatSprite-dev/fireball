@@ -294,7 +294,7 @@ func checkCash(logger *slog.Logger, data []accountData, holdings []ledger.Holdin
 
 	cash := make(map[string]decimal.Decimal)
 	for _, h := range holdings {
-		if h.Type == "currency" {
+		if h.InstrumentKind == ledger.InstrumentCurrency {
 			cash[h.AccountID] = cash[h.AccountID].Add(h.Value())
 		}
 	}
@@ -315,7 +315,7 @@ func checkCash(logger *slog.Logger, data []accountData, holdings []ledger.Holdin
 			logger.Info("  events by currency", "currency", cur, "sum", sum.Round(2))
 		}
 		for _, h := range holdings {
-			if h.AccountID == id && h.Type == "currency" {
+			if h.AccountID == id && h.InstrumentKind == "currency" {
 				logger.Info("  broker cash", "ticker", h.Ticker, "quantity", h.Quantity)
 			}
 		}

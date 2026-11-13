@@ -90,3 +90,24 @@ func toInstrumentKind(s string) ledger.InstrumentKind {
 	}
 	return ledger.InstrumentOther
 }
+
+// positionKinds — тип бумаги в позиции портфеля брокера → наш тип.
+// В портфеле брокер отдаёт только строку instrumentType, без instrumentKind.
+var positionKinds = map[string]ledger.InstrumentKind{
+	"share":    ledger.InstrumentShare,
+	"bond":     ledger.InstrumentBond,
+	"etf":      ledger.InstrumentETF,
+	"currency": ledger.InstrumentCurrency,
+	"futures":  ledger.InstrumentFutures,
+	"option":   ledger.InstrumentOption,
+}
+
+func positionKind(s string) ledger.InstrumentKind {
+	if s == "" {
+		return ""
+	}
+	if kind, ok := positionKinds[s]; ok {
+		return kind
+	}
+	return ledger.InstrumentOther
+}
