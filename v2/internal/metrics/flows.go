@@ -15,20 +15,10 @@ type Flows struct {
 }
 
 func ByInstrument(events []ledger.Event) map[string]*Flows {
-	opsByInstrument := make(map[string]string, len(events))
-	for _, e := range events {
-		if e.InstrumentUID != "" {
-			opsByInstrument[e.OperationID] = e.InstrumentUID
-		}
-	}
-
 	result := make(map[string]*Flows)
 
 	for _, e := range events {
 		uid := e.InstrumentUID
-		if uid == "" {
-			uid = opsByInstrument[e.ParentID]
-		}
 		if uid == "" {
 			continue
 		}

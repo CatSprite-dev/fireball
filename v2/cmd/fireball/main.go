@@ -91,6 +91,7 @@ func run(logger *slog.Logger) error {
 	if err := ledger.ApplyBase(events, rates); err != nil {
 		return err
 	}
+	ledger.InheritInstruments(events)
 	events = ledger.AddCurrencyLegs(events, convert.CurrencyByAsset(currencies))
 	logger.Info("loaded", "accounts", len(data), "events", len(events), "duration", time.Since(start))
 
@@ -102,6 +103,9 @@ func run(logger *slog.Logger) error {
 	checkTotal(logger, holdings, events)
 	checkCash(logger, data, holdings, events)
 	checkFutures(logger, data, events)
+	if err := checkFX(logger, data, events, rates); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -186,12 +190,11 @@ func loadRates(ctx context.Context, client *tinvest.Client, currencies []tinvest
 	needed := make(map[string]bool)
 	var earliest time.Time
 	for _, e := range events {
-		if e.Amount.Currency == baseCurrency {
-			continue
-		}
-		needed[e.Amount.Currency] = true
 		if earliest.IsZero() || e.Date.Before(earliest) {
 			earliest = e.Date
+		}
+		if e.Amount.Currency != baseCurrency {
+			needed[e.Amount.Currency] = true
 		}
 	}
 	if len(needed) == 0 {
@@ -237,15 +240,9 @@ func checkTotal(logger *slog.Logger, holdings []ledger.Holding, events []ledger.
 		values[h.InstrumentUID] = values[h.InstrumentUID].Add(h.Value())
 	}
 
-	instrumentOf := make(map[string]string)
-	for _, e := range events {
-		if e.InstrumentUID != "" {
-			instrumentOf[e.OperationID] = e.InstrumentUID
-		}
-	}
-
 	netIn := decimal.Zero
 	derivatives := decimal.Zero
+	exchange := decimal.Zero
 	unlinked := decimal.Zero
 	for _, e := range events {
 		amount := e.BaseAmount.Amount
@@ -256,8 +253,11 @@ func checkTotal(logger *slog.Logger, holdings []ledger.Holding, events []ledger.
 		case ledger.KindVariationMargin, ledger.KindExpiration:
 			derivatives = derivatives.Add(amount)
 			continue
+		case ledger.KindExchange:
+			exchange = exchange.Add(amount)
+			continue
 		}
-		if e.InstrumentUID == "" && instrumentOf[e.ParentID] == "" {
+		if e.InstrumentUID == "" {
 			unlinked = unlinked.Add(amount)
 		}
 	}
@@ -268,11 +268,12 @@ func checkTotal(logger *slog.Logger, holdings []ledger.Holding, events []ledger.
 	}
 
 	top := value.Sub(netIn)
-	bottom := instruments.Add(derivatives).Add(unlinked)
+	bottom := instruments.Add(derivatives).Add(exchange).Add(unlinked)
 	logger.Info("total", "value_now", value.Round(2), "net_in", netIn.Round(2), "profit", top.Round(2))
 	logger.Info("bottom-up",
 		"instruments", instruments.Round(2),
 		"derivatives", derivatives.Round(2),
+		"exchange", exchange.Round(2),
 		"unlinked", unlinked.Round(2),
 		"sum", bottom.Round(2),
 		"diff", top.Sub(bottom).Round(2),
@@ -315,7 +316,7 @@ func checkCash(logger *slog.Logger, data []accountData, holdings []ledger.Holdin
 			logger.Info("  events by currency", "currency", cur, "sum", sum.Round(2))
 		}
 		for _, h := range holdings {
-			if h.AccountID == id && h.InstrumentKind == "currency" {
+			if h.AccountID == id && h.InstrumentKind == ledger.InstrumentCurrency {
 				logger.Info("  broker cash", "ticker", h.Ticker, "quantity", h.Quantity)
 			}
 		}
@@ -345,4 +346,76 @@ func checkFutures(logger *slog.Logger, data []accountData, events []ledger.Event
 			"varmargin", margin[id].Round(2),
 		)
 	}
+}
+
+// checkFX — временная проверка: откуда курсовая разница по валюте на счёте.
+func checkFX(logger *slog.Logger, data []accountData, events []ledger.Event, rates *fx.Rates) error {
+	names := make(map[string]string, len(data))
+	for _, d := range data {
+		names[d.Account.ID] = d.Account.Name
+	}
+
+	type state struct {
+		balance decimal.Decimal
+		rate    decimal.Decimal
+		date    time.Time
+		last    ledger.Event
+	}
+	states := make(map[string]map[string]*state)
+	totals := make(map[string]map[string]decimal.Decimal)
+
+	report := func(acc, cur string, s *state, rate decimal.Decimal, date time.Time) {
+		diff := s.balance.Mul(rate.Sub(s.rate))
+		totals[acc][cur] = totals[acc][cur].Add(diff)
+		if diff.Abs().LessThan(decimal.NewFromInt(1)) {
+			return
+		}
+		logger.Info("held",
+			"account", names[acc],
+			"currency", cur,
+			"from", s.date.Format("2006-01-02 15:04"),
+			"to", date.Format("2006-01-02 15:04"),
+			"balance", s.balance,
+			"rate_from", s.rate.Round(4),
+			"rate_to", rate.Round(4),
+			"diff", diff.Round(2),
+		)
+	}
+
+	for _, e := range events {
+		cur := e.Amount.Currency
+		if cur == baseCurrency || e.Amount.Amount.IsZero() {
+			continue
+		}
+		if states[e.AccountID] == nil {
+			states[e.AccountID] = make(map[string]*state)
+			totals[e.AccountID] = make(map[string]decimal.Decimal)
+		}
+		s := states[e.AccountID][cur]
+		if s == nil {
+			s = &state{}
+			states[e.AccountID][cur] = s
+		}
+		rate := e.BaseAmount.Amount.Div(e.Amount.Amount)
+		report(e.AccountID, cur, s, rate, e.Date)
+		s.balance = s.balance.Add(e.Amount.Amount)
+		s.rate = rate
+		s.date = e.Date
+		s.last = e
+	}
+
+	now := time.Now()
+	for acc, byCurrency := range states {
+		for cur, s := range byCurrency {
+			unit := s.last.Amount
+			unit.Amount = decimal.NewFromInt(1)
+			today, err := rates.ToBase(unit, now)
+			if err != nil {
+				return err
+			}
+			report(acc, cur, s, today.Amount, now)
+			logger.Info("fx total", "account", names[acc], "currency", cur, "diff", totals[acc][cur].Round(2))
+		}
+	}
+	return nil
 }

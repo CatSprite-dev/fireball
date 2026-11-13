@@ -26,11 +26,11 @@ func TestByInstrument(t *testing.T) {
 	events := []ledger.Event{
 		ev("dep", "", ledger.KindDeposit, "", "200000", ""),
 		ev("buy1", "", ledger.KindBuy, "etln", "-100510", "100"),
-		ev("fee1", "buy1", ledger.KindFee, "", "-50.26", ""),
+		ev("fee1", "buy1", ledger.KindFee, "etln", "-50.26", ""),
 		ev("cpn", "", ledger.KindCoupon, "etln", "2000", ""),
 		ev("tax", "", ledger.KindTax, "etln", "-260", ""),
 		ev("sell1", "", ledger.KindSell, "etln", "100789", "100"),
-		ev("fee2", "sell1", ledger.KindFee, "", "-301.53", ""),
+		ev("fee2", "sell1", ledger.KindFee, "etln", "-301.53", ""),
 		ev("svc", "", ledger.KindFee, "", "-99", ""),
 	}
 
