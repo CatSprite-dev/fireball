@@ -253,7 +253,7 @@ func checkTotal(logger *slog.Logger, holdings []ledger.Holding, events []ledger.
 		case ledger.KindDeposit, ledger.KindWithdrawal, ledger.KindTransferIn, ledger.KindTransferOut:
 			netIn = netIn.Add(amount)
 			continue
-		case ledger.KindDerivatives:
+		case ledger.KindVariationMargin, ledger.KindExpiration:
 			derivatives = derivatives.Add(amount)
 			continue
 		}
@@ -330,7 +330,7 @@ func checkFutures(logger *slog.Logger, data []accountData, events []ledger.Event
 		switch {
 		case e.InstrumentKind == ledger.InstrumentFutures && (e.OperationKind == ledger.KindBuy || e.OperationKind == ledger.KindSell):
 			trades[e.AccountID] = trades[e.AccountID].Add(e.BaseAmount.Amount)
-		case e.OperationKind == ledger.KindDerivatives:
+		case e.OperationKind == ledger.KindVariationMargin || e.OperationKind == ledger.KindExpiration:
 			margin[e.AccountID] = margin[e.AccountID].Add(e.BaseAmount.Amount)
 		}
 	}

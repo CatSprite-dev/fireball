@@ -28,7 +28,7 @@ func TestToEventKind(t *testing.T) {
 		{"покупка валюты", "OPERATION_TYPE_BUY", "INSTRUMENT_TYPE_CURRENCY", ledger.KindBuy, ledger.InstrumentCurrency},
 		{"покупка фьючерса", "OPERATION_TYPE_BUY", "INSTRUMENT_TYPE_FUTURES", ledger.KindBuy, ledger.InstrumentFutures},
 		{"комиссия по опциону", "OPERATION_TYPE_BROKER_FEE", "INSTRUMENT_TYPE_OPTION", ledger.KindFee, ledger.InstrumentOption},
-		{"вариационная маржа", "OPERATION_TYPE_ACCRUING_VARMARGIN", "INSTRUMENT_TYPE_UNSPECIFIED", ledger.KindDerivatives, ""},
+		{"вариационная маржа", "OPERATION_TYPE_ACCRUING_VARMARGIN", "INSTRUMENT_TYPE_UNSPECIFIED", ledger.KindVariationMargin, ""},
 	}
 
 	for _, tt := range tests {

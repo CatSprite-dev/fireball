@@ -64,10 +64,10 @@ var operationKinds = map[string]ledger.OperationKind{
 	"OPERATION_TYPE_TAX_REPO_REFUND_PROGRESSIVE": ledger.KindTax,
 
 	// срочный рынок
-	"OPERATION_TYPE_ACCRUING_VARMARGIN":    ledger.KindDerivatives,
-	"OPERATION_TYPE_WRITING_OFF_VARMARGIN": ledger.KindDerivatives,
-	"OPERATION_TYPE_OPTION_EXPIRATION":     ledger.KindDerivatives,
-	"OPERATION_TYPE_FUTURE_EXPIRATION":     ledger.KindDerivatives,
+	"OPERATION_TYPE_ACCRUING_VARMARGIN":    ledger.KindVariationMargin,
+	"OPERATION_TYPE_WRITING_OFF_VARMARGIN": ledger.KindVariationMargin,
+	"OPERATION_TYPE_OPTION_EXPIRATION":     ledger.KindExpiration,
+	"OPERATION_TYPE_FUTURE_EXPIRATION":     ledger.KindExpiration,
 }
 
 var instrumentKinds = map[string]ledger.InstrumentKind{

@@ -10,20 +10,21 @@ import (
 type OperationKind string
 
 const (
-	KindDeposit      OperationKind = "deposit"      // пополнение
-	KindWithdrawal   OperationKind = "withdrawal"   // вывод
-	KindTransferIn   OperationKind = "transfer_in"  // перевод со своего счёта
-	KindTransferOut  OperationKind = "transfer_out" // перевод на свой счёт
-	KindBuy          OperationKind = "buy"
-	KindSell         OperationKind = "sell"
-	KindDividend     OperationKind = "dividend"
-	KindCoupon       OperationKind = "coupon"
-	KindRedemption   OperationKind = "redemption"   // погашение облигации
-	KindAmortization OperationKind = "amortization" // частичное погашение номинала облигации
-	KindFee          OperationKind = "fee"          // любая комиссия
-	KindTax          OperationKind = "tax"          // любой налог, включая коррекцию
-	KindDerivatives  OperationKind = "derivatives"  // всё по срочному рынку
-	KindExchange     OperationKind = "exchange"     // вторая нога обмена валюты
+	KindDeposit         OperationKind = "deposit"      // пополнение
+	KindWithdrawal      OperationKind = "withdrawal"   // вывод
+	KindTransferIn      OperationKind = "transfer_in"  // перевод со своего счёта
+	KindTransferOut     OperationKind = "transfer_out" // перевод на свой счёт
+	KindBuy             OperationKind = "buy"
+	KindSell            OperationKind = "sell"
+	KindDividend        OperationKind = "dividend"
+	KindCoupon          OperationKind = "coupon"
+	KindRedemption      OperationKind = "redemption"       // погашение облигации
+	KindAmortization    OperationKind = "amortization"     // частичное погашение номинала облигации
+	KindFee             OperationKind = "fee"              // любая комиссия
+	KindTax             OperationKind = "tax"              // любой налог, включая коррекцию
+	KindVariationMargin OperationKind = "variation_margin" // начисление и списание вариационной маржи
+	KindExpiration      OperationKind = "expiration"       // экспирация фьючерса или опциона
+	KindExchange        OperationKind = "exchange"         // вторая нога обмена валюты
 )
 
 type InstrumentKind string
