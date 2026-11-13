@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"slices"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -16,14 +17,14 @@ import (
 	"github.com/CatSprite-dev/fireball/v2/internal/convert"
 	"github.com/CatSprite-dev/fireball/v2/internal/fx"
 	"github.com/CatSprite-dev/fireball/v2/internal/ledger"
+	"github.com/CatSprite-dev/fireball/v2/internal/metrics"
 	"github.com/CatSprite-dev/fireball/v2/internal/tinvest"
 )
 
 const baseCurrency = "RUB"
 
 var excludedAccountTypes = map[string]bool{
-	"ACCOUNT_TYPE_INVEST_BOX": true,
-	"ACCOUNT_TYPE_DFA":        true,
+	"ACCOUNT_TYPE_DFA": true,
 }
 
 type accountData struct {
@@ -83,6 +84,18 @@ func run(logger *slog.Logger) error {
 	checkTransfers(logger, events)
 
 	if err := checkRates(ctx, logger, client, events); err != nil {
+		return err
+	}
+
+	if err := checkProfit(logger, data, events); err != nil {
+		return err
+	}
+
+	if err := checkSplits(logger, data, events); err != nil {
+		return err
+	}
+
+	if err := checkTotal(logger, data, events); err != nil {
 		return err
 	}
 
@@ -148,12 +161,6 @@ func checkRates(ctx context.Context, logger *slog.Logger, client *tinvest.Client
 		if e.Amount.Currency == baseCurrency {
 			continue
 		}
-		logger.Info("in rubles",
-			"date", e.Date.Format(time.DateOnly),
-			"amount", e.Amount.Amount,
-			"currency", e.Amount.Currency,
-			"rub", e.BaseAmount.Amount.Round(2),
-		)
 	}
 	return nil
 }
@@ -250,4 +257,186 @@ func loadRates(ctx context.Context, client *tinvest.Client, events []ledger.Even
 	}
 
 	return fx.New(points), nil
+}
+
+// checkProfit — временная проверка: позиции и прибыль по каждой бумаге.
+func checkProfit(logger *slog.Logger, data []accountData, events []ledger.Event) error {
+	values := make(map[string]decimal.Decimal)
+	brokerQty := make(map[string]decimal.Decimal)
+	tickers := make(map[string]string)
+
+	for _, d := range data {
+		if d.Portfolio == nil {
+			continue
+		}
+		holdings, err := convert.ToHoldings(d.Account.ID, d.Portfolio)
+		if err != nil {
+			return fmt.Errorf("account %s: %w", d.Account.Name, err)
+		}
+
+		sum := decimal.Zero
+		for _, h := range holdings {
+			sum = sum.Add(h.Value())
+			values[h.InstrumentUID] = values[h.InstrumentUID].Add(h.Value())
+			brokerQty[h.InstrumentUID] = brokerQty[h.InstrumentUID].Add(h.Quantity)
+			tickers[h.InstrumentUID] = h.Ticker
+		}
+
+		total, err := convert.ToDecimal(d.Portfolio.TotalAmountPortfolio.Units, d.Portfolio.TotalAmountPortfolio.Nano)
+		if err != nil && !errors.Is(err, convert.ErrNoValue) {
+			return fmt.Errorf("account %s: total: %w", d.Account.Name, err)
+		}
+		logger.Info("account value", "account", d.Account.Name, "ours", sum.Round(2), "broker", total)
+	}
+
+	flows := metrics.ByInstrument(events)
+
+	type row struct {
+		uid    string
+		profit decimal.Decimal
+		f      *metrics.Flows
+	}
+	var rows []row
+	for uid, f := range flows {
+		profit := values[uid].Add(f.Bought).Add(f.Sold).Add(f.Income).Add(f.Fees).Add(f.Taxes)
+		rows = append(rows, row{uid: uid, profit: profit, f: f})
+	}
+	slices.SortFunc(rows, func(a, b row) int { return a.profit.Cmp(b.profit) })
+
+	total := decimal.Zero
+	for _, r := range rows {
+		total = total.Add(r.profit)
+		name := tickers[r.uid]
+		if name == "" {
+			name = r.uid
+		}
+		logger.Info("profit",
+			"instrument", name,
+			"profit", r.profit.Round(2),
+			"value_now", values[r.uid].Round(2),
+			"bought", r.f.Bought.Round(2),
+			"sold", r.f.Sold.Round(2),
+			"income", r.f.Income.Round(2),
+			"fees", r.f.Fees.Round(2),
+			"taxes", r.f.Taxes.Round(2),
+			"qty_ours", r.f.Quantity,
+			"qty_broker", brokerQty[r.uid],
+		)
+	}
+	logger.Info("profit total", "instruments", len(rows), "sum", total.Round(2))
+	return nil
+}
+
+// checkSplits — временная проверка: цена за штуку в сделках по бумагам со сплитом.
+func checkSplits(logger *slog.Logger, data []accountData, events []ledger.Event) error {
+	watch := map[string]bool{"PLZL": true, "T": true}
+
+	uids := make(map[string]string)
+	for _, d := range data {
+		if d.Portfolio == nil {
+			continue
+		}
+		holdings, err := convert.ToHoldings(d.Account.ID, d.Portfolio)
+		if err != nil {
+			return err
+		}
+		for _, h := range holdings {
+			if watch[h.Ticker] {
+				uids[h.InstrumentUID] = h.Ticker
+			}
+		}
+	}
+
+	for _, e := range events {
+		ticker, ok := uids[e.InstrumentUID]
+		if !ok || (e.Kind != ledger.KindBuy && e.Kind != ledger.KindSell) || e.Quantity.IsZero() {
+			continue
+		}
+		logger.Info("trade",
+			"ticker", ticker,
+			"date", e.Date.Format(time.DateOnly),
+			"kind", e.Kind,
+			"quantity", e.Quantity,
+			"amount", e.BaseAmount.Amount.Round(2),
+			"price_per_piece", e.BaseAmount.Amount.Div(e.Quantity).Abs().Round(2),
+		)
+	}
+	return nil
+}
+
+// checkTotal — временная проверка: общая прибыль за всё время по всем счетам.
+func checkTotal(logger *slog.Logger, data []accountData, events []ledger.Event) error {
+	value := decimal.Zero
+	for _, d := range data {
+		if d.Portfolio == nil {
+			continue
+		}
+		total, err := convert.ToDecimal(d.Portfolio.TotalAmountPortfolio.Units, d.Portfolio.TotalAmountPortfolio.Nano)
+		if err != nil && !errors.Is(err, convert.ErrNoValue) {
+			return err
+		}
+		value = value.Add(total)
+	}
+
+	instrumentOf := make(map[string]string)
+	for _, e := range events {
+		if e.InstrumentUID != "" {
+			instrumentOf[e.OperationID] = e.InstrumentUID
+		}
+	}
+
+	netIn := decimal.Zero
+	unlinked := make(map[ledger.Kind]decimal.Decimal)
+	derivatives := decimal.Zero
+	for _, e := range events {
+		amount := e.BaseAmount.Amount
+		switch e.Kind {
+		case ledger.KindDeposit, ledger.KindWithdrawal, ledger.KindTransferIn, ledger.KindTransferOut:
+			netIn = netIn.Add(amount)
+			continue
+		case ledger.KindDerivatives:
+			derivatives = derivatives.Add(amount)
+			continue
+		}
+		if e.InstrumentUID == "" && instrumentOf[e.ParentID] == "" {
+			unlinked[e.Kind] = unlinked[e.Kind].Add(amount)
+		}
+	}
+
+	logger.Info("total",
+		"value_now", value.Round(2),
+		"net_deposits", netIn.Round(2),
+		"profit", value.Sub(netIn).Round(2),
+	)
+	logger.Info("not in instruments", "derivatives", derivatives.Round(2))
+	for kind, sum := range unlinked {
+		logger.Info("not in instruments", "kind", kind, "sum", sum.Round(2))
+	}
+
+	byKind := make(map[ledger.Kind]decimal.Decimal)
+	byAccount := make(map[string]decimal.Decimal)
+	for _, e := range events {
+		switch e.Kind {
+		case ledger.KindDeposit, ledger.KindWithdrawal, ledger.KindTransferIn, ledger.KindTransferOut,
+			ledger.KindDividend, ledger.KindCoupon:
+			byKind[e.Kind] = byKind[e.Kind].Add(e.BaseAmount.Amount)
+		}
+		switch e.Kind {
+		case ledger.KindDeposit, ledger.KindWithdrawal, ledger.KindTransferIn, ledger.KindTransferOut:
+			byAccount[e.AccountID] = byAccount[e.AccountID].Add(e.BaseAmount.Amount)
+		}
+	}
+	for kind, sum := range byKind {
+		logger.Info("by kind", "kind", kind, "sum", sum.Round(2))
+	}
+	for _, d := range data {
+		logger.Info("net in by account",
+			"account", d.Account.Name,
+			"type", d.Account.Type,
+			"status", d.Account.Status,
+			"net_in", byAccount[d.Account.ID].Round(2),
+		)
+	}
+
+	return nil
 }
