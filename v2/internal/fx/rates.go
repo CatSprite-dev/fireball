@@ -68,7 +68,7 @@ func (r *Rates) Rate(currency string, date time.Time) (decimal.Decimal, error) {
 	return found.Rate, nil
 }
 
-func (r *Rates) ToRUB(m money.Money, date time.Time) (money.Money, error) {
+func (r *Rates) ToBase(m money.Money, date time.Time) (money.Money, error) {
 	rate, err := r.Rate(m.Currency, date)
 	if err != nil {
 		return money.Money{}, err

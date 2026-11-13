@@ -7,17 +7,17 @@ import (
 	"github.com/CatSprite-dev/fireball/v2/internal/money"
 )
 
-type RUBConverter interface {
-	ToRUB(m money.Money, date time.Time) (money.Money, error)
+type BaseConverter interface {
+	ToBase(m money.Money, date time.Time) (money.Money, error)
 }
 
-func ApplyRUB(events []Event, conv RUBConverter) error {
+func ApplyBase(events []Event, conv BaseConverter) error {
 	for i := range events {
-		amountRUB, err := conv.ToRUB(events[i].Amount, events[i].Date)
+		amountRUB, err := conv.ToBase(events[i].Amount, events[i].Date)
 		if err != nil {
 			return fmt.Errorf("operation %s: %w", events[i].OperationID, err)
 		}
-		events[i].AmountRUB = amountRUB
+		events[i].BaseAmount = amountRUB
 	}
 	return nil
 }

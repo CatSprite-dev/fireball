@@ -103,7 +103,7 @@ func TestRateUsesMoscowDay(t *testing.T) {
 func TestToRUB(t *testing.T) {
 	m := money.Money{Amount: decimal.RequireFromString("-9.2"), Currency: "USD"}
 
-	got, err := usdRates().ToRUB(m, date("2024-01-03"))
+	got, err := usdRates().ToBase(m, date("2024-01-03"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

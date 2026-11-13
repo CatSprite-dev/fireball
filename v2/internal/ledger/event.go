@@ -36,6 +36,6 @@ type Event struct {
 	InstrumentUID   string
 	Quantity        decimal.Decimal
 	Amount          money.Money
-	AmountRUB       money.Money
+	BaseAmount      money.Money
 	AccruedInterest money.Money
 }

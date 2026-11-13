@@ -141,7 +141,7 @@ func checkRates(ctx context.Context, logger *slog.Logger, client *tinvest.Client
 		return fmt.Errorf("load rates: %w", err)
 	}
 
-	if err := ledger.ApplyRUB(events, rates); err != nil {
+	if err := ledger.ApplyBase(events, rates); err != nil {
 		return err
 	}
 	for _, e := range events {
@@ -152,7 +152,7 @@ func checkRates(ctx context.Context, logger *slog.Logger, client *tinvest.Client
 			"date", e.Date.Format(time.DateOnly),
 			"amount", e.Amount.Amount,
 			"currency", e.Amount.Currency,
-			"rub", e.AmountRUB.Amount.Round(2),
+			"rub", e.BaseAmount.Amount.Round(2),
 		)
 	}
 	return nil

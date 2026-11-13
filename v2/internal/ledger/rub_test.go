@@ -11,7 +11,7 @@ import (
 
 type fakeConverter map[string]decimal.Decimal
 
-func (f fakeConverter) ToRUB(m money.Money, _ time.Time) (money.Money, error) {
+func (f fakeConverter) ToBase(m money.Money, _ time.Time) (money.Money, error) {
 	rate, ok := f[m.Currency]
 	if !ok {
 		return money.Money{}, errors.New("no rate")
@@ -30,15 +30,15 @@ func TestApplyRUB(t *testing.T) {
 		{OperationID: "usd-op", Amount: mny("-9.2", "USD")},
 	}
 
-	if err := ApplyRUB(events, conv); err != nil {
+	if err := ApplyBase(events, conv); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !events[0].AmountRUB.Amount.Equal(decimal.RequireFromString("-1000")) {
-		t.Errorf("rub-op = %s, want -1000", events[0].AmountRUB.Amount)
+	if !events[0].BaseAmount.Amount.Equal(decimal.RequireFromString("-1000")) {
+		t.Errorf("rub-op = %s, want -1000", events[0].BaseAmount.Amount)
 	}
-	if !events[1].AmountRUB.Amount.Equal(decimal.RequireFromString("-736")) {
-		t.Errorf("usd-op = %s, want -736", events[1].AmountRUB.Amount)
+	if !events[1].BaseAmount.Amount.Equal(decimal.RequireFromString("-736")) {
+		t.Errorf("usd-op = %s, want -736", events[1].BaseAmount.Amount)
 	}
 }
 
@@ -46,7 +46,7 @@ func TestApplyRUBStopsOnError(t *testing.T) {
 	conv := fakeConverter{"RUB": decimal.NewFromInt(1)}
 	events := []Event{{OperationID: "eur-op", Amount: mny("5", "EUR")}}
 
-	if err := ApplyRUB(events, conv); err == nil {
+	if err := ApplyBase(events, conv); err == nil {
 		t.Fatal("want error for currency without rate")
 	}
 }
