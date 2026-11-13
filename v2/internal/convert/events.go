@@ -25,7 +25,8 @@ func ToEvent(accountID string, op tinvest.Operation) (ledger.Event, error) {
 	if !ok {
 		return ledger.Event{}, fmt.Errorf("operation %s: %w: %s", op.ID, ErrUnknownOperationType, op.Type)
 	}
-	if op.InstrumentType == "futures" || op.InstrumentType == "option" {
+	instrumentKind := toInstrumentKind(op.InstrumentKind)
+	if instrumentKind == ledger.InstrumentFutures || instrumentKind == ledger.InstrumentOption {
 		kind = ledger.KindDerivatives
 	}
 
@@ -46,6 +47,7 @@ func ToEvent(accountID string, op tinvest.Operation) (ledger.Event, error) {
 		Date:            op.Date.UTC(),
 		Kind:            kind,
 		InstrumentUID:   op.InstrumentUID,
+		InstrumentKind:  instrumentKind,
 		Amount:          amount,
 		AccruedInterest: accruedInterest,
 	}

@@ -23,7 +23,18 @@ const (
 	KindFee          Kind = "fee"          // любая комиссия
 	KindTax          Kind = "tax"          // любой налог, включая коррекцию
 	KindDerivatives  Kind = "derivatives"  // всё по срочному рынку
+)
 
+type InstrumentKind string
+
+const (
+	InstrumentShare    InstrumentKind = "share"
+	InstrumentBond     InstrumentKind = "bond"
+	InstrumentETF      InstrumentKind = "etf"
+	InstrumentCurrency InstrumentKind = "currency"
+	InstrumentFutures  InstrumentKind = "futures"
+	InstrumentOption   InstrumentKind = "option"
+	InstrumentOther    InstrumentKind = "other"
 )
 
 // Event — одна операция брокера
@@ -34,6 +45,7 @@ type Event struct {
 	Date            time.Time
 	Kind            Kind
 	InstrumentUID   string
+	InstrumentKind  InstrumentKind
 	Quantity        decimal.Decimal
 	Amount          money.Money
 	BaseAmount      money.Money

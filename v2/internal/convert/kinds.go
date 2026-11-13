@@ -69,3 +69,24 @@ var operationKinds = map[string]ledger.Kind{
 	"OPERATION_TYPE_OPTION_EXPIRATION":     ledger.KindDerivatives,
 	"OPERATION_TYPE_FUTURE_EXPIRATION":     ledger.KindDerivatives,
 }
+
+var instrumentKinds = map[string]ledger.InstrumentKind{
+	"INSTRUMENT_TYPE_SHARE":    ledger.InstrumentShare,
+	"INSTRUMENT_TYPE_BOND":     ledger.InstrumentBond,
+	"INSTRUMENT_TYPE_ETF":      ledger.InstrumentETF,
+	"INSTRUMENT_TYPE_CURRENCY": ledger.InstrumentCurrency,
+	"INSTRUMENT_TYPE_FUTURES":  ledger.InstrumentFutures,
+	"INSTRUMENT_TYPE_OPTION":   ledger.InstrumentOption,
+}
+
+const instrumentUnspecified = "INSTRUMENT_TYPE_UNSPECIFIED"
+
+func toInstrumentKind(s string) ledger.InstrumentKind {
+	if s == "" || s == instrumentUnspecified {
+		return ""
+	}
+	if kind, ok := instrumentKinds[s]; ok {
+		return kind
+	}
+	return ledger.InstrumentOther
+}

@@ -17,15 +17,17 @@ func TestToEventKind(t *testing.T) {
 	tests := []struct {
 		name           string
 		opType         string
-		instrumentType string
+		instrumentKind string
 		want           ledger.Kind
+		wantInstrument ledger.InstrumentKind
 	}{
-		{"покупка акции", "OPERATION_TYPE_BUY", "share", ledger.KindBuy},
-		{"пополнение", "OPERATION_TYPE_INPUT", "", ledger.KindDeposit},
-		{"налог на дивиденды", "OPERATION_TYPE_DIVIDEND_TAX", "share", ledger.KindTax},
-		{"амортизация", "OPERATION_TYPE_BOND_REPAYMENT", "bond", ledger.KindAmortization},
-		{"покупка фьючерса", "OPERATION_TYPE_BUY", "futures", ledger.KindDerivatives},
-		{"комиссия по опциону", "OPERATION_TYPE_BROKER_FEE", "option", ledger.KindDerivatives},
+		{"покупка акции", "OPERATION_TYPE_BUY", "INSTRUMENT_TYPE_SHARE", ledger.KindBuy, ledger.InstrumentShare},
+		{"пополнение", "OPERATION_TYPE_INPUT", "INSTRUMENT_TYPE_UNSPECIFIED", ledger.KindDeposit, ""},
+		{"налог на дивиденды", "OPERATION_TYPE_DIVIDEND_TAX", "INSTRUMENT_TYPE_SHARE", ledger.KindTax, ledger.InstrumentShare},
+		{"амортизация", "OPERATION_TYPE_BOND_REPAYMENT", "INSTRUMENT_TYPE_BOND", ledger.KindAmortization, ledger.InstrumentBond},
+		{"покупка валюты", "OPERATION_TYPE_BUY", "INSTRUMENT_TYPE_CURRENCY", ledger.KindBuy, ledger.InstrumentCurrency},
+		{"покупка фьючерса", "OPERATION_TYPE_BUY", "INSTRUMENT_TYPE_FUTURES", ledger.KindDerivatives, ledger.InstrumentFutures},
+		{"комиссия по опциону", "OPERATION_TYPE_BROKER_FEE", "INSTRUMENT_TYPE_OPTION", ledger.KindDerivatives, ledger.InstrumentOption},
 	}
 
 	for _, tt := range tests {
@@ -33,7 +35,7 @@ func TestToEventKind(t *testing.T) {
 			op := tinvest.Operation{
 				State:          stateExecuted,
 				Type:           tt.opType,
-				InstrumentType: tt.instrumentType,
+				InstrumentKind: tt.instrumentKind,
 				Payment:        rubValue("100"),
 				QuantityDone:   "1",
 			}
@@ -42,7 +44,32 @@ func TestToEventKind(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if got.Kind != tt.want {
-				t.Fatalf("kind = %q, want %q", got.Kind, tt.want)
+				t.Errorf("kind = %q, want %q", got.Kind, tt.want)
+			}
+			if got.InstrumentKind != tt.wantInstrument {
+				t.Errorf("instrument kind = %q, want %q", got.InstrumentKind, tt.wantInstrument)
+			}
+		})
+	}
+}
+
+func TestToInstrumentKind(t *testing.T) {
+	tests := []struct {
+		in   string
+		want ledger.InstrumentKind
+	}{
+		{"INSTRUMENT_TYPE_BOND", ledger.InstrumentBond},
+		{"INSTRUMENT_TYPE_CURRENCY", ledger.InstrumentCurrency},
+		{"INSTRUMENT_TYPE_FUTURES", ledger.InstrumentFutures},
+		{"INSTRUMENT_TYPE_UNSPECIFIED", ""},
+		{"", ""},
+		{"INSTRUMENT_TYPE_SP", ledger.InstrumentOther},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			if got := toInstrumentKind(tt.in); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
 	}
