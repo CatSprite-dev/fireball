@@ -23,6 +23,7 @@ const (
 	KindFee          OperationKind = "fee"          // любая комиссия
 	KindTax          OperationKind = "tax"          // любой налог, включая коррекцию
 	KindDerivatives  OperationKind = "derivatives"  // всё по срочному рынку
+	KindExchange     OperationKind = "exchange"     // вторая нога обмена валюты
 )
 
 type InstrumentKind string
@@ -45,6 +46,7 @@ type Event struct {
 	Date            time.Time
 	OperationKind   OperationKind
 	InstrumentUID   string
+	AssetUID        string
 	InstrumentKind  InstrumentKind
 	Quantity        decimal.Decimal
 	Amount          money.Money

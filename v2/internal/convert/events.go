@@ -51,6 +51,7 @@ func ToEvent(accountID string, op tinvest.Operation) (ledger.Event, error) {
 		Date:            op.Date.UTC(),
 		OperationKind:   operationKind,
 		InstrumentUID:   op.InstrumentUID,
+		AssetUID:        op.AssetUID,
 		InstrumentKind:  instrumentKind,
 		Amount:          amount,
 		AccruedInterest: accruedInterest,

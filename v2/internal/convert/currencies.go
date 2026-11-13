@@ -46,3 +46,15 @@ func ExchangeCurrencies(list []tinvest.Currency) (map[string]CurrencyInstrument,
 
 	return result, nil
 }
+
+func CurrencyByAsset(currencies []tinvest.Currency) map[string]string {
+	result := make(map[string]string, len(currencies))
+	for _, c := range currencies {
+		code := strings.ToUpper(c.IsoCurrencyName)
+		if code == "RUB" || c.AssetUID == "" {
+			continue
+		}
+		result[c.AssetUID] = code
+	}
+	return result
+}

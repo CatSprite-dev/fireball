@@ -79,13 +79,19 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	rates, err := loadRates(ctx, client, events)
+	currencies, err := client.GetCurrencies(ctx, tinvest.InstrumentStatusAll)
+	if err != nil {
+		return fmt.Errorf("get currencies: %w", err)
+	}
+
+	rates, err := loadRates(ctx, client, currencies, events)
 	if err != nil {
 		return fmt.Errorf("load rates: %w", err)
 	}
 	if err := ledger.ApplyBase(events, rates); err != nil {
 		return err
 	}
+	events = ledger.AddCurrencyLegs(events, convert.CurrencyByAsset(currencies))
 	logger.Info("loaded", "accounts", len(data), "events", len(events), "duration", time.Since(start))
 
 	holdings, err := allHoldings(data)
@@ -176,7 +182,7 @@ func allHoldings(data []accountData) ([]ledger.Holding, error) {
 	return all, nil
 }
 
-func loadRates(ctx context.Context, client *tinvest.Client, events []ledger.Event) (*fx.Rates, error) {
+func loadRates(ctx context.Context, client *tinvest.Client, currencies []tinvest.Currency, events []ledger.Event) (*fx.Rates, error) {
 	needed := make(map[string]bool)
 	var earliest time.Time
 	for _, e := range events {
@@ -192,11 +198,7 @@ func loadRates(ctx context.Context, client *tinvest.Client, events []ledger.Even
 		return fx.New(nil), nil
 	}
 
-	list, err := client.GetCurrencies(ctx, tinvest.InstrumentStatusAll)
-	if err != nil {
-		return nil, err
-	}
-	instruments, err := convert.ExchangeCurrencies(list)
+	instruments, err := convert.ExchangeCurrencies(currencies)
 	if err != nil {
 		return nil, err
 	}
@@ -320,102 +322,15 @@ func checkCash(logger *slog.Logger, data []accountData, holdings []ledger.Holdin
 	}
 }
 
-// checkFXTrades — временная проверка: сделки с самой валютой (покупка и продажа долларов и евро).
-func checkFXTrades(logger *slog.Logger, holdings []ledger.Holding, events []ledger.Event) {
-	fxUIDs := map[string]string{
-		"a22a1263-8e1b-4546-a1aa-416463f104d3": "USD000UTSTOM (CETS)",
-		"b1c06e5e-f5d4-4ff5-8cb3-dcacccd933da": "EUR_RUB__TOM (CETS)",
-	}
-	for _, h := range holdings {
-		if h.Type == "currency" && h.Ticker != "RUB000UTSTOM" {
-			fxUIDs[h.InstrumentUID] = h.Ticker + " (portfolio)"
-		}
-	}
-
-	byOperation := make(map[string]string)
-	for _, e := range events {
-		if _, ok := fxUIDs[e.InstrumentUID]; ok {
-			byOperation[e.OperationID] = e.InstrumentUID
-		}
-	}
-
-	type total struct{ rub, qty decimal.Decimal }
-	totals := make(map[string]*total)
-
-	for _, e := range events {
-		uid := e.InstrumentUID
-		if uid == "" {
-			uid = byOperation[e.ParentID]
-		}
-		name, ok := fxUIDs[uid]
-		if !ok {
-			continue
-		}
-
-		t := totals[name]
-		if t == nil {
-			t = &total{}
-			totals[name] = t
-		}
-		t.rub = t.rub.Add(e.BaseAmount.Amount)
-		switch e.OperationKind {
-		case ledger.KindBuy:
-			t.qty = t.qty.Add(e.Quantity)
-		case ledger.KindSell:
-			t.qty = t.qty.Sub(e.Quantity)
-		}
-
-		logger.Info("fx trade",
-			"instrument", name,
-			"date", e.Date.Format(time.DateOnly),
-			"kind", e.OperationKind,
-			"amount", e.Amount.Amount,
-			"currency", e.Amount.Currency,
-			"quantity", e.Quantity,
-		)
-	}
-
-	for name, t := range totals {
-		logger.Info("fx total", "instrument", name, "rub", t.rub.Round(2), "quantity", t.qty)
-	}
-}
-
-// checkDays — временная проверка: все события счёта за выбранные даты.
-func checkDays(logger *slog.Logger, events []ledger.Event) {
-	days := map[string]bool{
-		"2021-08-30": true, // первая покупка за доллары
-		"2022-11-24": true, // комиссия за сделку с долларом
-		"2023-07-24": true, // комиссия + продажа за 74 $
-	}
-	for _, e := range events {
-		if !days[e.Date.Format(time.DateOnly)] {
-			continue
-		}
-		logger.Info("day",
-			"date", e.Date.Format(time.DateTime),
-			"account", e.AccountID,
-			"kind", e.OperationKind,
-			"instrument", e.InstrumentUID,
-			"op", e.OperationID,
-			"parent", e.ParentID,
-			"amount", e.Amount.Amount,
-			"currency", e.Amount.Currency,
-			"quantity", e.Quantity,
-		)
-	}
-}
-
 // checkFutures — временная проверка: сделки с фьючерсами против вариационной маржи.
 func checkFutures(logger *slog.Logger, data []accountData, events []ledger.Event) {
 	trades := make(map[string]decimal.Decimal)
 	margin := make(map[string]decimal.Decimal)
 	for _, e := range events {
-		if e.OperationKind != ledger.KindDerivatives {
-			continue
-		}
-		if e.InstrumentUID != "" {
+		switch {
+		case e.InstrumentKind == ledger.InstrumentFutures && (e.OperationKind == ledger.KindBuy || e.OperationKind == ledger.KindSell):
 			trades[e.AccountID] = trades[e.AccountID].Add(e.BaseAmount.Amount)
-		} else {
+		case e.OperationKind == ledger.KindDerivatives:
 			margin[e.AccountID] = margin[e.AccountID].Add(e.BaseAmount.Amount)
 		}
 	}

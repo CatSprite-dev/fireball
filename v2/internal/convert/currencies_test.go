@@ -55,3 +55,25 @@ func TestExchangeCurrenciesAmbiguous(t *testing.T) {
 		t.Errorf("got %v, want ErrAmbiguousCurrency", err)
 	}
 }
+
+func TestCurrencyByAsset(t *testing.T) {
+	list := []tinvest.Currency{
+		{AssetUID: "57880736", IsoCurrencyName: "usd", ClassCode: "CETS"},
+		{AssetUID: "57880736", IsoCurrencyName: "usd", ClassCode: "EES_CETS"},
+		{AssetUID: "e1408696", IsoCurrencyName: "eur"},
+		{AssetUID: "3fad82df", IsoCurrencyName: "rub"},
+		{AssetUID: "", IsoCurrencyName: "kzt"},
+	}
+
+	got := CurrencyByAsset(list)
+
+	want := map[string]string{"57880736": "USD", "e1408696": "EUR"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for asset, code := range want {
+		if got[asset] != code {
+			t.Errorf("asset %s = %q, want %q", asset, got[asset], code)
+		}
+	}
+}
