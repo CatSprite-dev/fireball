@@ -103,19 +103,7 @@ func run(logger *slog.Logger) error {
 	}
 
 	checkTotal(logger, holdings, events, currencyByAsset, currencyByUID(currencies))
-	brokerID := ""
-	for _, d := range data {
-		if d.Account.Name == "Брокерский счёт" {
-			brokerID = d.Account.ID
-		}
-	}
-	var brokerHoldings []ledger.Holding
-	for _, h := range holdings {
-		if h.AccountID == brokerID {
-			brokerHoldings = append(brokerHoldings, h)
-		}
-	}
-	checkTotal(logger, brokerHoldings, ledger.Filter(events, []string{brokerID}), currencyByAsset, currencyByUID(currencies))
+	checkChildren(logger, data)
 
 	return nil
 }
@@ -320,4 +308,44 @@ func currencyByUID(currencies []tinvest.Currency) map[string]string {
 		result[c.UID] = strings.ToUpper(c.IsoCurrencyName)
 	}
 	return result
+}
+
+// checkChildren — временная проверка: у всех ли операций маржи и экспирации есть разбивка по контрактам.
+func checkChildren(logger *slog.Logger, data []accountData) {
+	types := map[string]bool{
+		"OPERATION_TYPE_ACCRUING_VARMARGIN":    true,
+		"OPERATION_TYPE_WRITING_OFF_VARMARGIN": true,
+		"OPERATION_TYPE_OPTION_EXPIRATION":     true,
+		"OPERATION_TYPE_FUTURE_EXPIRATION":     true,
+	}
+	total, bad, multi := 0, 0, 0
+	for _, d := range data {
+		for _, op := range d.Operations {
+			if !types[op.Type] || op.State != "OPERATION_STATE_EXECUTED" {
+				continue
+			}
+			total++
+			payment, _ := convert.ToMoney(op.Payment)
+			sum := decimal.Zero
+			for _, ch := range op.ChildOperations {
+				p, _ := convert.ToMoney(ch.Payment)
+				sum = sum.Add(p.Amount)
+			}
+			if len(op.ChildOperations) > 1 {
+				multi++
+			}
+			if len(op.ChildOperations) == 0 || !sum.Equal(payment.Amount) {
+				bad++
+				logger.Info("bad",
+					"date", op.Date.Format("2006-01-02"),
+					"type", op.Type,
+					"uid", op.InstrumentUID,
+					"payment", payment.Amount,
+					"children", len(op.ChildOperations),
+					"children_sum", sum,
+				)
+			}
+		}
+	}
+	logger.Info("children", "total", total, "bad", bad, "with_several", multi)
 }

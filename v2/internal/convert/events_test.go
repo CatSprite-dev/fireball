@@ -1,12 +1,14 @@
 package convert
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/v2/internal/ledger"
 	"github.com/CatSprite-dev/fireball/v2/internal/tinvest"
+	"github.com/shopspring/decimal"
 )
 
 func rubValue(units string) tinvest.MoneyValue {
@@ -250,6 +252,83 @@ func TestPositionKind(t *testing.T) {
 		t.Run(tt.in, func(t *testing.T) {
 			if got := positionKind(tt.in); got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func opFromJSON(t *testing.T, s string) tinvest.Operation {
+	t.Helper()
+	var op tinvest.Operation
+	if err := json.Unmarshal([]byte(s), &op); err != nil {
+		t.Fatal(err)
+	}
+	return op
+}
+
+func TestToEventsSplitsByContracts(t *testing.T) {
+	type want struct {
+		id     string
+		uid    string
+		amount string
+	}
+	tests := []struct {
+		name string
+		op   string
+		want []want
+	}{
+		{
+			name: "one contract",
+			op: `{"id":"18127975","type":"OPERATION_TYPE_ACCRUING_VARMARGIN","state":"OPERATION_STATE_EXECUTED",
+				"date":"2026-08-14T21:00:21Z","instrumentKind":"INSTRUMENT_TYPE_UNSPECIFIED",
+				"payment":{"currency":"rub","units":"2885","nano":0},
+				"childOperations":[{"instrumentUid":"574d37d8","payment":{"currency":"rub","units":"2885","nano":0}}]}`,
+			want: []want{{"18127975:0", "574d37d8", "2885"}},
+		},
+		{
+			name: "two contracts",
+			op: `{"id":"m2","type":"OPERATION_TYPE_ACCRUING_VARMARGIN","state":"OPERATION_STATE_EXECUTED",
+				"date":"2026-08-14T21:00:21Z","instrumentKind":"INSTRUMENT_TYPE_UNSPECIFIED",
+				"payment":{"currency":"rub","units":"700","nano":0},
+				"childOperations":[
+					{"instrumentUid":"si-uid","payment":{"currency":"rub","units":"1000","nano":0}},
+					{"instrumentUid":"br-uid","payment":{"currency":"rub","units":"-300","nano":0}}]}`,
+			want: []want{{"m2:0", "si-uid", "1000"}, {"m2:1", "br-uid", "-300"}},
+		},
+		{
+			name: "children do not add up",
+			op: `{"id":"m3","type":"OPERATION_TYPE_ACCRUING_VARMARGIN","state":"OPERATION_STATE_EXECUTED",
+				"date":"2026-08-14T21:00:21Z","instrumentKind":"INSTRUMENT_TYPE_UNSPECIFIED",
+				"payment":{"currency":"rub","units":"700","nano":0},
+				"childOperations":[
+					{"instrumentUid":"si-uid","payment":{"currency":"rub","units":"1000","nano":0}},
+					{"instrumentUid":"br-uid","payment":{"currency":"rub","units":"-200","nano":0}}]}`,
+			want: []want{{"m3", "", "700"}},
+		},
+		{
+			name: "option expiration without children",
+			op: `{"id":"exp1","type":"OPERATION_TYPE_OPTION_EXPIRATION","state":"OPERATION_STATE_EXECUTED",
+				"date":"2024-07-31T21:00:00Z","instrumentUid":"2b4ab15b","instrumentKind":"INSTRUMENT_TYPE_OPTION",
+				"payment":{"currency":"rub","units":"264","nano":0},"childOperations":[]}`,
+			want: []want{{"exp1", "2b4ab15b", "264"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ToEvents("acc", []tinvest.Operation{opFromJSON(t, tt.op)})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %d events, want %d", len(got), len(tt.want))
+			}
+			for i, w := range tt.want {
+				e := got[i]
+				if e.OperationID != w.id || e.InstrumentUID != w.uid || !e.Amount.Amount.Equal(decimal.RequireFromString(w.amount)) {
+					t.Errorf("event %d = {%s %s %s}, want {%s %s %s}",
+						i, e.OperationID, e.InstrumentUID, e.Amount.Amount, w.id, w.uid, w.amount)
+				}
 			}
 		})
 	}
