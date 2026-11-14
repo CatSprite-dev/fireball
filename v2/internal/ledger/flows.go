@@ -1,4 +1,4 @@
-// Package metrics считает потоки денег по позициям журнала.
+// Package ledger — журнал событий и книга позиций
 //
 // Позиция — всё, что было у пользователя по одному активу. Ключ позиции:
 //   - валюта — код валюты (USD), потому что одна валюта торгуется под разными uid;
@@ -9,10 +9,9 @@
 //
 // Портфель брокера знает только instrumentUid, поэтому PageKeys даёт карту
 // instrumentUid → ключ позиции, чтобы стоимость легла туда же, куда сделки.
-package metrics
+package ledger
 
 import (
-	"github.com/CatSprite-dev/fireball/v2/internal/ledger"
 	"github.com/shopspring/decimal"
 )
 
@@ -26,7 +25,7 @@ type Flows struct {
 	Clearing decimal.Decimal
 }
 
-func ByInstrument(events []ledger.Event, currencyByAsset map[string]string) map[string]*Flows {
+func ByInstrument(events []Event, currencyByAsset map[string]string) map[string]*Flows {
 	result := make(map[string]*Flows)
 
 	for _, e := range events {
@@ -45,24 +44,24 @@ func ByInstrument(events []ledger.Event, currencyByAsset map[string]string) map[
 
 		amount := e.BaseAmount.Amount
 		switch e.OperationKind {
-		case ledger.KindBuy:
+		case KindBuy:
 			f.Bought = f.Bought.Add(amount)
 			f.Quantity = f.Quantity.Add(adjustForSplits(uid, e.Date, e.Quantity))
-		case ledger.KindSell:
+		case KindSell:
 			f.Sold = f.Sold.Add(amount)
 			f.Quantity = f.Quantity.Sub(adjustForSplits(uid, e.Date, e.Quantity))
-		case ledger.KindDividend, ledger.KindCoupon, ledger.KindAmortization:
+		case KindDividend, KindCoupon, KindAmortization:
 			f.Income = f.Income.Add(amount)
-		case ledger.KindRedemption:
+		case KindRedemption:
 			f.Income = f.Income.Add(amount)
 			f.Quantity = decimal.Zero
-		case ledger.KindFee:
+		case KindFee:
 			f.Fees = f.Fees.Add(amount)
-		case ledger.KindTax:
+		case KindTax:
 			f.Taxes = f.Taxes.Add(amount)
-		case ledger.KindVariationMargin:
+		case KindVariationMargin:
 			f.Clearing = f.Clearing.Add(amount)
-		case ledger.KindExpiration:
+		case KindExpiration:
 			f.Clearing = f.Clearing.Add(amount)
 			f.Quantity = decimal.Zero
 		}
@@ -72,14 +71,14 @@ func ByInstrument(events []ledger.Event, currencyByAsset map[string]string) map[
 }
 
 // pageKey возвращает ключ позиции, на которую записывается событие
-func pageKey(e ledger.Event, currencyByAsset map[string]string) string {
+func pageKey(e Event, currencyByAsset map[string]string) string {
 	switch e.InstrumentKind {
-	case ledger.InstrumentCurrency:
+	case InstrumentCurrency:
 		if code, ok := currencyByAsset[e.AssetUID]; ok {
 			return code
 		}
 		return e.InstrumentUID
-	case ledger.InstrumentFutures, ledger.InstrumentOption:
+	case InstrumentFutures, InstrumentOption:
 		return e.InstrumentUID
 	}
 	if e.AssetUID != "" {
@@ -91,8 +90,8 @@ func pageKey(e ledger.Event, currencyByAsset map[string]string) string {
 	return e.InstrumentUID
 }
 
-func addCurrencyMirror(pages map[string]*Flows, e ledger.Event) {
-	if e.OperationKind == ledger.KindExchange || e.Amount.Currency == e.BaseAmount.Currency || e.Amount.Amount.IsZero() {
+func addCurrencyMirror(pages map[string]*Flows, e Event) {
+	if e.OperationKind == KindExchange || e.Amount.Currency == e.BaseAmount.Currency || e.Amount.Amount.IsZero() {
 		return
 	}
 
@@ -111,7 +110,7 @@ func addCurrencyMirror(pages map[string]*Flows, e ledger.Event) {
 	f.Quantity = f.Quantity.Add(e.Amount.Amount)
 }
 
-func PageKeys(events []ledger.Event, currencyCodeByAssetUID map[string]string) (pageKeyByInstrumentUID map[string]string) {
+func PageKeys(events []Event, currencyCodeByAssetUID map[string]string) (pageKeyByInstrumentUID map[string]string) {
 	pageKeyByInstrumentUID = make(map[string]string)
 	for _, e := range events {
 		if e.InstrumentUID != "" {

@@ -1,16 +1,15 @@
-package metrics
+package ledger
 
 import (
 	"testing"
 	"time"
 
-	"github.com/CatSprite-dev/fireball/v2/internal/ledger"
 	"github.com/CatSprite-dev/fireball/v2/internal/money"
 	"github.com/shopspring/decimal"
 )
 
-func ev(id, parent string, kind ledger.OperationKind, uid, amount, qty string) ledger.Event {
-	e := ledger.Event{
+func ev(id, parent string, kind OperationKind, uid, amount, qty string) Event {
+	e := Event{
 		OperationID:   id,
 		ParentID:      parent,
 		OperationKind: kind,
@@ -24,15 +23,15 @@ func ev(id, parent string, kind ledger.OperationKind, uid, amount, qty string) l
 }
 
 func TestByInstrument(t *testing.T) {
-	events := []ledger.Event{
-		ev("dep", "", ledger.KindDeposit, "", "200000", ""),
-		ev("buy1", "", ledger.KindBuy, "etln", "-100510", "100"),
-		ev("fee1", "buy1", ledger.KindFee, "etln", "-50.26", ""),
-		ev("cpn", "", ledger.KindCoupon, "etln", "2000", ""),
-		ev("tax", "", ledger.KindTax, "etln", "-260", ""),
-		ev("sell1", "", ledger.KindSell, "etln", "100789", "100"),
-		ev("fee2", "sell1", ledger.KindFee, "etln", "-301.53", ""),
-		ev("svc", "", ledger.KindFee, "", "-99", ""),
+	events := []Event{
+		ev("dep", "", KindDeposit, "", "200000", ""),
+		ev("buy1", "", KindBuy, "etln", "-100510", "100"),
+		ev("fee1", "buy1", KindFee, "etln", "-50.26", ""),
+		ev("cpn", "", KindCoupon, "etln", "2000", ""),
+		ev("tax", "", KindTax, "etln", "-260", ""),
+		ev("sell1", "", KindSell, "etln", "100789", "100"),
+		ev("fee2", "sell1", KindFee, "etln", "-301.53", ""),
+		ev("svc", "", KindFee, "", "-99", ""),
 	}
 
 	got := ByInstrument(events, nil)
@@ -64,18 +63,18 @@ func TestByInstrument(t *testing.T) {
 func TestByInstrumentCurrencyPageByCode(t *testing.T) {
 	currencyByAsset := map[string]string{"usd-asset": "USD"}
 
-	oldDollar := ev("buy-old", "", ledger.KindBuy, "usd-cngd", "-810.15", "11")
-	oldDollar.InstrumentKind = ledger.InstrumentCurrency
+	oldDollar := ev("buy-old", "", KindBuy, "usd-cngd", "-810.15", "11")
+	oldDollar.InstrumentKind = InstrumentCurrency
 	oldDollar.AssetUID = "usd-asset"
 
-	newDollar := ev("buy-new", "", ledger.KindBuy, "usd-tom", "-6722.35", "74")
-	newDollar.InstrumentKind = ledger.InstrumentCurrency
+	newDollar := ev("buy-new", "", KindBuy, "usd-tom", "-6722.35", "74")
+	newDollar.InstrumentKind = InstrumentCurrency
 	newDollar.AssetUID = "usd-asset"
 
-	share := ev("buy-share", "", ledger.KindBuy, "etln", "-100510", "100")
-	share.InstrumentKind = ledger.InstrumentShare
+	share := ev("buy-share", "", KindBuy, "etln", "-100510", "100")
+	share.InstrumentKind = InstrumentShare
 
-	got := ByInstrument([]ledger.Event{oldDollar, newDollar, share}, currencyByAsset)
+	got := ByInstrument([]Event{oldDollar, newDollar, share}, currencyByAsset)
 
 	if _, ok := got["USD"]; !ok {
 		t.Fatalf("no USD page: %v", got)
@@ -92,22 +91,22 @@ func TestByInstrumentCurrencyPageByCode(t *testing.T) {
 }
 
 func TestByInstrumentCurrencyMirror(t *testing.T) {
-	buyUSD := ev("buy-usd", "", ledger.KindBuy, "usd-tom", "-810.15", "11")
-	buyUSD.InstrumentKind = ledger.InstrumentCurrency
+	buyUSD := ev("buy-usd", "", KindBuy, "usd-tom", "-810.15", "11")
+	buyUSD.InstrumentKind = InstrumentCurrency
 	buyUSD.AssetUID = "usd-asset"
 
-	leg := ev("buy-usd:leg", "buy-usd", ledger.KindExchange, "usd-tom", "810.15", "")
-	leg.InstrumentKind = ledger.InstrumentCurrency
+	leg := ev("buy-usd:leg", "buy-usd", KindExchange, "usd-tom", "810.15", "")
+	leg.InstrumentKind = InstrumentCurrency
 	leg.AssetUID = "usd-asset"
 	leg.Amount = money.Money{Amount: decimal.RequireFromString("11"), Currency: "USD"}
 
-	buyShare := ev("buy-aapl", "", ledger.KindBuy, "aapl", "-740", "1")
+	buyShare := ev("buy-aapl", "", KindBuy, "aapl", "-740", "1")
 	buyShare.Amount = money.Money{Amount: decimal.RequireFromString("-10"), Currency: "USD"}
 
-	dividend := ev("div-aapl", "", ledger.KindDividend, "aapl", "37.5", "")
+	dividend := ev("div-aapl", "", KindDividend, "aapl", "37.5", "")
 	dividend.Amount = money.Money{Amount: decimal.RequireFromString("0.5"), Currency: "USD"}
 
-	got := ByInstrument([]ledger.Event{buyUSD, leg, buyShare, dividend}, map[string]string{"usd-asset": "USD"})
+	got := ByInstrument([]Event{buyUSD, leg, buyShare, dividend}, map[string]string{"usd-asset": "USD"})
 
 	usd := got["USD"]
 	checks := []struct {
@@ -129,10 +128,10 @@ func TestByInstrumentCurrencyMirror(t *testing.T) {
 }
 
 func TestByInstrumentClearing(t *testing.T) {
-	events := []ledger.Event{
-		ev("vm:0", "vm", ledger.KindVariationMargin, "fut", "2885", ""),
-		ev("vm2:0", "vm2", ledger.KindVariationMargin, "fut", "-1687", ""),
-		ev("exp", "", ledger.KindExpiration, "opt", "264", ""),
+	events := []Event{
+		ev("vm:0", "vm", KindVariationMargin, "fut", "2885", ""),
+		ev("vm2:0", "vm2", KindVariationMargin, "fut", "-1687", ""),
+		ev("exp", "", KindExpiration, "opt", "264", ""),
 	}
 
 	got := ByInstrument(events, nil)
@@ -146,15 +145,15 @@ func TestByInstrumentClearing(t *testing.T) {
 }
 
 func TestByInstrumentRedemptionAndExpirationCloseQuantity(t *testing.T) {
-	events := []ledger.Event{
-		ev("buy-bond", "", ledger.KindBuy, "bond", "-1028.33", "1"),
-		ev("redeem", "", ledger.KindRedemption, "bond", "1035.10", ""),
+	events := []Event{
+		ev("buy-bond", "", KindBuy, "bond", "-1028.33", "1"),
+		ev("redeem", "", KindRedemption, "bond", "1035.10", ""),
 
-		ev("buy-opt", "", ledger.KindBuy, "opt", "-305.90", "322"),
-		ev("exp", "", ledger.KindExpiration, "opt", "0", ""),
+		ev("buy-opt", "", KindBuy, "opt", "-305.90", "322"),
+		ev("exp", "", KindExpiration, "opt", "0", ""),
 
-		ev("buy-amort", "", ledger.KindBuy, "amort", "-10000", "10"),
-		ev("amort", "", ledger.KindAmortization, "amort", "2500", ""),
+		ev("buy-amort", "", KindBuy, "amort", "-10000", "10"),
+		ev("amort", "", KindAmortization, "amort", "2500", ""),
 	}
 
 	got := ByInstrument(events, nil)
@@ -177,23 +176,23 @@ func TestByInstrumentRedemptionAndExpirationCloseQuantity(t *testing.T) {
 }
 
 func TestByInstrumentMergesByAsset(t *testing.T) {
-	oldUID := ev("buy", "", ledger.KindBuy, "tspx-tqtd", "-6174.67", "700")
-	oldUID.InstrumentKind = ledger.InstrumentETF
+	oldUID := ev("buy", "", KindBuy, "tspx-tqtd", "-6174.67", "700")
+	oldUID.InstrumentKind = InstrumentETF
 	oldUID.AssetUID = "tspx-asset"
 
-	newUID := ev("sell", "", ledger.KindSell, "tspx-tqtf", "5497.80", "700")
-	newUID.InstrumentKind = ledger.InstrumentETF
+	newUID := ev("sell", "", KindSell, "tspx-tqtf", "5497.80", "700")
+	newUID.InstrumentKind = InstrumentETF
 	newUID.AssetUID = "tspx-asset"
 
-	option := ev("opt", "", ledger.KindBuy, "gz130", "-500.80", "80")
-	option.InstrumentKind = ledger.InstrumentOption
+	option := ev("opt", "", KindBuy, "gz130", "-500.80", "80")
+	option.InstrumentKind = InstrumentOption
 	option.AssetUID = "gazp-asset"
 
-	share := ev("gazp", "", ledger.KindBuy, "gazp-uid", "-25821.30", "100")
-	share.InstrumentKind = ledger.InstrumentShare
+	share := ev("gazp", "", KindBuy, "gazp-uid", "-25821.30", "100")
+	share.InstrumentKind = InstrumentShare
 	share.AssetUID = "gazp-asset"
 
-	got := ByInstrument([]ledger.Event{oldUID, newUID, option, share}, nil)
+	got := ByInstrument([]Event{oldUID, newUID, option, share}, nil)
 
 	if !got["tspx-asset"].Quantity.IsZero() {
 		t.Errorf("tspx quantity = %s, want 0", got["tspx-asset"].Quantity)
@@ -207,23 +206,23 @@ func TestByInstrumentMergesByAsset(t *testing.T) {
 }
 
 func TestPageKeys(t *testing.T) {
-	oldTSPX := ev("buy", "", ledger.KindBuy, "tspx-tqtd", "-6174.67", "700")
-	oldTSPX.InstrumentKind = ledger.InstrumentETF
+	oldTSPX := ev("buy", "", KindBuy, "tspx-tqtd", "-6174.67", "700")
+	oldTSPX.InstrumentKind = InstrumentETF
 	oldTSPX.AssetUID = "tspx-asset"
 
-	newTSPX := ev("sell", "", ledger.KindSell, "tspx-tqtf", "5497.80", "700")
-	newTSPX.InstrumentKind = ledger.InstrumentETF
+	newTSPX := ev("sell", "", KindSell, "tspx-tqtf", "5497.80", "700")
+	newTSPX.InstrumentKind = InstrumentETF
 	newTSPX.AssetUID = "tspx-asset"
 
-	usd := ev("buy-usd", "", ledger.KindBuy, "usd-tom", "-810.15", "11")
-	usd.InstrumentKind = ledger.InstrumentCurrency
+	usd := ev("buy-usd", "", KindBuy, "usd-tom", "-810.15", "11")
+	usd.InstrumentKind = InstrumentCurrency
 	usd.AssetUID = "usd-asset"
 
-	option := ev("opt", "", ledger.KindBuy, "gz130", "-500.80", "80")
-	option.InstrumentKind = ledger.InstrumentOption
+	option := ev("opt", "", KindBuy, "gz130", "-500.80", "80")
+	option.InstrumentKind = InstrumentOption
 	option.AssetUID = "gazp-asset"
 
-	got := PageKeys([]ledger.Event{oldTSPX, newTSPX, usd, option}, map[string]string{"usd-asset": "USD"})
+	got := PageKeys([]Event{oldTSPX, newTSPX, usd, option}, map[string]string{"usd-asset": "USD"})
 
 	want := map[string]string{
 		"tspx-tqtd": "tspx-asset",
@@ -239,15 +238,15 @@ func TestPageKeys(t *testing.T) {
 }
 
 func TestByInstrumentMergesKnownConversion(t *testing.T) {
-	gdr := ev("buy-tcsg", "", ledger.KindBuy, "a640e094", "-8353.10", "1")
-	gdr.InstrumentKind = ledger.InstrumentShare
+	gdr := ev("buy-tcsg", "", KindBuy, "a640e094", "-8353.10", "1")
+	gdr.InstrumentKind = InstrumentShare
 	gdr.AssetUID = "4ac39e69-fff7-406c-8324-a869d97ec022"
 
-	share := ev("buy-t", "", ledger.KindBuy, "87db07bc", "-71683.66", "64")
-	share.InstrumentKind = ledger.InstrumentShare
+	share := ev("buy-t", "", KindBuy, "87db07bc", "-71683.66", "64")
+	share.InstrumentKind = InstrumentShare
 	share.AssetUID = "4393bdb6-9017-466e-a3bb-ddb55d24159f"
 
-	got := ByInstrument([]ledger.Event{gdr, share}, nil)
+	got := ByInstrument([]Event{gdr, share}, nil)
 
 	if len(got) != 1 {
 		t.Fatalf("got %d positions, want 1 (T): %v", len(got), got)
@@ -265,27 +264,27 @@ func TestByInstrumentAdjustsForSplit(t *testing.T) {
 	const tAsset = "4393bdb6-9017-466e-a3bb-ddb55d24159f"
 	msk := time.FixedZone("MSK", 3*60*60)
 
-	before := ev("buy-before", "", ledger.KindBuy, "t-uid", "-3107.10", "1")
-	before.InstrumentKind = ledger.InstrumentShare
+	before := ev("buy-before", "", KindBuy, "t-uid", "-3107.10", "1")
+	before.InstrumentKind = InstrumentShare
 	before.AssetUID = tAsset
 	before.Date = time.Date(2025, 4, 10, 12, 0, 0, 0, msk)
 
-	lastDay := ev("buy-last", "", ledger.KindBuy, "t-uid", "-3236.20", "1")
-	lastDay.InstrumentKind = ledger.InstrumentShare
+	lastDay := ev("buy-last", "", KindBuy, "t-uid", "-3236.20", "1")
+	lastDay.InstrumentKind = InstrumentShare
 	lastDay.AssetUID = tAsset
 	lastDay.Date = time.Date(2026, 4, 14, 18, 0, 0, 0, msk)
 
-	after := ev("buy-after", "", ledger.KindBuy, "t-uid", "-1598", "5")
-	after.InstrumentKind = ledger.InstrumentShare
+	after := ev("buy-after", "", KindBuy, "t-uid", "-1598", "5")
+	after.InstrumentKind = InstrumentShare
 	after.AssetUID = tAsset
 	after.Date = time.Date(2026, 4, 17, 10, 0, 0, 0, msk)
 
-	sell := ev("sell-after", "", ledger.KindSell, "t-uid", "960", "3")
-	sell.InstrumentKind = ledger.InstrumentShare
+	sell := ev("sell-after", "", KindSell, "t-uid", "960", "3")
+	sell.InstrumentKind = InstrumentShare
 	sell.AssetUID = tAsset
 	sell.Date = time.Date(2026, 5, 20, 12, 0, 0, 0, msk)
 
-	got := ByInstrument([]ledger.Event{before, lastDay, after, sell}, nil)
+	got := ByInstrument([]Event{before, lastDay, after, sell}, nil)
 
 	pos := got[tAsset]
 	if !pos.Quantity.Equal(decimal.NewFromInt(22)) {
@@ -300,17 +299,17 @@ func TestByInstrumentAdjustsForReverseSplit(t *testing.T) {
 	const vtbAsset = "94f18cc6-9e01-4db6-9d73-8c3ba6ab9655"
 	msk := time.FixedZone("MSK", 3*60*60)
 
-	before := ev("buy-before", "", ledger.KindBuy, "vtbr-uid", "-230", "10000")
-	before.InstrumentKind = ledger.InstrumentShare
+	before := ev("buy-before", "", KindBuy, "vtbr-uid", "-230", "10000")
+	before.InstrumentKind = InstrumentShare
 	before.AssetUID = vtbAsset
 	before.Date = time.Date(2024, 7, 8, 12, 0, 0, 0, msk)
 
-	after := ev("buy-after", "", ledger.KindBuy, "vtbr-uid", "-1150", "10")
-	after.InstrumentKind = ledger.InstrumentShare
+	after := ev("buy-after", "", KindBuy, "vtbr-uid", "-1150", "10")
+	after.InstrumentKind = InstrumentShare
 	after.AssetUID = vtbAsset
 	after.Date = time.Date(2024, 7, 15, 12, 0, 0, 0, msk)
 
-	got := ByInstrument([]ledger.Event{before, after}, nil)
+	got := ByInstrument([]Event{before, after}, nil)
 
 	if !got[vtbAsset].Quantity.Equal(decimal.NewFromInt(12)) {
 		t.Errorf("quantity = %s, want 12 (10000 / 5000 + 10)", got[vtbAsset].Quantity)

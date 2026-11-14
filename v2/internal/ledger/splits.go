@@ -1,4 +1,4 @@
-package metrics
+package ledger
 
 import (
 	"time"

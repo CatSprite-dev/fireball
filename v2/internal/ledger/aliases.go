@@ -1,4 +1,4 @@
-package metrics
+package ledger
 
 // currentAssetUIDByOldAssetUID — конвертации, которые брокер не связывает общим признаком.
 var currentAssetUIDByOldAssetUID = map[string]string{

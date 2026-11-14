@@ -19,7 +19,6 @@ import (
 	"github.com/CatSprite-dev/fireball/v2/internal/convert"
 	"github.com/CatSprite-dev/fireball/v2/internal/fx"
 	"github.com/CatSprite-dev/fireball/v2/internal/ledger"
-	"github.com/CatSprite-dev/fireball/v2/internal/metrics"
 	"github.com/CatSprite-dev/fireball/v2/internal/tinvest"
 )
 
@@ -240,7 +239,7 @@ func currencyByUID(currencies []tinvest.Currency) map[string]string {
 
 // printBook — временная проверка: все страницы журнала.
 func printBook(data []accountData, holdings []ledger.Holding, events []ledger.Event, currencyByAsset, currencyByUID map[string]string) {
-	pageKeyByInstrumentUID := metrics.PageKeys(events, currencyByAsset)
+	pageKeyByInstrumentUID := ledger.PageKeys(events, currencyByAsset)
 
 	tickers := make(map[string]string)
 	for _, d := range data {
@@ -266,13 +265,13 @@ func printBook(data []accountData, holdings []ledger.Holding, events []ledger.Ev
 
 	type row struct {
 		key    string
-		f      *metrics.Flows
+		f      *ledger.Flows
 		value  decimal.Decimal
 		profit decimal.Decimal
 	}
 	var rows []row
 	total := decimal.Zero
-	for key, f := range metrics.ByInstrument(events, currencyByAsset) {
+	for key, f := range ledger.ByInstrument(events, currencyByAsset) {
 		v := values[key]
 		profit := v.Add(f.Bought).Add(f.Sold).Add(f.Income).Add(f.Fees).Add(f.Taxes).Add(f.Clearing)
 		total = total.Add(profit)
