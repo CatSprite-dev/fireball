@@ -22,9 +22,11 @@ var splitsByAssetUID = map[string][]split{
 }
 
 func adjustForSplits(positionKey string, date time.Time, quantity decimal.Decimal) decimal.Decimal {
-	for _, s := range splitsByAssetUID[positionKey] {
-		if date.Before(s.date) {
-			quantity = quantity.Mul(decimal.NewFromInt(s.after)).Div(decimal.NewFromInt(s.before))
+	for _, table := range []map[string][]split{splitsByAssetUID, generatedSplitsByAssetUID} {
+		for _, s := range table[positionKey] {
+			if date.Before(s.date) {
+				quantity = quantity.Mul(decimal.NewFromInt(s.after)).Div(decimal.NewFromInt(s.before))
+			}
 		}
 	}
 	return quantity

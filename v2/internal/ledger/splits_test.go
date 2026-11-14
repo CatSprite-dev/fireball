@@ -80,3 +80,10 @@ func TestAdjustForSplitsExactRatio(t *testing.T) {
 		t.Errorf("quantity = %s, want 100 (300 × 1 / 3)", got)
 	}
 }
+func TestSplitTablesDoNotOverlap(t *testing.T) {
+	for uid := range splitsByAssetUID {
+		if _, ok := generatedSplitsByAssetUID[uid]; ok {
+			t.Errorf("%s is in both tables: split would be applied twice", uid)
+		}
+	}
+}

@@ -1,0 +1,344 @@
+[
+  {
+    "tradedate": "2018-12-12",
+    "secid": "FXRU",
+    "before": 10,
+    "after": 1
+  },
+  {
+    "tradedate": "2021-04-12",
+    "secid": "VTBB",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2021-04-12",
+    "secid": "VTBBA",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2021-04-12",
+    "secid": "VTBU",
+    "before": 1,
+    "after": 40
+  },
+  {
+    "tradedate": "2021-04-12",
+    "secid": "VTBUE",
+    "before": 1,
+    "after": 40
+  },
+  {
+    "tradedate": "2021-05-07",
+    "secid": "VTBA",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2021-05-07",
+    "secid": "VTBE",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2021-05-07",
+    "secid": "VTBEM",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2021-05-07",
+    "secid": "VTBEM2",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2021-05-07",
+    "secid": "VTBH",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2021-05-07",
+    "secid": "VTBHY",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2021-05-07",
+    "secid": "VTBHY2",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2021-05-07",
+    "secid": "VTBSN",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2021-05-07",
+    "secid": "VTBSN2",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2021-06-04",
+    "secid": "SBGB",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2021-06-04",
+    "secid": "SBGBA",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2021-06-04",
+    "secid": "SBMX",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2021-06-04",
+    "secid": "SBMXA",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2021-06-04",
+    "secid": "SBRB",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2021-06-04",
+    "secid": "SBRBA",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2021-06-28",
+    "secid": "SCIP",
+    "before": 1,
+    "after": 140
+  },
+  {
+    "tradedate": "2021-06-28",
+    "secid": "SCIPA",
+    "before": 1,
+    "after": 140
+  },
+  {
+    "tradedate": "2021-07-21",
+    "secid": "NVDA-RM",
+    "before": 1,
+    "after": 4
+  },
+  {
+    "tradedate": "2021-07-30",
+    "secid": "GE-RM",
+    "before": 8,
+    "after": 1
+  },
+  {
+    "tradedate": "2021-09-09",
+    "secid": "FXDE",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2021-10-04",
+    "secid": "ISRG-RM",
+    "before": 1,
+    "after": 3
+  },
+  {
+    "tradedate": "2021-10-06",
+    "secid": "FXRB",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2021-10-06",
+    "secid": "FXRL",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2021-10-06",
+    "secid": "FXUS",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2022-02-02",
+    "secid": "FXGD",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2022-02-02",
+    "secid": "FXRU",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2022-02-02",
+    "secid": "FXTB",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2022-07-13",
+    "secid": "SCFT",
+    "before": 1,
+    "after": 5
+  },
+  {
+    "tradedate": "2022-07-13",
+    "secid": "SCFTA",
+    "before": 1,
+    "after": 5
+  },
+  {
+    "tradedate": "2023-01-18",
+    "secid": "ROLO",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2024-02-08",
+    "secid": "GEMA",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2024-02-21",
+    "secid": "FIXTRNFP",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2024-02-21",
+    "secid": "TRNFP",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2024-04-08",
+    "secid": "FIXGMKN",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2024-04-08",
+    "secid": "GMKN",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2024-07-15",
+    "secid": "FIXVTBR",
+    "before": 5000,
+    "after": 1
+  },
+  {
+    "tradedate": "2024-07-15",
+    "secid": "VTBR",
+    "before": 5000,
+    "after": 1
+  },
+  {
+    "tradedate": "2024-08-13",
+    "secid": "RU000A0JP799",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2024-10-01",
+    "secid": "AKQU",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2024-10-01",
+    "secid": "AKQUB",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2024-10-02",
+    "secid": "RU000A100EQ2",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2025-03-27",
+    "secid": "FIXPLZL",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2025-03-27",
+    "secid": "PLZL",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2025-08-05",
+    "secid": "URKZ",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2025-08-15",
+    "secid": "KOGK",
+    "before": 1,
+    "after": 100
+  },
+  {
+    "tradedate": "2025-11-17",
+    "secid": "NFLX-RM",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2025-12-19",
+    "secid": "NOW-RM",
+    "before": 1,
+    "after": 5
+  },
+  {
+    "tradedate": "2026-04-06",
+    "secid": "BKNG-RM",
+    "before": 1,
+    "after": 25
+  },
+  {
+    "tradedate": "2026-04-17",
+    "secid": "FIXT",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2026-04-17",
+    "secid": "T",
+    "before": 1,
+    "after": 10
+  },
+  {
+    "tradedate": "2026-07-02",
+    "secid": "CRWD-RM",
+    "before": 1,
+    "after": 4
+  },
+  {
+    "tradedate": "2026-08-14",
+    "secid": "RU000A0JT4S1",
+    "before": 1,
+    "after": 100
+  }
+]
