@@ -104,7 +104,6 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	checkTotal(logger, holdings, events, currencyByAsset, currencyByUID(currencies))
 	printBook(data, holdings, events, currencyByAsset, currencyByUID(currencies))
 
 	return nil
@@ -229,74 +228,6 @@ func loadRates(ctx context.Context, client *tinvest.Client, currencies []tinvest
 	}
 
 	return fx.New(baseCurrency, points), nil
-}
-
-// checkTotal — временная проверка: общая прибыль «сверху» и «снизу».
-func checkTotal(logger *slog.Logger, holdings []ledger.Holding, events []ledger.Event, currencyByAsset, currencyByUID map[string]string) {
-	value := decimal.Zero
-	values := make(map[string]decimal.Decimal)
-	for _, h := range holdings {
-		value = value.Add(h.Value())
-		key := h.InstrumentUID
-		if code, ok := currencyByUID[h.InstrumentUID]; ok && h.InstrumentKind == ledger.InstrumentCurrency {
-			key = code
-		}
-		values[key] = values[key].Add(h.Value())
-	}
-
-	netIn := decimal.Zero
-	unlinked := decimal.Zero
-	for _, e := range events {
-		amount := e.BaseAmount.Amount
-		switch e.OperationKind {
-		case ledger.KindDeposit, ledger.KindWithdrawal, ledger.KindTransferIn, ledger.KindTransferOut:
-			netIn = netIn.Add(amount)
-			continue
-		case ledger.KindExchange:
-			continue
-		}
-		if e.InstrumentUID == "" {
-			unlinked = unlinked.Add(amount)
-		}
-	}
-
-	instruments := decimal.Zero
-	for key, f := range metrics.ByInstrument(events, currencyByAsset) {
-		instruments = instruments.Add(values[key]).Add(f.Bought).Add(f.Sold).Add(f.Income).Add(f.Fees).Add(f.Taxes).Add(f.Clearing)
-	}
-
-	top := value.Sub(netIn)
-	bottom := instruments.Add(unlinked)
-	logger.Info("total", "value_now", value.Round(2), "net_in", netIn.Round(2), "profit", top.Round(2))
-	logger.Info("bottom-up",
-		"instruments", instruments.Round(2),
-		"unlinked", unlinked.Round(2),
-		"sum", bottom.Round(2),
-		"diff", top.Sub(bottom).Round(2),
-	)
-}
-
-// checkCurrencyInFlows — временная проверка: валютные позиции, чей uid попал в ByInstrument.
-func checkCurrencyInFlows(logger *slog.Logger, holdings []ledger.Holding, events []ledger.Event) {
-	flows := metrics.ByInstrument(events, nil)
-	total := decimal.Zero
-	for _, h := range holdings {
-		if h.InstrumentKind != ledger.InstrumentCurrency {
-			continue
-		}
-		_, inFlows := flows[h.InstrumentUID]
-		if inFlows {
-			total = total.Add(h.Value())
-		}
-		logger.Info("currency holding",
-			"ticker", h.Ticker,
-			"uid", h.InstrumentUID,
-			"quantity", h.Quantity,
-			"value", h.Value().Round(2),
-			"in_flows", inFlows,
-		)
-	}
-	logger.Info("counted twice", "sum", total.Round(2))
 }
 
 func currencyByUID(currencies []tinvest.Currency) map[string]string {
