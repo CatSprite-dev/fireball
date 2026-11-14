@@ -236,3 +236,26 @@ func TestPageKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestByInstrumentMergesKnownConversion(t *testing.T) {
+	gdr := ev("buy-tcsg", "", ledger.KindBuy, "a640e094", "-8353.10", "1")
+	gdr.InstrumentKind = ledger.InstrumentShare
+	gdr.AssetUID = "4ac39e69-fff7-406c-8324-a869d97ec022"
+
+	share := ev("buy-t", "", ledger.KindBuy, "87db07bc", "-71683.66", "64")
+	share.InstrumentKind = ledger.InstrumentShare
+	share.AssetUID = "4393bdb6-9017-466e-a3bb-ddb55d24159f"
+
+	got := ByInstrument([]ledger.Event{gdr, share}, nil)
+
+	if len(got) != 1 {
+		t.Fatalf("got %d positions, want 1 (T): %v", len(got), got)
+	}
+	pos := got["4393bdb6-9017-466e-a3bb-ddb55d24159f"]
+	if pos == nil {
+		t.Fatalf("no T position: %v", got)
+	}
+	if !pos.Bought.Equal(decimal.RequireFromString("-80036.76")) {
+		t.Errorf("T bought = %s, want -80036.76", pos.Bought)
+	}
+}

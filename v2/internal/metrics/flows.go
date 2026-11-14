@@ -83,6 +83,9 @@ func pageKey(e ledger.Event, currencyByAsset map[string]string) string {
 		return e.InstrumentUID
 	}
 	if e.AssetUID != "" {
+		if current, ok := currentAssetUIDByOldAssetUID[e.AssetUID]; ok {
+			return current
+		}
 		return e.AssetUID
 	}
 	return e.InstrumentUID
