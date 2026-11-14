@@ -309,23 +309,28 @@ func currencyByUID(currencies []tinvest.Currency) map[string]string {
 
 // printBook — временная проверка: все страницы журнала.
 func printBook(data []accountData, holdings []ledger.Holding, events []ledger.Event, currencyByAsset, currencyByUID map[string]string) {
+	pageKeyByInstrumentUID := metrics.PageKeys(events, currencyByAsset)
+
 	tickers := make(map[string]string)
 	for _, d := range data {
 		for _, op := range d.Operations {
-			if op.InstrumentUID != "" && op.Ticker != "" {
-				tickers[op.InstrumentUID] = op.Ticker
+			if key := pageKeyByInstrumentUID[op.InstrumentUID]; key != "" && op.Ticker != "" {
+				tickers[key] = op.Ticker
 			}
 		}
 	}
 
 	values := make(map[string]decimal.Decimal)
 	for _, h := range holdings {
-		key := h.InstrumentUID
-		if code, ok := currencyByUID[h.InstrumentUID]; ok && h.InstrumentKind == ledger.InstrumentCurrency {
-			key = code
+		key, ok := pageKeyByInstrumentUID[h.InstrumentUID]
+		if !ok {
+			key = h.InstrumentUID
+			if code, isCurrency := currencyByUID[h.InstrumentUID]; isCurrency && h.InstrumentKind == ledger.InstrumentCurrency {
+				key = code
+			}
 		}
 		values[key] = values[key].Add(h.Value())
-		tickers[h.InstrumentUID] = h.Ticker
+		tickers[key] = h.Ticker
 	}
 
 	type row struct {

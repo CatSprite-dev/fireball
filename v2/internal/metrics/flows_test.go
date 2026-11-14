@@ -174,3 +174,65 @@ func TestByInstrumentRedemptionAndExpirationCloseQuantity(t *testing.T) {
 		}
 	}
 }
+
+func TestByInstrumentMergesByAsset(t *testing.T) {
+	oldUID := ev("buy", "", ledger.KindBuy, "tspx-tqtd", "-6174.67", "700")
+	oldUID.InstrumentKind = ledger.InstrumentETF
+	oldUID.AssetUID = "tspx-asset"
+
+	newUID := ev("sell", "", ledger.KindSell, "tspx-tqtf", "5497.80", "700")
+	newUID.InstrumentKind = ledger.InstrumentETF
+	newUID.AssetUID = "tspx-asset"
+
+	option := ev("opt", "", ledger.KindBuy, "gz130", "-500.80", "80")
+	option.InstrumentKind = ledger.InstrumentOption
+	option.AssetUID = "gazp-asset"
+
+	share := ev("gazp", "", ledger.KindBuy, "gazp-uid", "-25821.30", "100")
+	share.InstrumentKind = ledger.InstrumentShare
+	share.AssetUID = "gazp-asset"
+
+	got := ByInstrument([]ledger.Event{oldUID, newUID, option, share}, nil)
+
+	if !got["tspx-asset"].Quantity.IsZero() {
+		t.Errorf("tspx quantity = %s, want 0", got["tspx-asset"].Quantity)
+	}
+	if _, ok := got["gz130"]; !ok {
+		t.Errorf("option must keep its own page")
+	}
+	if len(got) != 3 {
+		t.Errorf("got %d pages, want 3 (tspx-asset, gz130, gazp-asset): %v", len(got), got)
+	}
+}
+
+func TestPageKeys(t *testing.T) {
+	oldTSPX := ev("buy", "", ledger.KindBuy, "tspx-tqtd", "-6174.67", "700")
+	oldTSPX.InstrumentKind = ledger.InstrumentETF
+	oldTSPX.AssetUID = "tspx-asset"
+
+	newTSPX := ev("sell", "", ledger.KindSell, "tspx-tqtf", "5497.80", "700")
+	newTSPX.InstrumentKind = ledger.InstrumentETF
+	newTSPX.AssetUID = "tspx-asset"
+
+	usd := ev("buy-usd", "", ledger.KindBuy, "usd-tom", "-810.15", "11")
+	usd.InstrumentKind = ledger.InstrumentCurrency
+	usd.AssetUID = "usd-asset"
+
+	option := ev("opt", "", ledger.KindBuy, "gz130", "-500.80", "80")
+	option.InstrumentKind = ledger.InstrumentOption
+	option.AssetUID = "gazp-asset"
+
+	got := PageKeys([]ledger.Event{oldTSPX, newTSPX, usd, option}, map[string]string{"usd-asset": "USD"})
+
+	want := map[string]string{
+		"tspx-tqtd": "tspx-asset",
+		"tspx-tqtf": "tspx-asset",
+		"usd-tom":   "USD",
+		"gz130":     "gz130",
+	}
+	for uid, key := range want {
+		if got[uid] != key {
+			t.Errorf("%s → %q, want %q", uid, got[uid], key)
+		}
+	}
+}

@@ -1,3 +1,14 @@
+// Package metrics считает потоки денег по позициям журнала.
+//
+// Позиция — всё, что было у пользователя по одному активу. Ключ позиции:
+//   - валюта — код валюты (USD), потому что одна валюта торгуется под разными uid;
+//   - фьючерс и опцион — instrumentUid: у каждого контракта своя позиция;
+//   - акции, облигации, фонды — assetUid: при переводе бумаги брокер меняет
+//     instrumentUid, а assetUid остаётся прежним;
+//   - если assetUid пустой — instrumentUid.
+//
+// Портфель брокера знает только instrumentUid, поэтому PageKeys даёт карту
+// instrumentUid → ключ позиции, чтобы стоимость легла туда же, куда сделки.
 package metrics
 
 import (
@@ -60,11 +71,19 @@ func ByInstrument(events []ledger.Event, currencyByAsset map[string]string) map[
 	return result
 }
 
+// pageKey возвращает ключ позиции, на которую записывается событие
 func pageKey(e ledger.Event, currencyByAsset map[string]string) string {
-	if e.InstrumentKind == ledger.InstrumentCurrency {
+	switch e.InstrumentKind {
+	case ledger.InstrumentCurrency:
 		if code, ok := currencyByAsset[e.AssetUID]; ok {
 			return code
 		}
+		return e.InstrumentUID
+	case ledger.InstrumentFutures, ledger.InstrumentOption:
+		return e.InstrumentUID
+	}
+	if e.AssetUID != "" {
+		return e.AssetUID
 	}
 	return e.InstrumentUID
 }
@@ -87,4 +106,14 @@ func addCurrencyMirror(pages map[string]*Flows, e ledger.Event) {
 		f.Sold = f.Sold.Add(mirror)
 	}
 	f.Quantity = f.Quantity.Add(e.Amount.Amount)
+}
+
+func PageKeys(events []ledger.Event, currencyCodeByAssetUID map[string]string) (pageKeyByInstrumentUID map[string]string) {
+	pageKeyByInstrumentUID = make(map[string]string)
+	for _, e := range events {
+		if e.InstrumentUID != "" {
+			pageKeyByInstrumentUID[e.InstrumentUID] = pageKey(e, currencyCodeByAssetUID)
+		}
+	}
+	return pageKeyByInstrumentUID
 }
