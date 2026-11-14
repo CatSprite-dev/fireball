@@ -47,10 +47,10 @@ func ByInstrument(events []ledger.Event, currencyByAsset map[string]string) map[
 		switch e.OperationKind {
 		case ledger.KindBuy:
 			f.Bought = f.Bought.Add(amount)
-			f.Quantity = f.Quantity.Add(e.Quantity)
+			f.Quantity = f.Quantity.Add(adjustForSplits(uid, e.Date, e.Quantity))
 		case ledger.KindSell:
 			f.Sold = f.Sold.Add(amount)
-			f.Quantity = f.Quantity.Sub(e.Quantity)
+			f.Quantity = f.Quantity.Sub(adjustForSplits(uid, e.Date, e.Quantity))
 		case ledger.KindDividend, ledger.KindCoupon, ledger.KindAmortization:
 			f.Income = f.Income.Add(amount)
 		case ledger.KindRedemption:
