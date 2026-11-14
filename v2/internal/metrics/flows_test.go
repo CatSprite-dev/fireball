@@ -295,3 +295,24 @@ func TestByInstrumentAdjustsForSplit(t *testing.T) {
 		t.Errorf("bought = %s, want -7941.30 (money is not changed by split)", pos.Bought)
 	}
 }
+
+func TestByInstrumentAdjustsForReverseSplit(t *testing.T) {
+	const vtbAsset = "94f18cc6-9e01-4db6-9d73-8c3ba6ab9655"
+	msk := time.FixedZone("MSK", 3*60*60)
+
+	before := ev("buy-before", "", ledger.KindBuy, "vtbr-uid", "-230", "10000")
+	before.InstrumentKind = ledger.InstrumentShare
+	before.AssetUID = vtbAsset
+	before.Date = time.Date(2024, 7, 8, 12, 0, 0, 0, msk)
+
+	after := ev("buy-after", "", ledger.KindBuy, "vtbr-uid", "-1150", "10")
+	after.InstrumentKind = ledger.InstrumentShare
+	after.AssetUID = vtbAsset
+	after.Date = time.Date(2024, 7, 15, 12, 0, 0, 0, msk)
+
+	got := ByInstrument([]ledger.Event{before, after}, nil)
+
+	if !got[vtbAsset].Quantity.Equal(decimal.NewFromInt(12)) {
+		t.Errorf("quantity = %s, want 12 (10000 / 5000 + 10)", got[vtbAsset].Quantity)
+	}
+}
