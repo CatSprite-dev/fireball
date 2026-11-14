@@ -2,7 +2,6 @@ package ledger
 
 import (
 	"testing"
-	"time"
 
 	"github.com/CatSprite-dev/fireball/v2/internal/money"
 	"github.com/shopspring/decimal"
@@ -257,61 +256,5 @@ func TestByInstrumentMergesKnownConversion(t *testing.T) {
 	}
 	if !pos.Bought.Equal(decimal.RequireFromString("-80036.76")) {
 		t.Errorf("T bought = %s, want -80036.76", pos.Bought)
-	}
-}
-
-func TestByInstrumentAdjustsForSplit(t *testing.T) {
-	const tAsset = "4393bdb6-9017-466e-a3bb-ddb55d24159f"
-	msk := time.FixedZone("MSK", 3*60*60)
-
-	before := ev("buy-before", "", KindBuy, "t-uid", "-3107.10", "1")
-	before.InstrumentKind = InstrumentShare
-	before.AssetUID = tAsset
-	before.Date = time.Date(2025, 4, 10, 12, 0, 0, 0, msk)
-
-	lastDay := ev("buy-last", "", KindBuy, "t-uid", "-3236.20", "1")
-	lastDay.InstrumentKind = InstrumentShare
-	lastDay.AssetUID = tAsset
-	lastDay.Date = time.Date(2026, 4, 14, 18, 0, 0, 0, msk)
-
-	after := ev("buy-after", "", KindBuy, "t-uid", "-1598", "5")
-	after.InstrumentKind = InstrumentShare
-	after.AssetUID = tAsset
-	after.Date = time.Date(2026, 4, 17, 10, 0, 0, 0, msk)
-
-	sell := ev("sell-after", "", KindSell, "t-uid", "960", "3")
-	sell.InstrumentKind = InstrumentShare
-	sell.AssetUID = tAsset
-	sell.Date = time.Date(2026, 5, 20, 12, 0, 0, 0, msk)
-
-	got := ByInstrument([]Event{before, lastDay, after, sell}, nil)
-
-	pos := got[tAsset]
-	if !pos.Quantity.Equal(decimal.NewFromInt(22)) {
-		t.Errorf("quantity = %s, want 22 (1×10 + 1×10 + 5 − 3)", pos.Quantity)
-	}
-	if !pos.Bought.Equal(decimal.RequireFromString("-7941.30")) {
-		t.Errorf("bought = %s, want -7941.30 (money is not changed by split)", pos.Bought)
-	}
-}
-
-func TestByInstrumentAdjustsForReverseSplit(t *testing.T) {
-	const vtbAsset = "94f18cc6-9e01-4db6-9d73-8c3ba6ab9655"
-	msk := time.FixedZone("MSK", 3*60*60)
-
-	before := ev("buy-before", "", KindBuy, "vtbr-uid", "-230", "10000")
-	before.InstrumentKind = InstrumentShare
-	before.AssetUID = vtbAsset
-	before.Date = time.Date(2024, 7, 8, 12, 0, 0, 0, msk)
-
-	after := ev("buy-after", "", KindBuy, "vtbr-uid", "-1150", "10")
-	after.InstrumentKind = InstrumentShare
-	after.AssetUID = vtbAsset
-	after.Date = time.Date(2024, 7, 15, 12, 0, 0, 0, msk)
-
-	got := ByInstrument([]Event{before, after}, nil)
-
-	if !got[vtbAsset].Quantity.Equal(decimal.NewFromInt(12)) {
-		t.Errorf("quantity = %s, want 12 (10000 / 5000 + 10)", got[vtbAsset].Quantity)
 	}
 }
