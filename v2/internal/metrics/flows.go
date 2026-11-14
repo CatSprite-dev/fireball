@@ -12,6 +12,7 @@ type Flows struct {
 	Fees     decimal.Decimal
 	Taxes    decimal.Decimal
 	Quantity decimal.Decimal
+	Clearing decimal.Decimal
 }
 
 func ByInstrument(events []ledger.Event, currencyByAsset map[string]string) map[string]*Flows {
@@ -39,12 +40,20 @@ func ByInstrument(events []ledger.Event, currencyByAsset map[string]string) map[
 		case ledger.KindSell:
 			f.Sold = f.Sold.Add(amount)
 			f.Quantity = f.Quantity.Sub(e.Quantity)
-		case ledger.KindDividend, ledger.KindCoupon, ledger.KindAmortization, ledger.KindRedemption:
+		case ledger.KindDividend, ledger.KindCoupon, ledger.KindAmortization:
 			f.Income = f.Income.Add(amount)
+		case ledger.KindRedemption:
+			f.Income = f.Income.Add(amount)
+			f.Quantity = decimal.Zero
 		case ledger.KindFee:
 			f.Fees = f.Fees.Add(amount)
 		case ledger.KindTax:
 			f.Taxes = f.Taxes.Add(amount)
+		case ledger.KindVariationMargin:
+			f.Clearing = f.Clearing.Add(amount)
+		case ledger.KindExpiration:
+			f.Clearing = f.Clearing.Add(amount)
+			f.Quantity = decimal.Zero
 		}
 	}
 

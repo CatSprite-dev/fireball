@@ -126,3 +126,51 @@ func TestByInstrumentCurrencyMirror(t *testing.T) {
 		}
 	}
 }
+
+func TestByInstrumentClearing(t *testing.T) {
+	events := []ledger.Event{
+		ev("vm:0", "vm", ledger.KindVariationMargin, "fut", "2885", ""),
+		ev("vm2:0", "vm2", ledger.KindVariationMargin, "fut", "-1687", ""),
+		ev("exp", "", ledger.KindExpiration, "opt", "264", ""),
+	}
+
+	got := ByInstrument(events, nil)
+
+	if !got["fut"].Clearing.Equal(decimal.RequireFromString("1198")) {
+		t.Errorf("fut clearing = %s, want 1198", got["fut"].Clearing)
+	}
+	if !got["opt"].Clearing.Equal(decimal.RequireFromString("264")) {
+		t.Errorf("opt clearing = %s, want 264", got["opt"].Clearing)
+	}
+}
+
+func TestByInstrumentRedemptionAndExpirationCloseQuantity(t *testing.T) {
+	events := []ledger.Event{
+		ev("buy-bond", "", ledger.KindBuy, "bond", "-1028.33", "1"),
+		ev("redeem", "", ledger.KindRedemption, "bond", "1035.10", ""),
+
+		ev("buy-opt", "", ledger.KindBuy, "opt", "-305.90", "322"),
+		ev("exp", "", ledger.KindExpiration, "opt", "0", ""),
+
+		ev("buy-amort", "", ledger.KindBuy, "amort", "-10000", "10"),
+		ev("amort", "", ledger.KindAmortization, "amort", "2500", ""),
+	}
+
+	got := ByInstrument(events, nil)
+
+	checks := []struct {
+		name string
+		got  decimal.Decimal
+		want string
+	}{
+		{"bond quantity", got["bond"].Quantity, "0"},
+		{"bond income", got["bond"].Income, "1035.10"},
+		{"option quantity", got["opt"].Quantity, "0"},
+		{"amortization keeps quantity", got["amort"].Quantity, "10"},
+	}
+	for _, c := range checks {
+		if !c.got.Equal(decimal.RequireFromString(c.want)) {
+			t.Errorf("%s = %s, want %s", c.name, c.got, c.want)
+		}
+	}
+}

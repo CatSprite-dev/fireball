@@ -7,7 +7,9 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -103,7 +105,7 @@ func run(logger *slog.Logger) error {
 	}
 
 	checkTotal(logger, holdings, events, currencyByAsset, currencyByUID(currencies))
-	checkChildren(logger, data)
+	printBook(data, holdings, events, currencyByAsset, currencyByUID(currencies))
 
 	return nil
 }
@@ -243,16 +245,12 @@ func checkTotal(logger *slog.Logger, holdings []ledger.Holding, events []ledger.
 	}
 
 	netIn := decimal.Zero
-	derivatives := decimal.Zero
 	unlinked := decimal.Zero
 	for _, e := range events {
 		amount := e.BaseAmount.Amount
 		switch e.OperationKind {
 		case ledger.KindDeposit, ledger.KindWithdrawal, ledger.KindTransferIn, ledger.KindTransferOut:
 			netIn = netIn.Add(amount)
-			continue
-		case ledger.KindVariationMargin, ledger.KindExpiration:
-			derivatives = derivatives.Add(amount)
 			continue
 		case ledger.KindExchange:
 			continue
@@ -264,15 +262,14 @@ func checkTotal(logger *slog.Logger, holdings []ledger.Holding, events []ledger.
 
 	instruments := decimal.Zero
 	for key, f := range metrics.ByInstrument(events, currencyByAsset) {
-		instruments = instruments.Add(values[key]).Add(f.Bought).Add(f.Sold).Add(f.Income).Add(f.Fees).Add(f.Taxes)
+		instruments = instruments.Add(values[key]).Add(f.Bought).Add(f.Sold).Add(f.Income).Add(f.Fees).Add(f.Taxes).Add(f.Clearing)
 	}
 
 	top := value.Sub(netIn)
-	bottom := instruments.Add(derivatives).Add(unlinked)
+	bottom := instruments.Add(unlinked)
 	logger.Info("total", "value_now", value.Round(2), "net_in", netIn.Round(2), "profit", top.Round(2))
 	logger.Info("bottom-up",
 		"instruments", instruments.Round(2),
-		"derivatives", derivatives.Round(2),
 		"unlinked", unlinked.Round(2),
 		"sum", bottom.Round(2),
 		"diff", top.Sub(bottom).Round(2),
@@ -310,42 +307,94 @@ func currencyByUID(currencies []tinvest.Currency) map[string]string {
 	return result
 }
 
-// checkChildren — временная проверка: у всех ли операций маржи и экспирации есть разбивка по контрактам.
-func checkChildren(logger *slog.Logger, data []accountData) {
-	types := map[string]bool{
-		"OPERATION_TYPE_ACCRUING_VARMARGIN":    true,
-		"OPERATION_TYPE_WRITING_OFF_VARMARGIN": true,
-		"OPERATION_TYPE_OPTION_EXPIRATION":     true,
-		"OPERATION_TYPE_FUTURE_EXPIRATION":     true,
-	}
-	total, bad, multi := 0, 0, 0
+// printBook — временная проверка: все страницы журнала.
+func printBook(data []accountData, holdings []ledger.Holding, events []ledger.Event, currencyByAsset, currencyByUID map[string]string) {
+	tickers := make(map[string]string)
 	for _, d := range data {
 		for _, op := range d.Operations {
-			if !types[op.Type] || op.State != "OPERATION_STATE_EXECUTED" {
-				continue
-			}
-			total++
-			payment, _ := convert.ToMoney(op.Payment)
-			sum := decimal.Zero
-			for _, ch := range op.ChildOperations {
-				p, _ := convert.ToMoney(ch.Payment)
-				sum = sum.Add(p.Amount)
-			}
-			if len(op.ChildOperations) > 1 {
-				multi++
-			}
-			if len(op.ChildOperations) == 0 || !sum.Equal(payment.Amount) {
-				bad++
-				logger.Info("bad",
-					"date", op.Date.Format("2006-01-02"),
-					"type", op.Type,
-					"uid", op.InstrumentUID,
-					"payment", payment.Amount,
-					"children", len(op.ChildOperations),
-					"children_sum", sum,
-				)
+			if op.InstrumentUID != "" && op.Ticker != "" {
+				tickers[op.InstrumentUID] = op.Ticker
 			}
 		}
 	}
-	logger.Info("children", "total", total, "bad", bad, "with_several", multi)
+
+	values := make(map[string]decimal.Decimal)
+	for _, h := range holdings {
+		key := h.InstrumentUID
+		if code, ok := currencyByUID[h.InstrumentUID]; ok && h.InstrumentKind == ledger.InstrumentCurrency {
+			key = code
+		}
+		values[key] = values[key].Add(h.Value())
+		tickers[h.InstrumentUID] = h.Ticker
+	}
+
+	type row struct {
+		key    string
+		f      *metrics.Flows
+		value  decimal.Decimal
+		profit decimal.Decimal
+	}
+	var rows []row
+	total := decimal.Zero
+	for key, f := range metrics.ByInstrument(events, currencyByAsset) {
+		v := values[key]
+		profit := v.Add(f.Bought).Add(f.Sold).Add(f.Income).Add(f.Fees).Add(f.Taxes).Add(f.Clearing)
+		total = total.Add(profit)
+		rows = append(rows, row{key, f, v, profit})
+	}
+	slices.SortFunc(rows, func(a, b row) int { return a.profit.Cmp(b.profit) })
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.AlignRight)
+	fmt.Fprintln(w, "тикер\tкуплено\tпродано\tдоходы\tкомиссии\tналоги\tклиринг\tшт\tстоимость\tприбыль\t")
+	for _, r := range rows {
+		name := tickers[r.key]
+		if name == "" {
+			name = r.key
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t\n",
+			name,
+			r.f.Bought.StringFixed(2), r.f.Sold.StringFixed(2), r.f.Income.StringFixed(2),
+			r.f.Fees.StringFixed(2), r.f.Taxes.StringFixed(2), r.f.Clearing.StringFixed(2),
+			r.f.Quantity.String(), r.value.StringFixed(2), r.profit.StringFixed(2))
+	}
+	netIn := decimal.Zero
+	fees := decimal.Zero
+	taxes := decimal.Zero
+	other := decimal.Zero
+	for _, e := range events {
+		amount := e.BaseAmount.Amount
+		switch e.OperationKind {
+		case ledger.KindDeposit, ledger.KindWithdrawal, ledger.KindTransferIn, ledger.KindTransferOut:
+			netIn = netIn.Add(amount)
+			continue
+		case ledger.KindExchange:
+			continue
+		}
+		if e.InstrumentUID != "" {
+			continue
+		}
+		switch e.OperationKind {
+		case ledger.KindFee:
+			fees = fees.Add(amount)
+		case ledger.KindTax:
+			taxes = taxes.Add(amount)
+		default:
+			other = other.Add(amount)
+		}
+	}
+
+	value := decimal.Zero
+	for _, h := range holdings {
+		value = value.Add(h.Value())
+	}
+	profit := value.Sub(netIn)
+	unexplained := profit.Sub(total).Sub(fees).Sub(taxes).Sub(other)
+
+	fmt.Fprintf(w, "по бумагам\t\t\t\t\t\t\t\t\t%s\t\n", total.StringFixed(2))
+	fmt.Fprintf(w, "комиссии без бумаги\t\t\t\t\t\t\t\t\t%s\t\n", fees.StringFixed(2))
+	fmt.Fprintf(w, "налоги без бумаги\t\t\t\t\t\t\t\t\t%s\t\n", taxes.StringFixed(2))
+	fmt.Fprintf(w, "прочее без бумаги\t\t\t\t\t\t\t\t\t%s\t\n", other.StringFixed(2))
+	fmt.Fprintf(w, "необъяснённое\t\t\t\t\t\t\t\t\t%s\t\n", unexplained.StringFixed(2))
+	fmt.Fprintf(w, "ИТОГО\t\t\t\t\t\t\t\t\t%s\t\n", profit.StringFixed(2))
+	w.Flush()
 }
