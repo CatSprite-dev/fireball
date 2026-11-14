@@ -17,19 +17,27 @@ type Account struct {
 	AccessLevel string    `json:"accessLevel"`
 }
 
+type AccountStatus string
+
+const (
+	AccountStatusOpen   AccountStatus = "ACCOUNT_STATUS_OPEN"
+	AccountStatusClosed AccountStatus = "ACCOUNT_STATUS_CLOSED"
+	AccountStatusAll    AccountStatus = "ACCOUNT_STATUS_ALL"
+)
+
 type getAccountsResponse struct {
 	Accounts []Account `json:"accounts"`
 }
 
-func (c *Client) GetAccounts(ctx context.Context) ([]Account, error) {
+func (c *Client) GetAccounts(ctx context.Context, status AccountStatus) ([]Account, error) {
 	type request struct {
-		Status string `json:"status"`
+		Status AccountStatus `json:"status"`
 	}
 
 	const method = "UsersService/GetAccounts"
 
 	var response getAccountsResponse
-	res, err := c.DoRequest(ctx, method, request{Status: "ACCOUNT_STATUS_OPEN"})
+	res, err := c.DoRequest(ctx, method, request{Status: status})
 	if err != nil {
 		return nil, err
 	}

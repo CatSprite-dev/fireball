@@ -23,6 +23,7 @@ var methodGroup = map[string]group{
 	"MarketDataService/GetCandles":            groupMarketData,
 	"InstrumentsService/GetInstrumentBy":      groupInstruments,
 	"InstrumentsService/Indicatives":          groupInstruments,
+	"InstrumentsService/Currencies":           groupInstruments,
 }
 
 var groupLimit = map[group]int{
