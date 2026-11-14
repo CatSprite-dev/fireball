@@ -13,11 +13,11 @@ type BaseConverter interface {
 
 func ApplyBase(events []Event, conv BaseConverter) error {
 	for i := range events {
-		amountRUB, err := conv.ToBase(events[i].Amount, events[i].Date)
+		amountBase, err := conv.ToBase(events[i].Amount, events[i].Date)
 		if err != nil {
 			return fmt.Errorf("operation %s: %w", events[i].OperationID, err)
 		}
-		events[i].BaseAmount = amountRUB
+		events[i].BaseAmount = amountBase
 	}
 	return nil
 }

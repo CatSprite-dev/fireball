@@ -14,11 +14,13 @@ type Flows struct {
 	Quantity decimal.Decimal
 }
 
-func ByInstrument(events []ledger.Event) map[string]*Flows {
+func ByInstrument(events []ledger.Event, currencyByAsset map[string]string) map[string]*Flows {
 	result := make(map[string]*Flows)
 
 	for _, e := range events {
-		uid := e.InstrumentUID
+		addCurrencyMirror(result, e)
+		uid := pageKey(e, currencyByAsset)
+
 		if uid == "" {
 			continue
 		}
@@ -47,4 +49,33 @@ func ByInstrument(events []ledger.Event) map[string]*Flows {
 	}
 
 	return result
+}
+
+func pageKey(e ledger.Event, currencyByAsset map[string]string) string {
+	if e.InstrumentKind == ledger.InstrumentCurrency {
+		if code, ok := currencyByAsset[e.AssetUID]; ok {
+			return code
+		}
+	}
+	return e.InstrumentUID
+}
+
+func addCurrencyMirror(pages map[string]*Flows, e ledger.Event) {
+	if e.OperationKind == ledger.KindExchange || e.Amount.Currency == e.BaseAmount.Currency || e.Amount.Amount.IsZero() {
+		return
+	}
+
+	f, ok := pages[e.Amount.Currency]
+	if !ok {
+		f = &Flows{}
+		pages[e.Amount.Currency] = f
+	}
+
+	mirror := e.BaseAmount.Amount.Neg()
+	if mirror.IsNegative() {
+		f.Bought = f.Bought.Add(mirror)
+	} else {
+		f.Sold = f.Sold.Add(mirror)
+	}
+	f.Quantity = f.Quantity.Add(e.Amount.Amount)
 }
