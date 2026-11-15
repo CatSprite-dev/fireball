@@ -45,3 +45,13 @@ func Sorted(s Series) Series {
 	slices.SortFunc(s, func(a, b Point) int { return a.Date.Compare(b.Date) })
 	return s
 }
+
+// Merge — один ряд из нескольких: точки по дате, на одну дату — из первого ряда, где она есть.
+func Merge(parts ...Series) Series {
+	var all Series
+	for _, p := range parts {
+		all = append(all, p...)
+	}
+	slices.SortStableFunc(all, func(a, b Point) int { return a.Date.Compare(b.Date) })
+	return slices.CompactFunc(all, func(a, b Point) bool { return a.Date.Equal(b.Date) })
+}

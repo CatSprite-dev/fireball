@@ -20,6 +20,7 @@ import (
 	"github.com/CatSprite-dev/fireball/v2/internal/fx"
 	"github.com/CatSprite-dev/fireball/v2/internal/ledger"
 	"github.com/CatSprite-dev/fireball/v2/internal/series"
+	"github.com/CatSprite-dev/fireball/v2/internal/snapshot"
 	"github.com/CatSprite-dev/fireball/v2/internal/tinvest"
 )
 
@@ -103,6 +104,9 @@ func run(logger *slog.Logger) error {
 	currencyByUID := currencyByUID(currencies)
 
 	printBook(data, holdings, events, currencyByAsset, currencyByUID)
+	if err := checkSnapshot(ctx, client, data, holdings, events, currencyByAsset, currencyByUID); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -374,4 +378,72 @@ func printBook(data []accountData, holdings []ledger.Holding, events []ledger.Ev
 	fmt.Fprintf(w, "деньги %s: книга\t\t\t\t\t\t\t\t\t%s\t\n", baseCurrency, cash.StringFixed(2))
 	fmt.Fprintf(w, "деньги %s: брокер\t\t\t\t\t\t\t\t\t%s\t\n", baseCurrency, values[baseCurrency].StringFixed(2))
 	w.Flush()
+}
+
+func checkSnapshot(ctx context.Context, client *tinvest.Client, data []accountData, holdings []ledger.Holding, events []ledger.Event, currencyByAsset, currencyByUID map[string]string) error {
+	from := events[0].Date
+	to := time.Now()
+
+	positions := ledger.ByInstrument(events, currencyByAsset)
+	pageKeys := ledger.PageKeys(events, currencyByAsset)
+
+	uidsByKey := make(map[string][]string)
+	for uid, key := range pageKeys {
+		uidsByKey[key] = append(uidsByKey[key], uid)
+	}
+
+	prices := make(map[string]series.Series)
+	for key, uids := range uidsByKey {
+		var parts []series.Series
+		for _, uid := range uids {
+			candles, err := client.GetCandles(ctx, uid, from, to, tinvest.CandleIntervalDay)
+			if err != nil {
+				continue
+			}
+			points, err := convert.ToPoints(candles.Candles, decimal.NewFromInt(1))
+			if err != nil {
+				return fmt.Errorf("prices %s: %w", uid, err)
+			}
+			parts = append(parts, points)
+		}
+		prices[key] = series.Merge(parts...)
+	}
+
+	rows, gaps := snapshot.Build(positions, prices, from, to)
+
+	tickers := make(map[string]string)
+	for _, d := range data {
+		for _, op := range d.Operations {
+			if key := pageKeys[op.InstrumentUID]; key != "" && op.Ticker != "" {
+				tickers[key] = op.Ticker
+			}
+		}
+	}
+
+	values := make(map[string]decimal.Decimal)
+	for _, h := range holdings {
+		key, ok := pageKeys[h.InstrumentUID]
+		if !ok {
+			key = h.InstrumentUID
+			if code, isCurrency := currencyByUID[h.InstrumentUID]; isCurrency && h.InstrumentKind == ledger.InstrumentCurrency {
+				key = code
+			}
+		}
+		values[key] = values[key].Add(h.Value())
+	}
+
+	fmt.Printf("строк: %d, дыр: %d\n", len(rows), len(gaps))
+	for _, g := range gaps {
+		days := int(g.To.Sub(g.From).Hours()/24) + 1
+		fmt.Printf("дыра  %-14s %s — %s  (%d дн.)\n", tickers[g.Key], g.From.Format(time.DateOnly), g.To.Format(time.DateOnly), days)
+	}
+
+	today := series.Day(to)
+	for _, r := range rows {
+		if r.Date.Equal(today) {
+			fmt.Printf("сегодня  %-14s шт %-6s снимок %12s  брокер %12s  цена от %s\n",
+				tickers[r.Key], r.Quantity, r.Value.StringFixed(2), values[r.Key].StringFixed(2), r.Price.Date.Format(time.DateOnly))
+		}
+	}
+	return nil
 }

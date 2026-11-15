@@ -2,6 +2,7 @@
 package snapshot
 
 import (
+	"slices"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/v2/internal/ledger"
@@ -57,6 +58,25 @@ func positionRows(key string, history ledger.History, prices series.Series, from
 			Price:    price,
 			Value:    quantity.Mul(price.Value),
 		})
+	}
+	return rows, gaps
+}
+
+// Build — строки всех позиций за каждый день с from по to и дни без цены.
+// prices — ряд цен на каждый ключ позиции.
+func Build(positions map[string]*ledger.Flows, prices map[string]series.Series, from, to time.Time) ([]Row, []Gap) {
+	keys := make([]string, 0, len(positions))
+	for key := range positions {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+
+	var rows []Row
+	var gaps []Gap
+	for _, key := range keys {
+		r, g := positionRows(key, positions[key].History, prices[key], from, to)
+		rows = append(rows, r...)
+		gaps = append(gaps, g...)
 	}
 	return rows, gaps
 }
