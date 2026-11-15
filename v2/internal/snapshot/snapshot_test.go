@@ -23,7 +23,7 @@ func TestPositionRows(t *testing.T) {
 		{Date: d(5), Value: decimal.RequireFromString("279.3")},
 	}
 
-	rows, gaps := positionRows("t", ledger.InstrumentShare, history, prices, d(1), d(7))
+	rows, gaps := positionRows("t", ledger.InstrumentShare, history, prices, Bond{}, d(1), d(7))
 
 	if len(rows) != 2 {
 		t.Fatalf("got %d rows, want 2: %+v", len(rows), rows)
@@ -53,7 +53,7 @@ func TestPositionRowsFuturesHaveZeroValue(t *testing.T) {
 		{Date: time.Date(2026, 8, 2, 12, 0, 0, 0, msk), Quantity: decimal.NewFromInt(1)},
 	}
 
-	rows, gaps := positionRows("si", ledger.InstrumentFutures, history, nil, d(2), d(3))
+	rows, gaps := positionRows("si", ledger.InstrumentFutures, history, nil, Bond{}, d(2), d(3))
 
 	if len(gaps) != 0 {
 		t.Errorf("futures must not have price gaps: %+v", gaps)
@@ -89,5 +89,52 @@ func TestCashRows(t *testing.T) {
 			t.Errorf("row %d: %s %s value %s price %s, want RUB %s price 1",
 				i, r.Date.Format(time.DateOnly), r.Key, r.Value, r.Price.Value, want[i])
 		}
+	}
+}
+
+func TestPositionRowsBond(t *testing.T) {
+	msk := time.FixedZone("MSK", 3*60*60)
+	day := time.Date(2026, 11, 15, 0, 0, 0, 0, time.UTC)
+
+	history := ledger.History{
+		{Date: time.Date(2025, 11, 20, 12, 0, 0, 0, msk), Quantity: decimal.NewFromInt(112)},
+	}
+	prices := series.Series{{Date: day, Value: decimal.RequireFromString("102.16")}}
+	bond := Bond{
+		Nominal: series.Series{{Date: day, Value: decimal.NewFromInt(1000)}},
+		NKD:     series.Series{{Date: day, Value: decimal.RequireFromString("11.38")}},
+	}
+
+	rows, gaps := positionRows("dbm5", ledger.InstrumentBond, history, prices, bond, day, day)
+
+	if len(gaps) != 0 || len(rows) != 1 {
+		t.Fatalf("got %d rows and %d gaps, want 1 and 0", len(rows), len(gaps))
+	}
+	r := rows[0]
+	checks := []struct {
+		name string
+		got  decimal.Decimal
+		want string
+	}{
+		{"цена в рублях", r.Price.Value, "1021.6"},
+		{"НКД", r.NKD, "11.38"},
+		{"стоимость", r.Value, "115693.76"},
+	}
+	for _, c := range checks {
+		if !c.got.Equal(decimal.RequireFromString(c.want)) {
+			t.Errorf("%s = %s, want %s", c.name, c.got, c.want)
+		}
+	}
+}
+
+func TestPositionRowsBondWithoutNominalIsGap(t *testing.T) {
+	day := time.Date(2026, 11, 15, 0, 0, 0, 0, time.UTC)
+	history := ledger.History{{Date: day, Quantity: decimal.NewFromInt(1)}}
+	prices := series.Series{{Date: day, Value: decimal.RequireFromString("102.16")}}
+
+	rows, gaps := positionRows("bond", ledger.InstrumentBond, history, prices, Bond{}, day, day)
+
+	if len(rows) != 0 || len(gaps) != 1 {
+		t.Errorf("got %d rows and %d gaps, want 0 and 1", len(rows), len(gaps))
 	}
 }

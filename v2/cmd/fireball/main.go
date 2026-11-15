@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -105,11 +106,8 @@ func run(logger *slog.Logger) error {
 	holdings, _ := allHoldings(data)
 
 	printBook(data, holdings, events, cur.ByAsset, cur.ByUID)
-	if err := checkSnapshot(ctx, client, data, holdings, events, rates, cur.ByAsset, cur.ByUID); err != nil {
-		return err
-	}
+	return checkSnapshot(ctx, client, data, holdings, events, rates, cur.ByAsset, cur.ByUID)
 
-	return nil
 }
 
 func filterAccounts(accounts []tinvest.Account) []tinvest.Account {
@@ -367,7 +365,28 @@ func checkSnapshot(ctx context.Context, client *tinvest.Client, data []accountDa
 		prices[key] = series.Merge(parts...)
 	}
 
-	rows, gaps := snapshot.Build(positions, ledger.CashHistory(events, baseCurrency), baseCurrency, prices, from, to)
+	bonds := make(map[string]snapshot.Bond)
+	for key, f := range positions {
+		if f.Kind != ledger.InstrumentBond {
+			continue
+		}
+		var nominals, nkds []series.Series
+		for _, uid := range uidsByKey[key] {
+			list, err := client.GetAccruedInterests(ctx, uid, from, to)
+			if err != nil {
+				continue
+			}
+			nominal, nkd, err := convert.ToAccrued(list)
+			if err != nil {
+				return fmt.Errorf("accrued %s: %w", uid, err)
+			}
+			nominals = append(nominals, nominal)
+			nkds = append(nkds, nkd)
+		}
+		bonds[key] = snapshot.Bond{Nominal: series.Merge(nominals...), NKD: series.Merge(nkds...)}
+	}
+
+	rows, gaps := snapshot.Build(positions, prices, bonds, ledger.CashHistory(events, baseCurrency), baseCurrency, from, to)
 
 	tickers := make(map[string]string)
 	for _, d := range data {
@@ -377,6 +396,7 @@ func checkSnapshot(ctx context.Context, client *tinvest.Client, data []accountDa
 			}
 		}
 	}
+	tickers[baseCurrency] = baseCurrency
 
 	values := make(map[string]decimal.Decimal)
 	for _, h := range holdings {
@@ -397,25 +417,81 @@ func checkSnapshot(ctx context.Context, client *tinvest.Client, data []accountDa
 	}
 
 	today := series.Day(to)
-	for _, r := range rows {
-		if r.Date.Equal(today) {
-			fmt.Printf("сегодня  %-14s шт %-6s снимок %12s  брокер %12s  цена от %s\n",
-				tickers[r.Key], r.Quantity, r.Value.StringFixed(2), values[r.Key].StringFixed(2), r.Price.Date.Format(time.DateOnly))
-		}
-	}
-
 	snapshotTotal := decimal.Zero
 	for _, r := range rows {
-		if r.Date.Equal(today) {
-			snapshotTotal = snapshotTotal.Add(r.Value)
+		if !r.Date.Equal(today) {
+			continue
 		}
+		snapshotTotal = snapshotTotal.Add(r.Value)
+		fmt.Printf("сегодня  %-14s шт %-8s цена %-10s НКД %-6s снимок %12s  брокер %12s  цена от %s\n",
+			tickers[r.Key], r.Quantity, r.Price.Value.StringFixed(2), r.NKD.StringFixed(2),
+			r.Value.StringFixed(2), values[r.Key].StringFixed(2), r.Price.Date.Format(time.DateOnly))
 	}
+
 	brokerTotal := decimal.Zero
 	for _, h := range holdings {
 		brokerTotal = brokerTotal.Add(h.Value())
 	}
 	fmt.Printf("итого сегодня: снимок %s  брокер %s  разница %s\n",
 		snapshotTotal.StringFixed(2), brokerTotal.StringFixed(2), snapshotTotal.Sub(brokerTotal).StringFixed(2))
+	return nil
+}
 
+func checkBonds(ctx context.Context, client *tinvest.Client, holdings []ledger.Holding, from time.Time) error {
+	for _, h := range holdings {
+		if h.InstrumentKind != ledger.InstrumentBond {
+			continue
+		}
+		fmt.Printf("\n===== %s  портфель: шт %s  цена %s  НКД %s  стоимость %s\n",
+			h.Ticker, h.Quantity, h.Price, h.NKD, h.Value().StringFixed(2))
+
+		bond, err := client.DoRequest(ctx, "InstrumentsService/BondBy", map[string]any{
+			"idType": "INSTRUMENT_ID_TYPE_UID",
+			"id":     h.InstrumentUID,
+			"from":   from,
+		})
+		if err != nil {
+			return fmt.Errorf("bond %s: %w", h.Ticker, err)
+		}
+		fmt.Println("--- BondBy:")
+		fmt.Println(string(bond))
+
+		candles, err := client.GetCandles(ctx, h.InstrumentUID, time.Now().AddDate(0, 0, -4), time.Now(), tinvest.CandleIntervalDay)
+		if err != nil {
+			return err
+		}
+		fmt.Println("--- свечи:")
+		for _, c := range candles.Candles {
+			cl, _ := convert.ToDecimal(c.Close.Units, c.Close.Nano)
+			fmt.Printf("  %s  закрытие %s\n", series.Day(c.Time).Format(time.DateOnly), cl)
+		}
+
+		aci, err := client.DoRequest(ctx, "InstrumentsService/GetAccruedInterests", map[string]any{
+			"instrumentId": h.InstrumentUID,
+			"from":         time.Now().AddDate(-3, 0, 0),
+			"to":           time.Now(),
+		})
+		if err != nil {
+			fmt.Println("--- НКД: ошибка:", err)
+			continue
+		}
+		var out struct {
+			AccruedInterests []struct {
+				Date    time.Time         `json:"date"`
+				Value   tinvest.Quotation `json:"value"`
+				Nominal tinvest.Quotation `json:"nominal"`
+			} `json:"accruedInterests"`
+		}
+		if err := json.Unmarshal(aci, &out); err != nil {
+			return err
+		}
+		list := out.AccruedInterests
+		fmt.Printf("--- НКД: записей %d\n", len(list))
+		if len(list) > 0 {
+			first, last := list[0], list[len(list)-1]
+			fmt.Printf("  первая %s  НКД %s.%09d  номинал %s\n", first.Date.Format(time.DateOnly), first.Value.Units, first.Value.Nano, first.Nominal.Units)
+			fmt.Printf("  последняя %s  НКД %s.%09d  номинал %s\n", last.Date.Format(time.DateOnly), last.Value.Units, last.Value.Nano, last.Nominal.Units)
+		}
+	}
 	return nil
 }
