@@ -367,7 +367,7 @@ func checkSnapshot(ctx context.Context, client *tinvest.Client, data []accountDa
 		prices[key] = series.Merge(parts...)
 	}
 
-	rows, gaps := snapshot.Build(positions, prices, from, to)
+	rows, gaps := snapshot.Build(positions, ledger.CashHistory(events, baseCurrency), baseCurrency, prices, from, to)
 
 	tickers := make(map[string]string)
 	for _, d := range data {
@@ -403,5 +403,19 @@ func checkSnapshot(ctx context.Context, client *tinvest.Client, data []accountDa
 				tickers[r.Key], r.Quantity, r.Value.StringFixed(2), values[r.Key].StringFixed(2), r.Price.Date.Format(time.DateOnly))
 		}
 	}
+
+	snapshotTotal := decimal.Zero
+	for _, r := range rows {
+		if r.Date.Equal(today) {
+			snapshotTotal = snapshotTotal.Add(r.Value)
+		}
+	}
+	brokerTotal := decimal.Zero
+	for _, h := range holdings {
+		brokerTotal = brokerTotal.Add(h.Value())
+	}
+	fmt.Printf("итого сегодня: снимок %s  брокер %s  разница %s\n",
+		snapshotTotal.StringFixed(2), brokerTotal.StringFixed(2), snapshotTotal.Sub(brokerTotal).StringFixed(2))
+
 	return nil
 }

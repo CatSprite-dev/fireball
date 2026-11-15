@@ -67,3 +67,27 @@ func TestPositionRowsFuturesHaveZeroValue(t *testing.T) {
 		}
 	}
 }
+
+func TestCashRows(t *testing.T) {
+	msk := time.FixedZone("MSK", 3*60*60)
+	d := func(day int) time.Time { return time.Date(2025, 1, day, 0, 0, 0, 0, time.UTC) }
+	at := func(day, hour int) time.Time { return time.Date(2025, 1, day, hour, 0, 0, 0, msk) }
+
+	cash := ledger.History{
+		{Date: at(10, 12), Quantity: decimal.RequireFromString("200000")},
+		{Date: at(11, 12), Quantity: decimal.RequireFromString("99439.74")},
+	}
+
+	rows := cashRows("RUB", cash, d(9), d(11))
+
+	if len(rows) != 2 {
+		t.Fatalf("got %d rows, want 2: %+v", len(rows), rows)
+	}
+	want := []string{"200000", "99439.74"}
+	for i, r := range rows {
+		if r.Key != "RUB" || !r.Value.Equal(decimal.RequireFromString(want[i])) || !r.Price.Value.Equal(decimal.NewFromInt(1)) {
+			t.Errorf("row %d: %s %s value %s price %s, want RUB %s price 1",
+				i, r.Date.Format(time.DateOnly), r.Key, r.Value, r.Price.Value, want[i])
+		}
+	}
+}

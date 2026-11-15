@@ -67,9 +67,29 @@ func positionRows(key string, kind ledger.InstrumentKind, history ledger.History
 	return rows, gaps
 }
 
-// Build — строки всех позиций за каждый день с from по to и дни без цены.
-// prices — ряд цен на каждый ключ позиции.
-func Build(positions map[string]*ledger.Flows, prices map[string]series.Series, from, to time.Time) ([]Row, []Gap) {
+// cashRows — деньги в базовой валюте base на конец каждого дня; цена денег в базе всегда 1.
+func cashRows(base string, cash ledger.History, from, to time.Time) []Row {
+	var rows []Row
+	for d := series.Day(from); !d.After(series.Day(to)); d = d.AddDate(0, 0, 1) {
+		amount := cash.At(series.EndOfDay(d))
+		if amount.IsZero() {
+			continue
+		}
+		rows = append(rows, Row{
+			Date:     d,
+			Key:      base,
+			Quantity: amount,
+			Price:    series.Point{Date: d, Value: decimal.NewFromInt(1)},
+			Value:    amount,
+		})
+	}
+	return rows
+}
+
+// Build — строки всех позиций и денег за каждый день с from по to и дни без цены.
+// prices — ряд цен на каждый ключ позиции, по возрастанию даты.
+// cash — деньги в базовой валюте base.
+func Build(positions map[string]*ledger.Flows, cash ledger.History, base string, prices map[string]series.Series, from, to time.Time) ([]Row, []Gap) {
 	keys := make([]string, 0, len(positions))
 	for key := range positions {
 		keys = append(keys, key)
@@ -83,5 +103,7 @@ func Build(positions map[string]*ledger.Flows, prices map[string]series.Series, 
 		rows = append(rows, r...)
 		gaps = append(gaps, g...)
 	}
+	rows = append(rows, cashRows(base, cash, from, to)...)
+
 	return rows, gaps
 }
