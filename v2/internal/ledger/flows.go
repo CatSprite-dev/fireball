@@ -35,6 +35,7 @@ func (h History) At(t time.Time) decimal.Decimal {
 }
 
 type Flows struct {
+	Kind     InstrumentKind
 	Bought   decimal.Decimal
 	Sold     decimal.Decimal
 	Income   decimal.Decimal
@@ -60,6 +61,10 @@ func ByInstrument(events []Event, currencyByAsset map[string]string) map[string]
 		if !ok {
 			f = &Flows{}
 			result[uid] = f
+		}
+
+		if f.Kind == "" {
+			f.Kind = e.InstrumentKind
 		}
 
 		amount := e.BaseAmount.Amount
@@ -121,7 +126,7 @@ func addCurrencyMirror(pages map[string]*Flows, e Event) {
 
 	f, ok := pages[e.Amount.Currency]
 	if !ok {
-		f = &Flows{}
+		f = &Flows{Kind: InstrumentCurrency}
 		pages[e.Amount.Currency] = f
 	}
 

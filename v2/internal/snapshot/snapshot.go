@@ -27,7 +27,7 @@ type Gap struct {
 }
 
 // positionRows — строки одной позиции за каждый день с from по to и дни без цены.
-func positionRows(key string, history ledger.History, prices series.Series, from, to time.Time) ([]Row, []Gap) {
+func positionRows(key string, kind ledger.InstrumentKind, history ledger.History, prices series.Series, from, to time.Time) ([]Row, []Gap) {
 	var rows []Row
 	var gaps []Gap
 	inGap := false
@@ -36,6 +36,11 @@ func positionRows(key string, history ledger.History, prices series.Series, from
 		quantity := history.At(series.EndOfDay(d))
 		if quantity.IsZero() {
 			inGap = false
+			continue
+		}
+
+		if kind == ledger.InstrumentFutures {
+			rows = append(rows, Row{Date: d, Key: key, Quantity: quantity})
 			continue
 		}
 
@@ -74,7 +79,7 @@ func Build(positions map[string]*ledger.Flows, prices map[string]series.Series, 
 	var rows []Row
 	var gaps []Gap
 	for _, key := range keys {
-		r, g := positionRows(key, positions[key].History, prices[key], from, to)
+		r, g := positionRows(key, positions[key].Kind, positions[key].History, prices[key], from, to)
 		rows = append(rows, r...)
 		gaps = append(gaps, g...)
 	}

@@ -23,7 +23,7 @@ func TestPositionRows(t *testing.T) {
 		{Date: d(5), Value: decimal.RequireFromString("279.3")},
 	}
 
-	rows, gaps := positionRows("t", history, prices, d(1), d(7))
+	rows, gaps := positionRows("t", ledger.InstrumentShare, history, prices, d(1), d(7))
 
 	if len(rows) != 2 {
 		t.Fatalf("got %d rows, want 2: %+v", len(rows), rows)
@@ -42,5 +42,28 @@ func TestPositionRows(t *testing.T) {
 	if !gaps[0].From.Equal(d(2)) || !gaps[0].To.Equal(d(3)) {
 		t.Errorf("gap %s — %s, want 2026-08-02 — 2026-08-03",
 			gaps[0].From.Format(time.DateOnly), gaps[0].To.Format(time.DateOnly))
+	}
+}
+
+func TestPositionRowsFuturesHaveZeroValue(t *testing.T) {
+	msk := time.FixedZone("MSK", 3*60*60)
+	d := func(day int) time.Time { return time.Date(2026, 8, day, 0, 0, 0, 0, time.UTC) }
+
+	history := ledger.History{
+		{Date: time.Date(2026, 8, 2, 12, 0, 0, 0, msk), Quantity: decimal.NewFromInt(1)},
+	}
+
+	rows, gaps := positionRows("si", ledger.InstrumentFutures, history, nil, d(2), d(3))
+
+	if len(gaps) != 0 {
+		t.Errorf("futures must not have price gaps: %+v", gaps)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("got %d rows, want 2", len(rows))
+	}
+	for _, r := range rows {
+		if !r.Value.IsZero() || !r.Quantity.Equal(decimal.NewFromInt(1)) {
+			t.Errorf("%s: quantity %s value %s, want 1 and 0", r.Date.Format(time.DateOnly), r.Quantity, r.Value)
+		}
 	}
 }
