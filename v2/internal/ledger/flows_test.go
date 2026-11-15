@@ -2,6 +2,7 @@ package ledger
 
 import (
 	"testing"
+	"time"
 
 	"github.com/CatSprite-dev/fireball/v2/internal/money"
 	"github.com/shopspring/decimal"
@@ -256,5 +257,45 @@ func TestByInstrumentMergesKnownConversion(t *testing.T) {
 	}
 	if !pos.Bought.Equal(decimal.RequireFromString("-80036.76")) {
 		t.Errorf("T bought = %s, want -80036.76", pos.Bought)
+	}
+}
+
+func TestQuantityAt(t *testing.T) {
+	const tAsset = "t-asset"
+	withSplit(t, tAsset, split{date: time.Date(2026, 4, 17, 0, 0, 0, 0, moscow), before: 1, after: 10})
+
+	buy := func(id, qty string, date time.Time) Event {
+		e := ev(id, "", KindBuy, "t-uid", "-1", qty)
+		e.InstrumentKind = InstrumentShare
+		e.AssetUID = tAsset
+		e.Date = date
+		return e
+	}
+	sell := buy("sell", "3", time.Date(2026, 5, 20, 12, 0, 0, 0, moscow))
+	sell.OperationKind = KindSell
+
+	events := []Event{
+		sell,
+		buy("b1", "1", time.Date(2025, 4, 10, 12, 0, 0, 0, moscow)),
+		buy("b2", "1", time.Date(2026, 4, 14, 18, 0, 0, 0, moscow)),
+		buy("b3", "5", time.Date(2026, 4, 17, 10, 0, 0, 0, moscow)),
+	}
+
+	pos := ByInstrument(events, nil)[tAsset]
+
+	checks := []struct {
+		at   time.Time
+		want int64
+	}{
+		{time.Date(2025, 4, 9, 23, 59, 0, 0, moscow), 0},
+		{time.Date(2025, 4, 10, 12, 0, 0, 0, moscow), 10},
+		{time.Date(2026, 4, 16, 23, 59, 0, 0, moscow), 20},
+		{time.Date(2026, 4, 17, 23, 59, 0, 0, moscow), 25},
+		{time.Date(2026, 11, 15, 0, 0, 0, 0, moscow), 22},
+	}
+	for _, c := range checks {
+		if got := pos.QuantityAt(c.at); !got.Equal(decimal.NewFromInt(c.want)) {
+			t.Errorf("at %s: quantity = %s, want %d", c.at.Format(time.DateTime), got, c.want)
+		}
 	}
 }

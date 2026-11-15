@@ -12,8 +12,16 @@
 package ledger
 
 import (
+	"sort"
+	"time"
+
 	"github.com/shopspring/decimal"
 )
+
+type QuantityPoint struct {
+	Date     time.Time
+	Quantity decimal.Decimal
+}
 
 type Flows struct {
 	Bought   decimal.Decimal
@@ -23,12 +31,17 @@ type Flows struct {
 	Taxes    decimal.Decimal
 	Quantity decimal.Decimal
 	Clearing decimal.Decimal
+	History  []QuantityPoint
 }
 
 func ByInstrument(events []Event, currencyByAsset map[string]string) map[string]*Flows {
 	result := make(map[string]*Flows)
 
-	for _, e := range events {
+	sorted := make([]Event, len(events))
+	copy(sorted, events)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Date.Before(sorted[j].Date) })
+
+	for _, e := range sorted {
 		addCurrencyMirror(result, e)
 		uid := pageKey(e, currencyByAsset)
 
@@ -47,14 +60,17 @@ func ByInstrument(events []Event, currencyByAsset map[string]string) map[string]
 		case KindBuy:
 			f.Bought = f.Bought.Add(amount)
 			f.Quantity = f.Quantity.Add(adjustForSplits(uid, e.Date, e.Quantity))
+			f.record(e.Date)
 		case KindSell:
 			f.Sold = f.Sold.Add(amount)
 			f.Quantity = f.Quantity.Sub(adjustForSplits(uid, e.Date, e.Quantity))
+			f.record(e.Date)
 		case KindDividend, KindCoupon, KindAmortization:
 			f.Income = f.Income.Add(amount)
 		case KindRedemption:
 			f.Income = f.Income.Add(amount)
 			f.Quantity = decimal.Zero
+			f.record(e.Date)
 		case KindFee:
 			f.Fees = f.Fees.Add(amount)
 		case KindTax:
@@ -64,6 +80,7 @@ func ByInstrument(events []Event, currencyByAsset map[string]string) map[string]
 		case KindExpiration:
 			f.Clearing = f.Clearing.Add(amount)
 			f.Quantity = decimal.Zero
+			f.record(e.Date)
 		}
 	}
 
@@ -108,6 +125,7 @@ func addCurrencyMirror(pages map[string]*Flows, e Event) {
 		f.Sold = f.Sold.Add(mirror)
 	}
 	f.Quantity = f.Quantity.Add(e.Amount.Amount)
+	f.record(e.Date)
 }
 
 func PageKeys(events []Event, currencyCodeByAssetUID map[string]string) (pageKeyByInstrumentUID map[string]string) {
@@ -118,4 +136,16 @@ func PageKeys(events []Event, currencyCodeByAssetUID map[string]string) (pageKey
 		}
 	}
 	return pageKeyByInstrumentUID
+}
+
+func (f *Flows) record(date time.Time) {
+	f.History = append(f.History, QuantityPoint{Date: date, Quantity: f.Quantity})
+}
+
+func (f *Flows) QuantityAt(t time.Time) decimal.Decimal {
+	i := sort.Search(len(f.History), func(i int) bool { return f.History[i].Date.After(t) })
+	if i == 0 {
+		return decimal.Zero
+	}
+	return f.History[i-1].Quantity
 }
