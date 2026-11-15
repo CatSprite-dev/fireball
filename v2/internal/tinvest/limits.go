@@ -24,6 +24,7 @@ var methodGroup = map[string]group{
 	"InstrumentsService/GetInstrumentBy":      groupInstruments,
 	"InstrumentsService/Indicatives":          groupInstruments,
 	"InstrumentsService/Currencies":           groupInstruments,
+	"InstrumentsService/GetAccruedInterests":  groupInstruments,
 }
 
 var groupLimit = map[group]int{
