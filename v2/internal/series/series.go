@@ -17,6 +17,11 @@ func Day(t time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
+// EndOfDay — последний момент московского дня с меткой d.
+func EndOfDay(d time.Time) time.Time {
+	return time.Date(d.Year(), d.Month(), d.Day()+1, 0, 0, 0, 0, moscow).Add(-time.Nanosecond)
+}
+
 type Point struct {
 	Date  time.Time
 	Value decimal.Decimal
