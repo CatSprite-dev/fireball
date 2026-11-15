@@ -260,7 +260,7 @@ func TestByInstrumentMergesKnownConversion(t *testing.T) {
 	}
 }
 
-func TestQuantityAt(t *testing.T) {
+func TestHistoryAt(t *testing.T) {
 	const tAsset = "t-asset"
 	withSplit(t, tAsset, split{date: time.Date(2026, 4, 17, 0, 0, 0, 0, moscow), before: 1, after: 10})
 
@@ -294,8 +294,55 @@ func TestQuantityAt(t *testing.T) {
 		{time.Date(2026, 11, 15, 0, 0, 0, 0, moscow), 22},
 	}
 	for _, c := range checks {
-		if got := pos.QuantityAt(c.at); !got.Equal(decimal.NewFromInt(c.want)) {
+		if got := pos.History.At(c.at); !got.Equal(decimal.NewFromInt(c.want)) {
 			t.Errorf("at %s: quantity = %s, want %d", c.at.Format(time.DateTime), got, c.want)
+		}
+	}
+}
+
+func TestCashHistory(t *testing.T) {
+	rub := func(id, parent string, kind OperationKind, amount string, date time.Time) Event {
+		e := ev(id, parent, kind, "", amount, "")
+		e.Amount = e.BaseAmount
+		e.Date = date
+		return e
+	}
+	day := func(m time.Month, d int) time.Time { return time.Date(2025, m, d, 12, 0, 0, 0, moscow) }
+
+	leg := ev("buy-usd:leg", "buy-usd", KindExchange, "usd-tom", "810.15", "")
+	leg.Amount = money.Money{Amount: decimal.RequireFromString("11"), Currency: "USD"}
+	leg.Date = day(time.June, 2)
+
+	events := []Event{
+		rub("buy1", "", KindBuy, "-100510", day(time.January, 11)),
+		rub("fee1", "buy1", KindFee, "-50.26", day(time.January, 11)),
+		rub("cpn", "", KindCoupon, "2000", day(time.March, 1)),
+		rub("tax", "", KindTax, "-260", day(time.March, 1)),
+		rub("sell1", "", KindSell, "100789", day(time.May, 1)),
+		rub("fee2", "sell1", KindFee, "-301.53", day(time.May, 1)),
+		rub("svc", "", KindFee, "-99", day(time.June, 1)),
+		rub("buy-usd", "", KindBuy, "-810.15", day(time.June, 2)),
+		leg,
+		rub("dep", "", KindDeposit, "200000", day(time.January, 10)),
+	}
+
+	history := CashHistory(events, "RUB")
+
+	endOf := func(m time.Month, d int) time.Time { return time.Date(2025, m, d, 23, 59, 0, 0, moscow) }
+	checks := []struct {
+		at   time.Time
+		want string
+	}{
+		{endOf(time.January, 9), "0"},
+		{endOf(time.January, 10), "200000"},
+		{endOf(time.January, 11), "99439.74"},
+		{endOf(time.March, 1), "101179.74"},
+		{endOf(time.June, 1), "201568.21"},
+		{endOf(time.June, 2), "200758.06"},
+	}
+	for _, c := range checks {
+		if got := history.At(c.at); !got.Equal(decimal.RequireFromString(c.want)) {
+			t.Errorf("at %s: cash = %s, want %s", c.at.Format(time.DateOnly), got, c.want)
 		}
 	}
 }

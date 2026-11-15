@@ -12,6 +12,7 @@
 package ledger
 
 import (
+	"slices"
 	"sort"
 	"time"
 
@@ -23,6 +24,16 @@ type QuantityPoint struct {
 	Quantity decimal.Decimal
 }
 
+type History []QuantityPoint
+
+func (h History) At(t time.Time) decimal.Decimal {
+	i := sort.Search(len(h), func(i int) bool { return h[i].Date.After(t) })
+	if i == 0 {
+		return decimal.Zero
+	}
+	return h[i-1].Quantity
+}
+
 type Flows struct {
 	Bought   decimal.Decimal
 	Sold     decimal.Decimal
@@ -31,17 +42,13 @@ type Flows struct {
 	Taxes    decimal.Decimal
 	Quantity decimal.Decimal
 	Clearing decimal.Decimal
-	History  []QuantityPoint
+	History  History
 }
 
 func ByInstrument(events []Event, currencyByAsset map[string]string) map[string]*Flows {
 	result := make(map[string]*Flows)
 
-	sorted := make([]Event, len(events))
-	copy(sorted, events)
-	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Date.Before(sorted[j].Date) })
-
-	for _, e := range sorted {
+	for _, e := range byDate(events) {
 		addCurrencyMirror(result, e)
 		uid := pageKey(e, currencyByAsset)
 
@@ -142,10 +149,23 @@ func (f *Flows) record(date time.Time) {
 	f.History = append(f.History, QuantityPoint{Date: date, Quantity: f.Quantity})
 }
 
-func (f *Flows) QuantityAt(t time.Time) decimal.Decimal {
-	i := sort.Search(len(f.History), func(i int) bool { return f.History[i].Date.After(t) })
-	if i == 0 {
-		return decimal.Zero
+func byDate(events []Event) []Event {
+	sorted := slices.Clone(events)
+	SortByDate(sorted)
+	return sorted
+}
+
+// CashHistory — деньги в валюте currency на счетах после каждого события.
+// Базовая валюта не страница книги: её движение уже сидит в потоках позиций.
+func CashHistory(events []Event, currency string) History {
+	var history History
+	balance := decimal.Zero
+	for _, e := range byDate(events) {
+		if e.Amount.Currency != currency || e.Amount.Amount.IsZero() {
+			continue
+		}
+		balance = balance.Add(e.Amount.Amount)
+		history = append(history, QuantityPoint{Date: e.Date, Quantity: balance})
 	}
-	return f.History[i-1].Quantity
+	return history
 }
