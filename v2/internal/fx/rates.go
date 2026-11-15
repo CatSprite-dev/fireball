@@ -3,10 +3,10 @@ package fx
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"time"
 
 	"github.com/CatSprite-dev/fireball/v2/internal/money"
+	"github.com/CatSprite-dev/fireball/v2/internal/series"
 	"github.com/shopspring/decimal"
 )
 
@@ -15,29 +15,15 @@ var (
 	ErrNoRate          = errors.New("fx: no rate for date")
 )
 
-var moscow = time.FixedZone("MSK", 3*60*60)
-
-func tradingDay(t time.Time) time.Time {
-	y, m, d := t.In(moscow).Date()
-	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
-}
-
-type Point struct {
-	Date time.Time
-	Rate decimal.Decimal
-}
-
 type Rates struct {
 	base   string
-	points map[string][]Point
+	points map[string]series.Series
 }
 
-func New(base string, points map[string][]Point) *Rates {
-	sorted := make(map[string][]Point, len(points))
+func New(base string, points map[string]series.Series) *Rates {
+	sorted := make(map[string]series.Series, len(points))
 	for currency, list := range points {
-		list = slices.Clone(list)
-		slices.SortFunc(list, func(a, b Point) int { return a.Date.Compare(b.Date) })
-		sorted[currency] = list
+		sorted[currency] = series.Sorted(list)
 	}
 	return &Rates{base: base, points: sorted}
 }
@@ -52,19 +38,11 @@ func (r *Rates) Rate(currency string, date time.Time) (decimal.Decimal, error) {
 		return decimal.Zero, fmt.Errorf("%w: %s", ErrUnknownCurrency, currency)
 	}
 
-	day := tradingDay(date)
-	var found *Point
-	for i := range list {
-		if list[i].Date.After(day) {
-			break
-		}
-		found = &list[i]
-	}
-
-	if found == nil {
+	p, ok := list.At(series.Day(date))
+	if !ok {
 		return decimal.Zero, fmt.Errorf("%w: %s on %s", ErrNoRate, currency, date.Format(time.DateOnly))
 	}
-	return found.Rate, nil
+	return p.Value, nil
 }
 
 func (r *Rates) ToBase(m money.Money, date time.Time) (money.Money, error) {

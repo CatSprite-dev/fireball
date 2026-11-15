@@ -19,6 +19,7 @@ import (
 	"github.com/CatSprite-dev/fireball/v2/internal/convert"
 	"github.com/CatSprite-dev/fireball/v2/internal/fx"
 	"github.com/CatSprite-dev/fireball/v2/internal/ledger"
+	"github.com/CatSprite-dev/fireball/v2/internal/series"
 	"github.com/CatSprite-dev/fireball/v2/internal/tinvest"
 )
 
@@ -98,14 +99,52 @@ func run(logger *slog.Logger) error {
 	events = ledger.AddCurrencyLegs(events, currencyByAsset)
 	logger.Info("loaded", "accounts", len(data), "events", len(events), "duration", time.Since(start))
 
-	holdings, err := allHoldings(data)
-	if err != nil {
-		return err
-	}
+	holdings, _ := allHoldings(data)
+	currencyByUID := currencyByUID(currencies)
 
-	printBook(data, holdings, events, currencyByAsset, currencyByUID(currencies))
+	printBook(data, holdings, events, currencyByAsset, currencyByUID)
 
 	return nil
+}
+
+func checkCandles(ctx context.Context, client *tinvest.Client, data []accountData, events []ledger.Event, currencyByAsset map[string]string) {
+	from := events[0].Date
+	to := time.Now()
+
+	tickerByUID := make(map[string]string)
+	for _, d := range data {
+		for _, op := range d.Operations {
+			if op.Ticker != "" {
+				tickerByUID[op.InstrumentUID] = op.Ticker
+			}
+		}
+	}
+
+	uidsByKey := make(map[string][]string)
+	for uid, key := range ledger.PageKeys(events, currencyByAsset) {
+		uidsByKey[key] = append(uidsByKey[key], uid)
+	}
+
+	for key, f := range ledger.ByInstrument(events, currencyByAsset) {
+		held := !f.History.At(from).IsZero()
+		for _, p := range f.History {
+			if p.Date.After(from) {
+				held = true
+				break
+			}
+		}
+		if !held {
+			continue
+		}
+		for _, uid := range uidsByKey[key] {
+			candles, err := client.GetCandles(ctx, uid, from, to, tinvest.CandleIntervalDay)
+			if err != nil {
+				fmt.Printf("%-14s %s  ошибка: %v\n", tickerByUID[uid], uid, err)
+				continue
+			}
+			fmt.Printf("%-14s %s  свечей: %d\n", tickerByUID[uid], uid, len(candles.Candles))
+		}
+	}
 }
 
 func filterAccounts(accounts []tinvest.Account) []tinvest.Account {
@@ -207,7 +246,7 @@ func loadRates(ctx context.Context, client *tinvest.Client, currencies []tinvest
 	from := earliest.AddDate(0, 0, -14)
 	to := time.Now()
 
-	points := make(map[string][]fx.Point, len(needed))
+	points := make(map[string]series.Series, len(needed))
 	for currency := range needed {
 		instrument, ok := instruments[currency]
 		if !ok {
@@ -331,5 +370,8 @@ func printBook(data []accountData, holdings []ledger.Holding, events []ledger.Ev
 	fmt.Fprintf(w, "прочее без бумаги\t\t\t\t\t\t\t\t\t%s\t\n", other.StringFixed(2))
 	fmt.Fprintf(w, "необъяснённое\t\t\t\t\t\t\t\t\t%s\t\n", unexplained.StringFixed(2))
 	fmt.Fprintf(w, "ИТОГО\t\t\t\t\t\t\t\t\t%s\t\n", profit.StringFixed(2))
+	cash := ledger.CashHistory(events, baseCurrency).At(time.Now())
+	fmt.Fprintf(w, "деньги %s: книга\t\t\t\t\t\t\t\t\t%s\t\n", baseCurrency, cash.StringFixed(2))
+	fmt.Fprintf(w, "деньги %s: брокер\t\t\t\t\t\t\t\t\t%s\t\n", baseCurrency, values[baseCurrency].StringFixed(2))
 	w.Flush()
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/CatSprite-dev/fireball/v2/internal/money"
+	"github.com/CatSprite-dev/fireball/v2/internal/series"
 	"github.com/shopspring/decimal"
 )
 
@@ -18,10 +19,10 @@ func date(s string) time.Time {
 }
 
 func usdRates() *Rates {
-	return New("RUB", map[string][]Point{
+	return New("RUB", map[string]series.Series{
 		"USD": {
-			{Date: date("2024-01-03"), Rate: decimal.RequireFromString("92")},
-			{Date: date("2023-12-29"), Rate: decimal.RequireFromString("90.36")},
+			{Date: date("2024-01-03"), Value: decimal.RequireFromString("92")},
+			{Date: date("2023-12-29"), Value: decimal.RequireFromString("90.36")},
 		},
 	})
 }
@@ -76,12 +77,12 @@ func TestRateErrors(t *testing.T) {
 }
 
 func TestNewDoesNotModifyInput(t *testing.T) {
-	input := []Point{
-		{Date: date("2024-01-03"), Rate: decimal.RequireFromString("92")},
-		{Date: date("2023-12-29"), Rate: decimal.RequireFromString("90.36")},
+	input := series.Series{
+		{Date: date("2024-01-03"), Value: decimal.RequireFromString("92")},
+		{Date: date("2023-12-29"), Value: decimal.RequireFromString("90.36")},
 	}
 
-	New("RUB", map[string][]Point{"USD": input})
+	New("RUB", map[string]series.Series{"USD": input})
 
 	if !input[0].Date.Equal(date("2024-01-03")) {
 		t.Errorf("input was reordered: first date %s", input[0].Date.Format(time.DateOnly))

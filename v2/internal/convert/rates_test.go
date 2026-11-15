@@ -22,7 +22,7 @@ func TestToPoints(t *testing.T) {
 	if len(points) != 1 {
 		t.Fatalf("got %d points, want 1", len(points))
 	}
-	if !points[0].Date.Equal(day) || !points[0].Rate.Equal(decimal.RequireFromString("90.36")) {
+	if !points[0].Date.Equal(day) || !points[0].Value.Equal(decimal.RequireFromString("90.36")) {
 		t.Errorf("got %+v, want 2023-12-29 90.36", points[0])
 	}
 }
@@ -45,8 +45,8 @@ func TestToPointsDividesByNominal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !points[0].Rate.Equal(decimal.RequireFromString("0.1805")) {
-		t.Errorf("rate = %s, want 0.1805", points[0].Rate)
+	if !points[0].Value.Equal(decimal.RequireFromString("0.1805")) {
+		t.Errorf("rate = %s, want 0.1805", points[0].Value)
 	}
 }
 
