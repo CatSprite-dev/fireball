@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"slices"
-	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -87,8 +86,12 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("get currencies: %w", err)
 	}
+	cur, err := convert.NewCurrencies(currencies)
+	if err != nil {
+		return fmt.Errorf("currencies: %w", err)
+	}
 
-	rates, err := loadRates(ctx, client, currencies, events)
+	rates, err := loadRates(ctx, client, cur, events)
 	if err != nil {
 		return fmt.Errorf("load rates: %w", err)
 	}
@@ -96,59 +99,17 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	ledger.InheritInstruments(events)
-	currencyByAsset := convert.CurrencyByAsset(currencies)
-	events = ledger.AddCurrencyLegs(events, currencyByAsset)
+	events = ledger.AddCurrencyLegs(events, cur.ByAsset)
 	logger.Info("loaded", "accounts", len(data), "events", len(events), "duration", time.Since(start))
 
 	holdings, _ := allHoldings(data)
-	currencyByUID := currencyByUID(currencies)
 
-	printBook(data, holdings, events, currencyByAsset, currencyByUID)
-	if err := checkSnapshot(ctx, client, data, holdings, events, currencyByAsset, currencyByUID); err != nil {
+	printBook(data, holdings, events, cur.ByAsset, cur.ByUID)
+	if err := checkSnapshot(ctx, client, data, holdings, events, cur.ByAsset, cur.ByUID); err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func checkCandles(ctx context.Context, client *tinvest.Client, data []accountData, events []ledger.Event, currencyByAsset map[string]string) {
-	from := events[0].Date
-	to := time.Now()
-
-	tickerByUID := make(map[string]string)
-	for _, d := range data {
-		for _, op := range d.Operations {
-			if op.Ticker != "" {
-				tickerByUID[op.InstrumentUID] = op.Ticker
-			}
-		}
-	}
-
-	uidsByKey := make(map[string][]string)
-	for uid, key := range ledger.PageKeys(events, currencyByAsset) {
-		uidsByKey[key] = append(uidsByKey[key], uid)
-	}
-
-	for key, f := range ledger.ByInstrument(events, currencyByAsset) {
-		held := !f.History.At(from).IsZero()
-		for _, p := range f.History {
-			if p.Date.After(from) {
-				held = true
-				break
-			}
-		}
-		if !held {
-			continue
-		}
-		for _, uid := range uidsByKey[key] {
-			candles, err := client.GetCandles(ctx, uid, from, to, tinvest.CandleIntervalDay)
-			if err != nil {
-				fmt.Printf("%-14s %s  ошибка: %v\n", tickerByUID[uid], uid, err)
-				continue
-			}
-			fmt.Printf("%-14s %s  свечей: %d\n", tickerByUID[uid], uid, len(candles.Candles))
-		}
-	}
 }
 
 func filterAccounts(accounts []tinvest.Account) []tinvest.Account {
@@ -227,7 +188,7 @@ func allHoldings(data []accountData) ([]ledger.Holding, error) {
 	return all, nil
 }
 
-func loadRates(ctx context.Context, client *tinvest.Client, currencies []tinvest.Currency, events []ledger.Event) (*fx.Rates, error) {
+func loadRates(ctx context.Context, client *tinvest.Client, cur convert.Currencies, events []ledger.Event) (*fx.Rates, error) {
 	needed := make(map[string]bool)
 	var earliest time.Time
 	for _, e := range events {
@@ -237,14 +198,12 @@ func loadRates(ctx context.Context, client *tinvest.Client, currencies []tinvest
 		if e.Amount.Currency != baseCurrency {
 			needed[e.Amount.Currency] = true
 		}
+		if code, ok := cur.ByAsset[e.AssetUID]; ok {
+			needed[code] = true
+		}
 	}
 	if len(needed) == 0 {
 		return fx.New(baseCurrency, nil), nil
-	}
-
-	instruments, err := convert.ExchangeCurrencies(currencies)
-	if err != nil {
-		return nil, err
 	}
 
 	from := earliest.AddDate(0, 0, -14)
@@ -252,7 +211,7 @@ func loadRates(ctx context.Context, client *tinvest.Client, currencies []tinvest
 
 	points := make(map[string]series.Series, len(needed))
 	for currency := range needed {
-		instrument, ok := instruments[currency]
+		instrument, ok := cur.Exchange[currency]
 		if !ok {
 			return nil, fmt.Errorf("no exchange instrument for currency %s", currency)
 		}
@@ -270,14 +229,6 @@ func loadRates(ctx context.Context, client *tinvest.Client, currencies []tinvest
 	}
 
 	return fx.New(baseCurrency, points), nil
-}
-
-func currencyByUID(currencies []tinvest.Currency) map[string]string {
-	result := make(map[string]string, len(currencies))
-	for _, c := range currencies {
-		result[c.UID] = strings.ToUpper(c.IsoCurrencyName)
-	}
-	return result
 }
 
 // printBook — временная проверка: все страницы журнала.

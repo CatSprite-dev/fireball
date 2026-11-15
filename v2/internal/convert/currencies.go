@@ -58,3 +58,28 @@ func CurrencyByAsset(currencies []tinvest.Currency) map[string]string {
 	}
 	return result
 }
+
+// Currencies — справочник валют брокера, разобранный один раз.
+type Currencies struct {
+	ByAsset  map[string]string             // assetUid → код валюты: события
+	ByUID    map[string]string             // instrumentUid → код валюты: портфель
+	Exchange map[string]CurrencyInstrument // код валюты → биржевой инструмент: курсы
+}
+
+func NewCurrencies(list []tinvest.Currency) (Currencies, error) {
+	exchange, err := ExchangeCurrencies(list)
+	if err != nil {
+		return Currencies{}, err
+	}
+
+	byUID := make(map[string]string, len(list))
+	for _, c := range list {
+		byUID[c.UID] = strings.ToUpper(c.IsoCurrencyName)
+	}
+
+	return Currencies{
+		ByAsset:  CurrencyByAsset(list),
+		ByUID:    byUID,
+		Exchange: exchange,
+	}, nil
+}
