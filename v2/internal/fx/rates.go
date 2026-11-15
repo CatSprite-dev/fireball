@@ -52,3 +52,9 @@ func (r *Rates) ToBase(m money.Money, date time.Time) (money.Money, error) {
 	}
 	return money.Money{Amount: m.Amount.Mul(rate), Currency: r.base}, nil
 }
+
+// Series — курс валюты к базовой по дням; false — курса этой валюты нет.
+func (r *Rates) Series(currency string) (series.Series, bool) {
+	s, ok := r.points[currency]
+	return s, ok
+}

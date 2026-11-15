@@ -105,7 +105,7 @@ func run(logger *slog.Logger) error {
 	holdings, _ := allHoldings(data)
 
 	printBook(data, holdings, events, cur.ByAsset, cur.ByUID)
-	if err := checkSnapshot(ctx, client, data, holdings, events, cur.ByAsset, cur.ByUID); err != nil {
+	if err := checkSnapshot(ctx, client, data, holdings, events, rates, cur.ByAsset, cur.ByUID); err != nil {
 		return err
 	}
 
@@ -331,7 +331,7 @@ func printBook(data []accountData, holdings []ledger.Holding, events []ledger.Ev
 	w.Flush()
 }
 
-func checkSnapshot(ctx context.Context, client *tinvest.Client, data []accountData, holdings []ledger.Holding, events []ledger.Event, currencyByAsset, currencyByUID map[string]string) error {
+func checkSnapshot(ctx context.Context, client *tinvest.Client, data []accountData, holdings []ledger.Holding, events []ledger.Event, rates *fx.Rates, currencyByAsset, currencyByUID map[string]string) error {
 	from := events[0].Date
 	to := time.Now()
 
@@ -344,9 +344,16 @@ func checkSnapshot(ctx context.Context, client *tinvest.Client, data []accountDa
 	}
 
 	prices := make(map[string]series.Series)
-	for key, uids := range uidsByKey {
+	for key, f := range positions {
+		if f.Kind == ledger.InstrumentCurrency {
+			if s, ok := rates.Series(key); ok {
+				prices[key] = s
+			}
+			continue
+		}
+
 		var parts []series.Series
-		for _, uid := range uids {
+		for _, uid := range uidsByKey[key] {
 			candles, err := client.GetCandles(ctx, uid, from, to, tinvest.CandleIntervalDay)
 			if err != nil {
 				continue
