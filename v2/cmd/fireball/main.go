@@ -112,6 +112,7 @@ func run(logger *slog.Logger) error {
 		return errors.New("account «робот» not found")
 	}
 	checkCurrencies(ctx, client, data)
+	dumpSnapshot(ctx, client, data, events, rates, cur, "snapshots.csv")
 	return nil
 }
 
@@ -240,6 +241,16 @@ func loadPrices(ctx context.Context, client *tinvest.Client, positions map[strin
 			points, err := convert.ToPoints(candles.Candles, decimal.NewFromInt(1))
 			if err != nil {
 				return nil, fmt.Errorf("prices %s: %w", uid, err)
+			}
+			if f.Kind != ledger.InstrumentBond {
+				inst, err := client.GetInstrumentBy(ctx, tinvest.InstrumentIDUID, "", uid)
+				if err != nil {
+					return nil, fmt.Errorf("instrument %s: %w", uid, err)
+				}
+				points, err = rates.Convert(points, strings.ToUpper(inst.Currency))
+				if err != nil {
+					return nil, fmt.Errorf("prices %s: %w", uid, err)
+				}
 			}
 			parts = append(parts, points)
 		}

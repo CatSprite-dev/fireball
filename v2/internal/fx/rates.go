@@ -58,3 +58,15 @@ func (r *Rates) Series(currency string) (series.Series, bool) {
 	s, ok := r.points[currency]
 	return s, ok
 }
+
+func (r *Rates) Convert(s series.Series, currency string) (series.Series, error) {
+	out := make(series.Series, len(s))
+	for i, p := range s {
+		rate, err := r.Rate(currency, p.Date)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = series.Point{Date: p.Date, Value: p.Value.Mul(rate)}
+	}
+	return out, nil
+}

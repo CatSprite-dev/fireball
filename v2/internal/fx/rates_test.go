@@ -126,3 +126,32 @@ func TestBaseComesFromNew(t *testing.T) {
 		t.Errorf("got %s %s, want 10 USD", got.Amount, got.Currency)
 	}
 }
+
+func TestConvert(t *testing.T) {
+	r := usdRates()
+	prices := series.Series{
+		{Date: date("2024-01-01"), Value: decimal.RequireFromString("0.1")},
+		{Date: date("2024-01-03"), Value: decimal.RequireFromString("0.2")},
+	}
+
+	got, err := r.Convert(prices, "USD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"9.036", "18.4"}
+	for i, p := range got {
+		if !p.Date.Equal(prices[i].Date) || !p.Value.Equal(decimal.RequireFromString(want[i])) {
+			t.Errorf("point %d = %s %s, want %s %s", i, p.Date.Format(time.DateOnly), p.Value, prices[i].Date.Format(time.DateOnly), want[i])
+		}
+	}
+	if !prices[0].Value.Equal(decimal.RequireFromString("0.1")) {
+		t.Error("source series changed")
+	}
+
+	if _, err := r.Convert(series.Series{{Date: date("2020-01-01"), Value: decimal.NewFromInt(1)}}, "USD"); !errors.Is(err, ErrNoRate) {
+		t.Errorf("before first rate: err = %v, want ErrNoRate", err)
+	}
+	if _, err := r.Convert(prices, "EUR"); !errors.Is(err, ErrUnknownCurrency) {
+		t.Errorf("unknown currency: err = %v, want ErrUnknownCurrency", err)
+	}
+}
