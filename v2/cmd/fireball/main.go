@@ -2,14 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
-	"slices"
-	"text/tabwriter"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -103,11 +102,17 @@ func run(logger *slog.Logger) error {
 	events = ledger.AddCurrencyLegs(events, cur.ByAsset)
 	logger.Info("loaded", "accounts", len(data), "events", len(events), "duration", time.Since(start))
 
-	holdings, _ := allHoldings(data)
-
-	printBook(data, holdings, events, cur.ByAsset, cur.ByUID)
-	return checkSnapshot(ctx, client, data, holdings, events, rates, cur.ByAsset, cur.ByUID)
-
+	var robotID string
+	for _, d := range data {
+		if strings.Contains(strings.ToLower(d.Account.Name), "робот") {
+			robotID = d.Account.ID
+		}
+	}
+	if robotID == "" {
+		return errors.New("account «робот» not found")
+	}
+	checkCurrencies(ctx, client, data)
+	return nil
 }
 
 func filterAccounts(accounts []tinvest.Account) []tinvest.Account {
@@ -171,21 +176,6 @@ func buildEvents(data []accountData) ([]ledger.Event, error) {
 	return selected, nil
 }
 
-func allHoldings(data []accountData) ([]ledger.Holding, error) {
-	var all []ledger.Holding
-	for _, d := range data {
-		if d.Portfolio == nil {
-			continue
-		}
-		holdings, err := convert.ToHoldings(d.Account.ID, d.Portfolio)
-		if err != nil {
-			return nil, fmt.Errorf("account %s: %w", d.Account.Name, err)
-		}
-		all = append(all, holdings...)
-	}
-	return all, nil
-}
-
 func loadRates(ctx context.Context, client *tinvest.Client, cur convert.Currencies, events []ledger.Event) (*fx.Rates, error) {
 	needed := make(map[string]bool)
 	var earliest time.Time
@@ -229,118 +219,9 @@ func loadRates(ctx context.Context, client *tinvest.Client, cur convert.Currenci
 	return fx.New(baseCurrency, points), nil
 }
 
-// printBook — временная проверка: все страницы журнала.
-func printBook(data []accountData, holdings []ledger.Holding, events []ledger.Event, currencyByAsset, currencyByUID map[string]string) {
-	pageKeyByInstrumentUID := ledger.PageKeys(events, currencyByAsset)
-
-	tickers := make(map[string]string)
-	for _, d := range data {
-		for _, op := range d.Operations {
-			if key := pageKeyByInstrumentUID[op.InstrumentUID]; key != "" && op.Ticker != "" {
-				tickers[key] = op.Ticker
-			}
-		}
-	}
-
-	values := make(map[string]decimal.Decimal)
-	for _, h := range holdings {
-		key, ok := pageKeyByInstrumentUID[h.InstrumentUID]
-		if !ok {
-			key = h.InstrumentUID
-			if code, isCurrency := currencyByUID[h.InstrumentUID]; isCurrency && h.InstrumentKind == ledger.InstrumentCurrency {
-				key = code
-			}
-		}
-		values[key] = values[key].Add(h.Value())
-		tickers[key] = h.Ticker
-	}
-
-	type row struct {
-		key    string
-		f      *ledger.Flows
-		value  decimal.Decimal
-		profit decimal.Decimal
-	}
-	var rows []row
-	total := decimal.Zero
-	for key, f := range ledger.ByInstrument(events, currencyByAsset) {
-		v := values[key]
-		profit := v.Add(f.Bought).Add(f.Sold).Add(f.Income).Add(f.Fees).Add(f.Taxes).Add(f.Clearing)
-		total = total.Add(profit)
-		rows = append(rows, row{key, f, v, profit})
-	}
-	slices.SortFunc(rows, func(a, b row) int { return a.profit.Cmp(b.profit) })
-
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.AlignRight)
-	fmt.Fprintln(w, "тикер\tкуплено\tпродано\tдоходы\tкомиссии\tналоги\tклиринг\tшт\tстоимость\tприбыль\t")
-	for _, r := range rows {
-		name := tickers[r.key]
-		if name == "" {
-			name = r.key
-		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t\n",
-			name,
-			r.f.Bought.StringFixed(2), r.f.Sold.StringFixed(2), r.f.Income.StringFixed(2),
-			r.f.Fees.StringFixed(2), r.f.Taxes.StringFixed(2), r.f.Clearing.StringFixed(2),
-			r.f.Quantity.String(), r.value.StringFixed(2), r.profit.StringFixed(2))
-	}
-	netIn := decimal.Zero
-	fees := decimal.Zero
-	taxes := decimal.Zero
-	other := decimal.Zero
-	for _, e := range events {
-		amount := e.BaseAmount.Amount
-		switch e.OperationKind {
-		case ledger.KindDeposit, ledger.KindWithdrawal, ledger.KindTransferIn, ledger.KindTransferOut:
-			netIn = netIn.Add(amount)
-			continue
-		case ledger.KindExchange:
-			continue
-		}
-		if e.InstrumentUID != "" {
-			continue
-		}
-		switch e.OperationKind {
-		case ledger.KindFee:
-			fees = fees.Add(amount)
-		case ledger.KindTax:
-			taxes = taxes.Add(amount)
-		default:
-			other = other.Add(amount)
-		}
-	}
-
-	value := decimal.Zero
-	for _, h := range holdings {
-		value = value.Add(h.Value())
-	}
-	profit := value.Sub(netIn)
-	unexplained := profit.Sub(total).Sub(fees).Sub(taxes).Sub(other)
-
-	fmt.Fprintf(w, "по бумагам\t\t\t\t\t\t\t\t\t%s\t\n", total.StringFixed(2))
-	fmt.Fprintf(w, "комиссии без бумаги\t\t\t\t\t\t\t\t\t%s\t\n", fees.StringFixed(2))
-	fmt.Fprintf(w, "налоги без бумаги\t\t\t\t\t\t\t\t\t%s\t\n", taxes.StringFixed(2))
-	fmt.Fprintf(w, "прочее без бумаги\t\t\t\t\t\t\t\t\t%s\t\n", other.StringFixed(2))
-	fmt.Fprintf(w, "необъяснённое\t\t\t\t\t\t\t\t\t%s\t\n", unexplained.StringFixed(2))
-	fmt.Fprintf(w, "ИТОГО\t\t\t\t\t\t\t\t\t%s\t\n", profit.StringFixed(2))
-	cash := ledger.CashHistory(events, baseCurrency).At(time.Now())
-	fmt.Fprintf(w, "деньги %s: книга\t\t\t\t\t\t\t\t\t%s\t\n", baseCurrency, cash.StringFixed(2))
-	fmt.Fprintf(w, "деньги %s: брокер\t\t\t\t\t\t\t\t\t%s\t\n", baseCurrency, values[baseCurrency].StringFixed(2))
-	w.Flush()
-}
-
-func checkSnapshot(ctx context.Context, client *tinvest.Client, data []accountData, holdings []ledger.Holding, events []ledger.Event, rates *fx.Rates, currencyByAsset, currencyByUID map[string]string) error {
-	from := events[0].Date
-	to := time.Now()
-
-	positions := ledger.ByInstrument(events, currencyByAsset)
-	pageKeys := ledger.PageKeys(events, currencyByAsset)
-
-	uidsByKey := make(map[string][]string)
-	for uid, key := range pageKeys {
-		uidsByKey[key] = append(uidsByKey[key], uid)
-	}
-
+// loadPrices — ряд цен на каждую позицию: валюте курс, остальным свечи всех её uid,
+// а где свечей нет — цены своих сделок.
+func loadPrices(ctx context.Context, client *tinvest.Client, positions map[string]*ledger.Flows, uidsByKey map[string][]string, tradePrices map[string]series.Series, rates *fx.Rates, from, to time.Time) (map[string]series.Series, error) {
 	prices := make(map[string]series.Series)
 	for key, f := range positions {
 		if f.Kind == ledger.InstrumentCurrency {
@@ -358,13 +239,17 @@ func checkSnapshot(ctx context.Context, client *tinvest.Client, data []accountDa
 			}
 			points, err := convert.ToPoints(candles.Candles, decimal.NewFromInt(1))
 			if err != nil {
-				return fmt.Errorf("prices %s: %w", uid, err)
+				return nil, fmt.Errorf("prices %s: %w", uid, err)
 			}
 			parts = append(parts, points)
 		}
-		prices[key] = series.Merge(parts...)
+		prices[key] = series.Merge(append(parts, tradePrices[key])...)
 	}
+	return prices, nil
+}
 
+// loadBonds — номинал и НКД по дням для каждой облигации, склеенные по всем её uid.
+func loadBonds(ctx context.Context, client *tinvest.Client, positions map[string]*ledger.Flows, uidsByKey map[string][]string, from, to time.Time) (map[string]snapshot.Bond, error) {
 	bonds := make(map[string]snapshot.Bond)
 	for key, f := range positions {
 		if f.Kind != ledger.InstrumentBond {
@@ -378,17 +263,44 @@ func checkSnapshot(ctx context.Context, client *tinvest.Client, data []accountDa
 			}
 			nominal, nkd, err := convert.ToAccrued(list)
 			if err != nil {
-				return fmt.Errorf("accrued %s: %w", uid, err)
+				return nil, fmt.Errorf("accrued %s: %w", uid, err)
 			}
 			nominals = append(nominals, nominal)
 			nkds = append(nkds, nkd)
 		}
 		bonds[key] = snapshot.Bond{Nominal: series.Merge(nominals...), NKD: series.Merge(nkds...)}
 	}
+	return bonds, nil
+}
+
+// checkRobot — временная проверка: снимок счёта «робот» за дни, которые есть в снимках proporcia.
+func checkRobot(ctx context.Context, client *tinvest.Client, data []accountData, events []ledger.Event, rates *fx.Rates, cur convert.Currencies) error {
+	if len(events) == 0 {
+		return errors.New("no events on account «робот»")
+	}
+	from := events[0].Date
+	to := time.Now()
+
+	positions := ledger.ByInstrument(events, cur.ByAsset)
+	pageKeys := ledger.PageKeys(events, cur.ByAsset)
+
+	uidsByKey := make(map[string][]string)
+	for uid, key := range pageKeys {
+		uidsByKey[key] = append(uidsByKey[key], uid)
+	}
+
+	prices, err := loadPrices(ctx, client, positions, uidsByKey, ledger.TradePrices(events, cur.ByAsset), rates, from, to)
+	if err != nil {
+		return err
+	}
+	bonds, err := loadBonds(ctx, client, positions, uidsByKey, from, to)
+	if err != nil {
+		return err
+	}
 
 	rows, gaps := snapshot.Build(positions, prices, bonds, ledger.CashHistory(events, baseCurrency), baseCurrency, from, to)
 
-	tickers := make(map[string]string)
+	tickers := map[string]string{baseCurrency: baseCurrency}
 	for _, d := range data {
 		for _, op := range d.Operations {
 			if key := pageKeys[op.InstrumentUID]; key != "" && op.Ticker != "" {
@@ -396,101 +308,113 @@ func checkSnapshot(ctx context.Context, client *tinvest.Client, data []accountDa
 			}
 		}
 	}
-	tickers[baseCurrency] = baseCurrency
 
-	values := make(map[string]decimal.Decimal)
-	for _, h := range holdings {
-		key, ok := pageKeys[h.InstrumentUID]
-		if !ok {
-			key = h.InstrumentUID
-			if code, isCurrency := currencyByUID[h.InstrumentUID]; isCurrency && h.InstrumentKind == ledger.InstrumentCurrency {
-				key = code
-			}
-		}
-		values[key] = values[key].Add(h.Value())
-	}
-
-	fmt.Printf("строк: %d, дыр: %d\n", len(rows), len(gaps))
+	fmt.Printf("робот: событий %d, строк %d, дыр %d\n", len(events), len(rows), len(gaps))
 	for _, g := range gaps {
-		days := int(g.To.Sub(g.From).Hours()/24) + 1
-		fmt.Printf("дыра  %-14s %s — %s  (%d дн.)\n", tickers[g.Key], g.From.Format(time.DateOnly), g.To.Format(time.DateOnly), days)
+		fmt.Printf("дыра  %-8s %s — %s\n", tickers[g.Key], g.From.Format(time.DateOnly), g.To.Format(time.DateOnly))
 	}
 
-	today := series.Day(to)
-	snapshotTotal := decimal.Zero
+	first := time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC)
+	last := time.Date(2026, 9, 24, 0, 0, 0, 0, time.UTC)
 	for _, r := range rows {
-		if !r.Date.Equal(today) {
+		if r.Date.Before(first) || r.Date.After(last) {
 			continue
 		}
-		snapshotTotal = snapshotTotal.Add(r.Value)
-		fmt.Printf("сегодня  %-14s шт %-8s цена %-10s НКД %-6s снимок %12s  брокер %12s  цена от %s\n",
-			tickers[r.Key], r.Quantity, r.Price.Value.StringFixed(2), r.NKD.StringFixed(2),
-			r.Value.StringFixed(2), values[r.Key].StringFixed(2), r.Price.Date.Format(time.DateOnly))
+		fmt.Printf("%s  %-6s шт %-8s цена %-9s стоимость %10s  цена от %s\n",
+			r.Date.Format(time.DateOnly), tickers[r.Key], r.Quantity, r.Price.Value.StringFixed(2),
+			r.Value.StringFixed(2), r.Price.Date.Format(time.DateOnly))
 	}
-
-	brokerTotal := decimal.Zero
-	for _, h := range holdings {
-		brokerTotal = brokerTotal.Add(h.Value())
-	}
-	fmt.Printf("итого сегодня: снимок %s  брокер %s  разница %s\n",
-		snapshotTotal.StringFixed(2), brokerTotal.StringFixed(2), snapshotTotal.Sub(brokerTotal).StringFixed(2))
 	return nil
 }
 
-func checkBonds(ctx context.Context, client *tinvest.Client, holdings []ledger.Holding, from time.Time) error {
-	for _, h := range holdings {
-		if h.InstrumentKind != ledger.InstrumentBond {
-			continue
-		}
-		fmt.Printf("\n===== %s  портфель: шт %s  цена %s  НКД %s  стоимость %s\n",
-			h.Ticker, h.Quantity, h.Price, h.NKD, h.Value().StringFixed(2))
+// dumpSnapshot — временная выгрузка снимка всех счетов в CSV для проверки.
+func dumpSnapshot(ctx context.Context, client *tinvest.Client, data []accountData, events []ledger.Event, rates *fx.Rates, cur convert.Currencies, path string) error {
+	from := events[0].Date
+	to := time.Now()
 
-		bond, err := client.DoRequest(ctx, "InstrumentsService/BondBy", map[string]any{
-			"idType": "INSTRUMENT_ID_TYPE_UID",
-			"id":     h.InstrumentUID,
-			"from":   from,
+	positions := ledger.ByInstrument(events, cur.ByAsset)
+	pageKeys := ledger.PageKeys(events, cur.ByAsset)
+
+	uidsByKey := make(map[string][]string)
+	for uid, key := range pageKeys {
+		uidsByKey[key] = append(uidsByKey[key], uid)
+	}
+
+	prices, err := loadPrices(ctx, client, positions, uidsByKey, ledger.TradePrices(events, cur.ByAsset), rates, from, to)
+	if err != nil {
+		return err
+	}
+	bonds, err := loadBonds(ctx, client, positions, uidsByKey, from, to)
+	if err != nil {
+		return err
+	}
+	rows, gaps := snapshot.Build(positions, prices, bonds, ledger.CashHistory(events, baseCurrency), baseCurrency, from, to)
+
+	tickers := map[string]string{baseCurrency: baseCurrency}
+	for _, d := range data {
+		for _, op := range d.Operations {
+			if key := pageKeys[op.InstrumentUID]; key != "" && op.Ticker != "" {
+				tickers[key] = op.Ticker
+			}
+		}
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	w := csv.NewWriter(f)
+	w.Write([]string{"date", "key", "ticker", "kind", "quantity", "price", "price_date", "nkd", "value"})
+	for _, r := range rows {
+		kind := "cash"
+		if p, ok := positions[r.Key]; ok {
+			kind = string(p.Kind)
+		}
+		w.Write([]string{
+			r.Date.Format(time.DateOnly), r.Key, tickers[r.Key], kind,
+			r.Quantity.String(), r.Price.Value.String(), r.Price.Date.Format(time.DateOnly),
+			r.NKD.String(), r.Value.String(),
 		})
-		if err != nil {
-			return fmt.Errorf("bond %s: %w", h.Ticker, err)
-		}
-		fmt.Println("--- BondBy:")
-		fmt.Println(string(bond))
+	}
+	w.Flush()
+	if err := w.Error(); err != nil {
+		return err
+	}
 
-		candles, err := client.GetCandles(ctx, h.InstrumentUID, time.Now().AddDate(0, 0, -4), time.Now(), tinvest.CandleIntervalDay)
-		if err != nil {
-			return err
-		}
-		fmt.Println("--- свечи:")
-		for _, c := range candles.Candles {
-			cl, _ := convert.ToDecimal(c.Close.Units, c.Close.Nano)
-			fmt.Printf("  %s  закрытие %s\n", series.Day(c.Time).Format(time.DateOnly), cl)
-		}
+	fmt.Printf("записано строк: %d, дыр: %d → %s\n", len(rows), len(gaps), path)
+	return nil
+}
 
-		aci, err := client.DoRequest(ctx, "InstrumentsService/GetAccruedInterests", map[string]any{
-			"instrumentId": h.InstrumentUID,
-			"from":         time.Now().AddDate(-3, 0, 0),
-			"to":           time.Now(),
-		})
-		if err != nil {
-			fmt.Println("--- НКД: ошибка:", err)
-			continue
+func dumpOps(data []accountData, from, to time.Time) {
+	for _, d := range data {
+		for _, op := range d.Operations {
+			if op.Date.Before(from) || op.Date.After(to) {
+				continue
+			}
+			fmt.Printf("%s  %-8s %-45s qty=%-6s pay=%v  %q  %s\n",
+				op.Date.Format("2006-01-02 15:04"), op.Ticker, op.Type,
+				op.Quantity, op.Payment, op.Name, op.Description)
 		}
-		var out struct {
-			AccruedInterests []struct {
-				Date    time.Time         `json:"date"`
-				Value   tinvest.Quotation `json:"value"`
-				Nominal tinvest.Quotation `json:"nominal"`
-			} `json:"accruedInterests"`
-		}
-		if err := json.Unmarshal(aci, &out); err != nil {
-			return err
-		}
-		list := out.AccruedInterests
-		fmt.Printf("--- НКД: записей %d\n", len(list))
-		if len(list) > 0 {
-			first, last := list[0], list[len(list)-1]
-			fmt.Printf("  первая %s  НКД %s.%09d  номинал %s\n", first.Date.Format(time.DateOnly), first.Value.Units, first.Value.Nano, first.Nominal.Units)
-			fmt.Printf("  последняя %s  НКД %s.%09d  номинал %s\n", last.Date.Format(time.DateOnly), last.Value.Units, last.Value.Nano, last.Nominal.Units)
+	}
+}
+
+func checkCurrencies(ctx context.Context, client *tinvest.Client, data []accountData) error {
+	want := map[string]bool{"TGRN": true, "TBIO": true, "TEUR": true, "TUSD": true, "TSPX": true}
+	seen := map[string]bool{}
+	for _, d := range data {
+		for _, op := range d.Operations {
+			if !want[op.Ticker] || op.InstrumentUID == "" || seen[op.InstrumentUID] {
+				continue
+			}
+			seen[op.InstrumentUID] = true
+			inst, err := client.GetInstrumentBy(ctx, tinvest.InstrumentIDUID, "", op.InstrumentUID)
+			if err != nil {
+				return fmt.Errorf("instrument %s: %w", op.Ticker, err)
+			}
+			fmt.Printf("%-5s uid=%s class=%-6s currency=%s  payment=%s\n",
+				inst.Ticker, inst.UID, inst.ClassCode, inst.Currency, op.Payment.Currency)
 		}
 	}
 	return nil
