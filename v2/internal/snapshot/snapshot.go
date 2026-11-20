@@ -12,12 +12,13 @@ import (
 
 // Row — одна позиция за один день.
 type Row struct {
-	Date     time.Time       // метка дня
-	Key      string          // ключ позиции из книги
-	Quantity decimal.Decimal // количество на конец дня
-	Price    series.Point    // цена одной бумаги в базовой валюте и день, от которого она
-	NKD      decimal.Decimal // НКД одной бумаги; не у облигаций — 0
-	Value    decimal.Decimal // количество × (цена + НКД)
+	Date     time.Time             // метка дня
+	Key      string                // ключ позиции из книги
+	Kind     ledger.InstrumentKind // тип инструмента
+	Quantity decimal.Decimal       // количество на конец дня
+	Price    series.Point          // цена одной бумаги в базовой валюте и день, от которого она
+	NKD      decimal.Decimal       // НКД одной бумаги; не у облигаций — 0
+	Value    decimal.Decimal       // количество × (цена + НКД)
 }
 
 // Gap — дни подряд, когда позиция была, а цены нет.
@@ -47,7 +48,7 @@ func positionRows(key string, kind ledger.InstrumentKind, history ledger.History
 		}
 
 		if kind == ledger.InstrumentFutures {
-			rows = append(rows, Row{Date: d, Key: key, Quantity: quantity})
+			rows = append(rows, Row{Date: d, Key: key, Kind: kind, Quantity: quantity})
 			continue
 		}
 
@@ -70,6 +71,7 @@ func positionRows(key string, kind ledger.InstrumentKind, history ledger.History
 		rows = append(rows, Row{
 			Date:     d,
 			Key:      key,
+			Kind:     kind,
 			Quantity: quantity,
 			Price:    price,
 			NKD:      nkd,
@@ -90,6 +92,7 @@ func cashRows(base string, cash ledger.History, from, to time.Time) []Row {
 		rows = append(rows, Row{
 			Date:     d,
 			Key:      base,
+			Kind:     ledger.InstrumentCurrency,
 			Quantity: amount,
 			Price:    series.Point{Date: d, Value: decimal.NewFromInt(1)},
 			Value:    amount,

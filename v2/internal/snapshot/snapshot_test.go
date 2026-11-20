@@ -34,6 +34,9 @@ func TestPositionRows(t *testing.T) {
 			t.Errorf("row %d: %s value %s, want %s value %s",
 				i, r.Date.Format(time.DateOnly), r.Value, d(4+i).Format(time.DateOnly), wantValues[i])
 		}
+		if r.Kind != ledger.InstrumentShare {
+			t.Errorf("row %d: kind %q, want share", i, r.Kind)
+		}
 	}
 
 	if len(gaps) != 1 {
@@ -65,6 +68,9 @@ func TestPositionRowsFuturesHaveZeroValue(t *testing.T) {
 		if !r.Value.IsZero() || !r.Quantity.Equal(decimal.NewFromInt(1)) {
 			t.Errorf("%s: quantity %s value %s, want 1 and 0", r.Date.Format(time.DateOnly), r.Quantity, r.Value)
 		}
+		if r.Kind != ledger.InstrumentFutures {
+			t.Errorf("%s: kind %q, want futures", r.Date.Format(time.DateOnly), r.Kind)
+		}
 	}
 }
 
@@ -88,6 +94,9 @@ func TestCashRows(t *testing.T) {
 		if r.Key != "RUB" || !r.Value.Equal(decimal.RequireFromString(want[i])) || !r.Price.Value.Equal(decimal.NewFromInt(1)) {
 			t.Errorf("row %d: %s %s value %s price %s, want RUB %s price 1",
 				i, r.Date.Format(time.DateOnly), r.Key, r.Value, r.Price.Value, want[i])
+		}
+		if r.Kind != ledger.InstrumentCurrency {
+			t.Errorf("row %d: kind %q, want currency", i, r.Kind)
 		}
 	}
 }
