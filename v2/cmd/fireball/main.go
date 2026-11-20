@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"log/slog"
 	"math"
 	"os"
 	"os/signal"
+	"slices"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -59,6 +61,9 @@ func run(logger *slog.Logger) error {
 
 	to := series.Day(time.Now())
 	from := to.AddDate(-1, 0, 0)
+	if slices.Contains(os.Args[1:], "all") {
+		from = series.Day(p.Events[0].Date)
+	}
 	loadFrom := from.AddDate(0, 0, -30)
 
 	m, err := loader.Market(ctx, p, loadFrom, time.Now())
@@ -172,15 +177,18 @@ func checkTWR(p *load.Portfolio, m *load.Market, index series.Series, accountIDs
 	rows, gaps := snapshot.Build(positions, m.Prices, m.Bonds, cash, baseCurrency, from, to)
 	values := snapshot.Total(rows, from, to)
 	deposits := ledger.NetDeposits(events)
-	growth := metrics.TWR(values, deposits, from, to)
+	in, out := ledger.DepositsAndWithdrawals(events)
+	growth := metrics.TWR(values, in, out, from, to)
 
+	fmt.Printf("период: %s — %s\n", from.Format(time.DateOnly), to.Format(time.DateOnly))
 	fmt.Printf("дыр: %d\n", len(gaps))
 	for _, g := range gaps {
 		fmt.Printf("  дыра %s %s — %s\n", g.Key, g.From.Format(time.DateOnly), g.To.Format(time.DateOnly))
 	}
 
-	twr := growth[len(growth)-1].Value.Sub(decimal.NewFromInt(1)).Mul(decimal.NewFromInt(100))
-	fmt.Printf("TWR за 12 месяцев: %s%%\n", twr.StringFixed(2))
+	hundred := decimal.NewFromInt(100)
+	twr := growth[len(growth)-1].Value.Sub(decimal.NewFromInt(1)).Mul(hundred)
+	fmt.Printf("TWR за период: %s%%\n", twr.StringFixed(2))
 	r, err := metrics.MWR(values, deposits, from, to)
 	if err != nil {
 		return err
@@ -191,28 +199,33 @@ func checkTWR(p *load.Portfolio, m *load.Market, index series.Series, accountIDs
 
 	sumDeposits := func(after, upTo time.Time) decimal.Decimal {
 		s := decimal.Zero
-		for _, p := range deposits {
-			if p.Date.After(after) && !p.Date.After(upTo) {
-				s = s.Add(p.Value)
+		for _, pt := range deposits {
+			if pt.Date.After(after) && !pt.Date.After(upTo) {
+				s = s.Add(pt.Value)
 			}
 		}
 		return s
 	}
 	vFrom, vTo := values[0].Value, values[len(values)-1].Value
-	periodProfit := vTo.Sub(vFrom).Sub(sumDeposits(from, to))
-	allTimeProfit := vTo.Sub(sumDeposits(time.Time{}, to))
-	fmt.Printf("прибыль за 12 месяцев: %s ₽\n", periodProfit.StringFixed(2))
-	fmt.Printf("прибыль за всё время (по снимку): %s ₽\n", allTimeProfit.StringFixed(2))
-	start, ok1 := index.At(from)
-	end, ok2 := index.At(to)
-	if !ok1 || !ok2 {
-		return errors.New("MCFTR: no value at period bounds")
+	fmt.Printf("прибыль за период: %s ₽\n", vTo.Sub(vFrom).Sub(sumDeposits(from, to)).StringFixed(2))
+	fmt.Printf("прибыль за всё время (по снимку): %s ₽\n", vTo.Sub(sumDeposits(time.Time{}, to)).StringFixed(2))
+
+	cmpFrom := from
+	if first := index[0].Date; first.After(cmpFrom) {
+		cmpFrom = first
+		fmt.Printf("индекс есть только с %s — сравнение с индексом с этой даты\n", cmpFrom.Format(time.DateOnly))
 	}
-	indexReturn := end.Value.Div(start.Value).Sub(decimal.NewFromInt(1)).Mul(decimal.NewFromInt(100))
-	fmt.Printf("MCFTR %s → %s: %s → %s, %s%%\n",
-		start.Date.Format(time.DateOnly), end.Date.Format(time.DateOnly),
-		start.Value.StringFixed(2), end.Value.StringFixed(2), indexReturn.StringFixed(2))
-	fmt.Printf("TWR против MCFTR: %s п.п.\n", twr.Sub(indexReturn).StringFixed(2))
+	start, ok1 := index.At(cmpFrom)
+	end, ok2 := index.At(to)
+	g0, ok3 := growth.At(cmpFrom)
+	if !ok1 || !ok2 || !ok3 {
+		return errors.New("MCFTR: no value at comparison bounds")
+	}
+	indexReturn := end.Value.Div(start.Value).Sub(decimal.NewFromInt(1)).Mul(hundred)
+	twrCmp := growth[len(growth)-1].Value.Div(g0.Value).Sub(decimal.NewFromInt(1)).Mul(hundred)
+	fmt.Printf("с %s: TWR %s%%, MCFTR %s%% (%s → %s), разница %s п.п.\n",
+		cmpFrom.Format(time.DateOnly), twrCmp.StringFixed(2), indexReturn.StringFixed(2),
+		start.Value.StringFixed(2), end.Value.StringFixed(2), twrCmp.Sub(indexReturn).StringFixed(2))
 
 	var secRows []snapshot.Row
 	for _, r := range rows {
@@ -223,34 +236,68 @@ func checkTWR(p *load.Portfolio, m *load.Market, index series.Series, accountIDs
 	}
 	securities := snapshot.Total(secRows, from, to)
 	trades, income := ledger.SecurityFlows(events)
-	actual, shadow, err := metrics.ShadowTrades(securities, index, trades, income, from, to)
+	actual, shadow, err := metrics.ShadowTrades(securities, index, trades, income, cmpFrom, to)
 	if err != nil {
 		return err
 	}
 	fmt.Println("по сделкам: ты / тень MCFTR / разница")
-	for i, p := range actual {
-		if p.Date.Day() == 1 || p.Date.Equal(to) {
-			fmt.Printf("  %s %14s %14s %12s\n", p.Date.Format(time.DateOnly),
-				p.Value.StringFixed(2), shadow[i].Value.StringFixed(2), p.Value.Sub(shadow[i].Value).StringFixed(2))
+	for i, pt := range actual {
+		if (pt.Date.Day() == 1 && pt.Date.Month() == time.January) || pt.Date.Equal(to) {
+			fmt.Printf("  %s %14s %14s %12s\n", pt.Date.Format(time.DateOnly),
+				pt.Value.StringFixed(2), shadow[i].Value.StringFixed(2), pt.Value.Sub(shadow[i].Value).StringFixed(2))
 		}
 	}
 
-	shadowDep, err := metrics.ShadowDeposits(values, index, deposits, from, to)
+	shadowDep, err := metrics.ShadowDeposits(values, index, deposits, cmpFrom, to)
 	if err != nil {
 		return err
 	}
 	fmt.Println("по пополнениям: ты / тень MCFTR / разница")
-	for i, p := range values {
-		if p.Date.Day() == 1 || p.Date.Equal(to) {
-			fmt.Printf("  %s %14s %14s %12s\n", p.Date.Format(time.DateOnly),
-				p.Value.StringFixed(2), shadowDep[i].Value.StringFixed(2), p.Value.Sub(shadowDep[i].Value).StringFixed(2))
+	for _, pt := range shadowDep {
+		v, _ := values.At(pt.Date)
+		if (pt.Date.Day() == 1 && pt.Date.Month() == time.January) || pt.Date.Equal(to) {
+			fmt.Printf("  %s %14s %14s %12s\n", pt.Date.Format(time.DateOnly),
+				v.Value.StringFixed(2), pt.Value.StringFixed(2), v.Value.Sub(pt.Value).StringFixed(2))
 		}
 	}
-	if err := checkValues(p, events, rows, to); err != nil {
-		return err
+
+	if slices.Contains(os.Args[1:], "csv") {
+		cols := map[string]series.Series{
+			"value": values, "deposit": deposits, "twr": growth,
+			"index":           metrics.TWR(index, nil, nil, from, to),
+			"shadow_deposits": shadowDep, "securities": securities, "shadow_trades": shadow,
+		}
+		if err := writeSeries("series.csv", values, cols); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return checkValues(p, events, rows, to)
+}
+
+func writeSeries(path string, days series.Series, cols map[string]series.Series) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	names := []string{"value", "deposit", "twr", "index", "shadow_deposits", "securities", "shadow_trades"}
+	w := csv.NewWriter(f)
+	w.Write(append([]string{"date"}, names...))
+	for _, d := range days {
+		row := []string{d.Date.Format(time.DateOnly)}
+		for _, n := range names {
+			cell := ""
+			if pt, ok := cols[n].At(d.Date); ok && pt.Date.Equal(d.Date) {
+				cell = pt.Value.StringFixed(6)
+			}
+			row = append(row, cell)
+		}
+		w.Write(row)
+	}
+	w.Flush()
+	return w.Error()
 }
 
 func checkValues(p *load.Portfolio, events []ledger.Event, rows []snapshot.Row, day time.Time) error {
@@ -274,11 +321,11 @@ func checkValues(p *load.Portfolio, events []ledger.Event, rows []snapshot.Row, 
 		if !r.Date.Equal(day) {
 			continue
 		}
-		p := get(r.Key)
-		p.ours = p.ours.Add(r.Value)
-		p.qty = p.qty.Add(r.Quantity)
-		p.ourPrice = r.Price.Value.Add(r.NKD)
-		p.priceDate = r.Price.Date
+		pr := get(r.Key)
+		pr.ours = pr.ours.Add(r.Value)
+		pr.qty = pr.qty.Add(r.Quantity)
+		pr.ourPrice = r.Price.Value.Add(r.NKD)
+		pr.priceDate = r.Price.Date
 	}
 	for _, d := range p.Accounts {
 		if d.Portfolio == nil {
@@ -296,24 +343,35 @@ func checkValues(p *load.Portfolio, events []ledger.Event, rows []snapshot.Row, 
 			if !ok {
 				key = h.InstrumentUID
 			}
-			p := get(key)
-			p.broker = p.broker.Add(h.Value())
-			p.brPrice = h.Price.Add(h.NKD)
+			pr := get(key)
+			pr.broker = pr.broker.Add(h.Value())
+			pr.brPrice = h.Price.Add(h.NKD)
 		}
 	}
 
 	total := decimal.Zero
 	fmt.Println("стоимость по позициям (наша − брокер), где разница больше 1 ₽:")
-	for k, p := range byKey {
-		diff := p.ours.Sub(p.broker)
+	for k, pr := range byKey {
+		diff := pr.ours.Sub(pr.broker)
 		total = total.Add(diff)
 		if diff.Abs().LessThan(decimal.NewFromInt(1)) {
 			continue
 		}
 		fmt.Printf("  %-38s qty=%-8s наша цена=%-10s (от %s) брокер=%-10s  разница=%s\n",
-			k, p.qty.String(), p.ourPrice.StringFixed(2), p.priceDate.Format(time.DateOnly),
-			p.brPrice.StringFixed(2), diff.StringFixed(2))
+			k, pr.qty.String(), pr.ourPrice.StringFixed(2), pr.priceDate.Format(time.DateOnly),
+			pr.brPrice.StringFixed(2), diff.StringFixed(2))
 	}
 	fmt.Printf("  итого разница: %s\n", total.StringFixed(2))
 	return nil
+}
+
+func dumpEvents(events []ledger.Event, from, to time.Time) {
+	for _, e := range events {
+		if e.Date.Before(from) || e.Date.After(to) {
+			continue
+		}
+		fmt.Printf("%s  %-8s %-16s %-10s qty=%-6s %12s %s\n",
+			e.Date.Format("2006-01-02 15:04"), e.AccountID[:8], e.OperationKind, e.InstrumentKind,
+			e.Quantity.String(), e.Amount.Amount.StringFixed(2), e.Amount.Currency)
+	}
 }
