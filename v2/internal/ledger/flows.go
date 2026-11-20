@@ -73,10 +73,18 @@ func ByInstrument(events []Event, currencyByAsset map[string]string) map[string]
 			f.Bought = f.Bought.Add(amount)
 			f.Quantity = f.Quantity.Add(adjustForSplits(uid, e.Date, e.Quantity))
 			f.record(e.Date)
+			if nkd := e.AccruedInterest.Amount; !nkd.IsZero() {
+				f.Bought = f.Bought.Add(nkd)
+				f.Income = f.Income.Sub(nkd)
+			}
 		case KindSell:
 			f.Sold = f.Sold.Add(amount)
 			f.Quantity = f.Quantity.Sub(adjustForSplits(uid, e.Date, e.Quantity))
 			f.record(e.Date)
+			if nkd := e.AccruedInterest.Amount; !nkd.IsZero() {
+				f.Sold = f.Sold.Sub(nkd)
+				f.Income = f.Income.Add(nkd)
+			}
 		case KindDividend, KindCoupon, KindAmortization:
 			f.Income = f.Income.Add(amount)
 		case KindRedemption:
