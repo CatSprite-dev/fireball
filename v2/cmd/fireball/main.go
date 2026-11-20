@@ -8,16 +8,14 @@ import (
 	"math"
 	"os"
 	"os/signal"
-	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/shopspring/decimal"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/CatSprite-dev/fireball/v2/internal/convert"
-	"github.com/CatSprite-dev/fireball/v2/internal/fx"
 	"github.com/CatSprite-dev/fireball/v2/internal/ledger"
+	"github.com/CatSprite-dev/fireball/v2/internal/load"
 	"github.com/CatSprite-dev/fireball/v2/internal/metrics"
 	"github.com/CatSprite-dev/fireball/v2/internal/series"
 	"github.com/CatSprite-dev/fireball/v2/internal/snapshot"
@@ -25,16 +23,6 @@ import (
 )
 
 const baseCurrency = "RUB"
-
-var excludedAccountTypes = map[string]bool{
-	"ACCOUNT_TYPE_DFA": true,
-}
-
-type accountData struct {
-	Account    tinvest.Account
-	Operations []tinvest.Operation
-	Portfolio  *tinvest.Portfolio
-}
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -62,163 +50,41 @@ func run(logger *slog.Logger) error {
 
 	client := tinvest.New(token, logger)
 
-	accounts, err := client.GetAccounts(ctx, tinvest.AccountStatusAll)
-	if err != nil {
-		return fmt.Errorf("get accounts: %w", err)
-	}
-
-	accounts = filterAccounts(accounts)
-	if len(accounts) == 0 {
-		return errors.New("no supported accounts")
-	}
+	loader := load.New(client, baseCurrency)
 
 	start := time.Now()
-	data, err := loadAccounts(ctx, client, accounts)
+	p, err := loader.Portfolio(ctx)
 	if err != nil {
-		return fmt.Errorf("load accounts: %w", err)
+		return err
 	}
+	logger.Info("loaded", "accounts", len(p.Accounts), "events", len(p.Events), "duration", time.Since(start))
 
-	events, err := buildEvents(data)
+	to := series.Day(time.Now())
+	from := to.AddDate(-1, 0, 0)
+	loadFrom := from.AddDate(0, 0, -30)
+
+	m, err := loader.Market(ctx, p, loadFrom, time.Now())
+	if err != nil {
+		return err
+	}
+	index, err := loader.Index(ctx, "MCFTR", loadFrom, time.Now())
 	if err != nil {
 		return err
 	}
 
-	currencies, err := client.GetCurrencies(ctx, tinvest.InstrumentStatusAll)
-	if err != nil {
-		return fmt.Errorf("get currencies: %w", err)
-	}
-	cur, err := convert.NewCurrencies(currencies)
-	if err != nil {
-		return fmt.Errorf("currencies: %w", err)
-	}
-
-	rates, err := loadRates(ctx, client, cur, events)
-	if err != nil {
-		return fmt.Errorf("load rates: %w", err)
-	}
-	if err := ledger.ApplyBase(events, rates); err != nil {
+	if err := checkTWR(p, m, index, nil, from, to); err != nil {
 		return err
 	}
-	ledger.InheritInstruments(events)
-	events = ledger.AddCurrencyLegs(events, cur.ByAsset)
-	logger.Info("loaded", "accounts", len(data), "events", len(events), "duration", time.Since(start))
-
-	if err := checkTWR(ctx, client, events, rates, cur, nil, data); err != nil {
-		return err
-	}
-	return checkAccounts(data, events, cur)
+	return checkAccounts(p)
 }
 
-func filterAccounts(accounts []tinvest.Account) []tinvest.Account {
-	var supported []tinvest.Account
-	for _, acc := range accounts {
-		if excludedAccountTypes[acc.Type] {
-			continue
-		}
-		supported = append(supported, acc)
-	}
-	return supported
-}
-
-func loadAccounts(ctx context.Context, client *tinvest.Client, accounts []tinvest.Account) ([]accountData, error) {
-	results := make([]accountData, len(accounts))
-	now := time.Now()
-
-	g, gctx := errgroup.WithContext(ctx)
-	for i, acc := range accounts {
-		g.Go(func() error {
-			ops, err := client.GetOperationsByCursor(gctx, tinvest.OperationsFilter{
-				AccountID: acc.ID,
-				From:      &acc.OpenedDate,
-				To:        &now,
-			})
-			if err != nil {
-				return fmt.Errorf("account %s: %w", acc.ID, err)
-			}
-			var portfolio *tinvest.Portfolio
-			if acc.Status != "ACCOUNT_STATUS_CLOSED" {
-				portfolio, err = client.GetPortfolio(gctx, acc.ID, baseCurrency)
-				if err != nil {
-					return fmt.Errorf("account %s: %w", acc.ID, err)
-				}
-			}
-			results[i] = accountData{Account: acc, Operations: ops, Portfolio: portfolio}
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-	return results, nil
-}
-
-func buildEvents(data []accountData) ([]ledger.Event, error) {
-	var all []ledger.Event
-	var accountIDs []string
-	for _, d := range data {
-		events, err := convert.ToEvents(d.Account.ID, d.Operations)
-		if err != nil {
-			return nil, fmt.Errorf("account %s: %w", d.Account.Name, err)
-		}
-		all = append(all, events...)
-		accountIDs = append(accountIDs, d.Account.ID)
-	}
-
-	selected := ledger.Filter(all, accountIDs)
-	ledger.SortByDate(selected)
-	return selected, nil
-}
-
-func loadRates(ctx context.Context, client *tinvest.Client, cur convert.Currencies, events []ledger.Event) (*fx.Rates, error) {
-	needed := make(map[string]bool)
-	var earliest time.Time
-	for _, e := range events {
-		if earliest.IsZero() || e.Date.Before(earliest) {
-			earliest = e.Date
-		}
-		if e.Amount.Currency != baseCurrency {
-			needed[e.Amount.Currency] = true
-		}
-		if code, ok := cur.ByAsset[e.AssetUID]; ok {
-			needed[code] = true
-		}
-	}
-	if len(needed) == 0 {
-		return fx.New(baseCurrency, nil), nil
-	}
-
-	from := earliest.AddDate(0, 0, -14)
-	to := time.Now()
-
-	points := make(map[string]series.Series, len(needed))
-	for currency := range needed {
-		instrument, ok := cur.Exchange[currency]
-		if !ok {
-			return nil, fmt.Errorf("no exchange instrument for currency %s", currency)
-		}
-
-		candles, err := client.GetCandles(ctx, instrument.UID, from, to, tinvest.CandleIntervalDay)
-		if err != nil {
-			return nil, fmt.Errorf("candles %s: %w", currency, err)
-		}
-
-		currencyPoints, err := convert.ToPoints(candles.Candles, instrument.Nominal)
-		if err != nil {
-			return nil, fmt.Errorf("points %s: %w", currency, err)
-		}
-		points[currency] = currencyPoints
-	}
-
-	return fx.New(baseCurrency, points), nil
-}
-
-func checkAccounts(data []accountData, events []ledger.Event, cur convert.Currencies) error {
+func checkAccounts(p *load.Portfolio) error {
+	events, cur := p.Events, p.Currencies
 	var sumTrade, sumPayout, sumClearing, sumAccount, sumBroker decimal.Decimal
 	fmt.Printf("%-28s %12s %12s %10s %10s %12s %12s %8s\n",
 		"счёт", "сделки", "выплаты", "клиринг", "счёт", "итого", "брокер", "разница")
 
-	for _, d := range data {
+	for _, d := range p.Accounts {
 		evs := ledger.Filter(events, []string{d.Account.ID})
 		book := ledger.ByInstrument(evs, cur.ByAsset)
 		keys := ledger.PageKeys(evs, cur.ByAsset)
@@ -297,91 +163,15 @@ func printSplit(name string, trade, payout, clearing, account, broker decimal.De
 		total.StringFixed(2), broker.StringFixed(2), total.Sub(broker).StringFixed(2))
 }
 
-func loadPrices(ctx context.Context, client *tinvest.Client, positions map[string]*ledger.Flows, uidsByKey map[string][]string, tradePrices map[string]series.Series, rates *fx.Rates, from, to time.Time) (map[string]series.Series, error) {
-	prices := make(map[string]series.Series)
-	for key, f := range positions {
-		if f.Kind == ledger.InstrumentCurrency {
-			if s, ok := rates.Series(key); ok {
-				prices[key] = s
-			}
-			continue
-		}
-		var parts []series.Series
-		for _, uid := range uidsByKey[key] {
-			candles, err := client.GetCandles(ctx, uid, from, to, tinvest.CandleIntervalDay)
-			if err != nil {
-				continue
-			}
-			points, err := convert.ToPoints(candles.Candles, decimal.NewFromInt(1))
-			if err != nil {
-				return nil, fmt.Errorf("prices %s: %w", uid, err)
-			}
-			if f.Kind != ledger.InstrumentBond {
-				inst, err := client.GetInstrumentBy(ctx, tinvest.InstrumentIDUID, "", uid)
-				if err != nil {
-					return nil, fmt.Errorf("instrument %s: %w", uid, err)
-				}
-				points, err = rates.Convert(points, strings.ToUpper(inst.Currency))
-				if err != nil {
-					return nil, fmt.Errorf("prices %s: %w", uid, err)
-				}
-			}
-			parts = append(parts, points)
-		}
-		prices[key] = series.Merge(append(parts, tradePrices[key])...)
-	}
-	return prices, nil
-}
-
-func loadBonds(ctx context.Context, client *tinvest.Client, positions map[string]*ledger.Flows, uidsByKey map[string][]string, from, to time.Time) (map[string]snapshot.Bond, error) {
-	bonds := make(map[string]snapshot.Bond)
-	for key, f := range positions {
-		if f.Kind != ledger.InstrumentBond {
-			continue
-		}
-		var nominals, nkds []series.Series
-		for _, uid := range uidsByKey[key] {
-			list, err := client.GetAccruedInterests(ctx, uid, from, to)
-			if err != nil {
-				continue
-			}
-			nominal, nkd, err := convert.ToAccrued(list)
-			if err != nil {
-				return nil, fmt.Errorf("accrued %s: %w", uid, err)
-			}
-			nominals, nkds = append(nominals, nominal), append(nkds, nkd)
-		}
-		bonds[key] = snapshot.Bond{Nominal: series.Merge(nominals...), NKD: series.Merge(nkds...)}
-	}
-	return bonds, nil
-}
-
-func checkTWR(ctx context.Context, client *tinvest.Client, events []ledger.Event, rates *fx.Rates, cur convert.Currencies, accountIDs []string, data []accountData) error {
+func checkTWR(p *load.Portfolio, m *load.Market, index series.Series, accountIDs []string, from, to time.Time) error {
+	events := p.Events
 	if accountIDs != nil {
 		events = ledger.Filter(events, accountIDs)
 	}
-	to := series.Day(time.Now())
-	from := to.AddDate(-1, 0, 0)
-	loadFrom := from.AddDate(0, 0, -30)
-
-	positions := ledger.ByInstrument(events, cur.ByAsset)
-	uidsByKey := make(map[string][]string)
-	for uid, key := range ledger.PageKeys(events, cur.ByAsset) {
-		uidsByKey[key] = append(uidsByKey[key], uid)
-	}
-	tradePrices := ledger.TradePrices(events, cur.ByAsset)
-
-	prices, err := loadPrices(ctx, client, positions, uidsByKey, tradePrices, rates, loadFrom, time.Now())
-	if err != nil {
-		return err
-	}
-	bonds, err := loadBonds(ctx, client, positions, uidsByKey, loadFrom, time.Now())
-	if err != nil {
-		return err
-	}
+	positions := ledger.ByInstrument(events, p.Currencies.ByAsset)
 
 	cash := ledger.CashHistory(events, baseCurrency)
-	rows, gaps := snapshot.Build(positions, prices, bonds, cash, baseCurrency, from, to)
+	rows, gaps := snapshot.Build(positions, m.Prices, m.Bonds, cash, baseCurrency, from, to)
 	values := snapshot.Total(rows, from, to)
 	deposits := ledger.NetDeposits(events)
 	growth := metrics.TWR(values, deposits, from, to)
@@ -415,28 +205,6 @@ func checkTWR(ctx context.Context, client *tinvest.Client, events []ledger.Event
 	allTimeProfit := vTo.Sub(sumDeposits(time.Time{}, to))
 	fmt.Printf("прибыль за 12 месяцев: %s ₽\n", periodProfit.StringFixed(2))
 	fmt.Printf("прибыль за всё время (по снимку): %s ₽\n", allTimeProfit.StringFixed(2))
-	indicatives, err := client.GetIndicatives(ctx)
-	if err != nil {
-		return fmt.Errorf("indicatives: %w", err)
-	}
-	var indexUID string
-	for _, ind := range indicatives {
-		if ind.Ticker == "MCFTR" {
-			indexUID = ind.UID
-		}
-	}
-	if indexUID == "" {
-		return errors.New("MCFTR not found in indicatives")
-	}
-
-	candles, err := client.GetCandles(ctx, indexUID, loadFrom, time.Now(), tinvest.CandleIntervalDay)
-	if err != nil {
-		return fmt.Errorf("MCFTR candles: %w", err)
-	}
-	index, err := convert.ToPoints(candles.Candles, decimal.NewFromInt(1))
-	if err != nil {
-		return fmt.Errorf("MCFTR points: %w", err)
-	}
 	start, ok1 := index.At(from)
 	end, ok2 := index.At(to)
 	if !ok1 || !ok2 {
@@ -459,7 +227,6 @@ func checkTWR(ctx context.Context, client *tinvest.Client, events []ledger.Event
 	trades, income := ledger.SecurityFlows(events)
 	actual, shadow, err := metrics.ShadowTrades(securities, index, trades, income, from, to)
 	if err != nil {
-
 		return err
 	}
 	fmt.Println("по сделкам: ты / тень MCFTR / разница")
@@ -481,14 +248,15 @@ func checkTWR(ctx context.Context, client *tinvest.Client, events []ledger.Event
 				p.Value.StringFixed(2), shadowDep[i].Value.StringFixed(2), p.Value.Sub(shadowDep[i].Value).StringFixed(2))
 		}
 	}
-	if err := checkValues(data, events, cur, rows, to); err != nil {
+	if err := checkValues(p, events, rows, to); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func checkValues(data []accountData, events []ledger.Event, cur convert.Currencies, rows []snapshot.Row, day time.Time) error {
+func checkValues(p *load.Portfolio, events []ledger.Event, rows []snapshot.Row, day time.Time) error {
+	cur := p.Currencies
 	keys := ledger.PageKeys(events, cur.ByAsset)
 
 	type pair struct {
@@ -514,7 +282,7 @@ func checkValues(data []accountData, events []ledger.Event, cur convert.Currenci
 		p.ourPrice = r.Price.Value.Add(r.NKD)
 		p.priceDate = r.Price.Date
 	}
-	for _, d := range data {
+	for _, d := range p.Accounts {
 		if d.Portfolio == nil {
 			continue
 		}
