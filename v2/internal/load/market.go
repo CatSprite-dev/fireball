@@ -19,8 +19,8 @@ import (
 
 // Market — цены и номиналы с НКД по ключам позиций.
 type Market struct {
-	Prices map[string]series.Series
-	Bonds  map[string]snapshot.Bond
+	Prices map[string]series.Series // цена позиции по дням; у облигаций — в % от номинала
+	Bonds  map[string]snapshot.Bond // номинал и НКД облигаций по дням — для перевода % в рубли
 }
 
 // Market — цены в базовой валюте и номиналы с НКД облигаций с from по to на все позиции портфеля.

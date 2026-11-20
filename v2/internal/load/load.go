@@ -173,7 +173,7 @@ func (l *Loader) loadRates(ctx context.Context, cur convert.Currencies, events [
 		return fx.New(l.base, nil), nil
 	}
 
-	from := earliest.AddDate(0, 0, -14)
+	from := earliest.AddDate(0, 0, -45)
 	to := time.Now()
 
 	points := make(map[string]series.Series, len(needed))

@@ -17,30 +17,30 @@ func TestTWR(t *testing.T) {
 	cases := []struct {
 		name     string
 		values   series.Series
-		deposits series.Series
+		in, out  series.Series
 		from, to int
 		want     []string // рост на каждый день от from до to
 	}{
 		{
-			name:     "пополнение не даёт доходности",
-			values:   series.Series{pt(1, "100000"), pt(2, "110000"), pt(3, "210000")},
-			deposits: series.Series{pt(1, "100000"), pt(3, "100000")},
-			from:     1, to: 3,
+			name:   "пополнение не даёт доходности",
+			values: series.Series{pt(1, "100000"), pt(2, "110000"), pt(3, "210000")},
+			in:     series.Series{pt(1, "100000"), pt(3, "100000")},
+			from:   1, to: 3,
 			want: []string{"1", "1.1", "1.1"},
 		},
 		{
-			name:     "первый день: до него пусто, пополнение 1000",
-			values:   series.Series{pt(2, "1000")},
-			deposits: series.Series{pt(2, "1000")},
-			from:     1, to: 2,
+			name:   "первый день: до него пусто, пополнение 1000",
+			values: series.Series{pt(2, "1000")},
+			in:     series.Series{pt(2, "1000")},
+			from:   1, to: 2,
 			want: []string{"1", "1"},
 		},
 		{
-			name:     "вывод утром",
-			values:   series.Series{pt(1, "100000"), pt(2, "55000")},
-			deposits: series.Series{pt(2, "-50000")},
-			from:     1, to: 2,
-			want: []string{"1", "1.1"},
+			name:   "вывод вечером",
+			values: series.Series{pt(1, "100000"), pt(2, "55000")},
+			out:    series.Series{pt(2, "-50000")},
+			from:   1, to: 2,
+			want: []string{"1", "1.05"},
 		},
 		{
 			name:   "пустой портфель без пополнений",
@@ -56,7 +56,7 @@ func TestTWR(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		got := TWR(c.values, c.deposits, day(c.from), day(c.to))
+		got := TWR(c.values, c.in, c.out, day(c.from), day(c.to))
 		if len(got) != len(c.want) {
 			t.Errorf("%s: got %d points, want %d: %+v", c.name, len(got), len(c.want), got)
 			continue
@@ -69,4 +69,17 @@ func TestTWR(t *testing.T) {
 			}
 		}
 	}
+
+	t.Run("приход и уход в один день", func(t *testing.T) {
+		values := series.Series{pt(1, "69.51"), pt(2, "0.69")}
+		in := series.Series{pt(2, "23000")}
+		out := series.Series{pt(2, "-22541")}
+
+		got := TWR(values, in, out, day(1), day(2))
+
+		r := got[1].Value.Sub(decimal.NewFromInt(1))
+		if r.Sub(decimal.RequireFromString("-0.0229")).Abs().GreaterThan(decimal.RequireFromString("0.0001")) {
+			t.Errorf("r = %s, want ≈ -0.0229", r)
+		}
+	})
 }
