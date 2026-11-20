@@ -140,3 +140,19 @@ func Build(positions map[string]*ledger.Flows, prices map[string]series.Series, 
 
 	return rows, gaps
 }
+
+// Total — стоимость портфеля на каждый день с from по to: сумма Value всех строк дня.
+// День без строк — точка 0, чтобы series.At не подставил ему старую стоимость.
+func Total(rows []Row, from, to time.Time) series.Series {
+	byDay := make(map[time.Time]decimal.Decimal)
+	for _, r := range rows {
+		day := series.Day(r.Date)
+		byDay[day] = byDay[day].Add(r.Value)
+	}
+
+	var result series.Series
+	for d := series.Day(from); !d.After(series.Day(to)); d = d.AddDate(0, 0, 1) {
+		result = append(result, series.Point{Date: d, Value: byDay[d]})
+	}
+	return result
+}

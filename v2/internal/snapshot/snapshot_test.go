@@ -147,3 +147,31 @@ func TestPositionRowsBondWithoutNominalIsGap(t *testing.T) {
 		t.Errorf("got %d rows and %d gaps, want 0 and 1", len(rows), len(gaps))
 	}
 }
+
+func TestTotal(t *testing.T) {
+	d := func(day int) time.Time { return time.Date(2026, 8, day, 0, 0, 0, 0, time.UTC) }
+	row := func(day int, key string, kind ledger.InstrumentKind, value string) Row {
+		return Row{Date: d(day), Key: key, Kind: kind, Value: decimal.RequireFromString(value)}
+	}
+
+	rows := []Row{
+		row(4, "t", ledger.InstrumentShare, "2793"),
+		row(2, "sber", ledger.InstrumentShare, "3100.5"),
+		row(2, "t", ledger.InstrumentShare, "2725.8"),
+		row(2, "RUB", ledger.InstrumentCurrency, "1000.25"),
+		row(4, "si", ledger.InstrumentFutures, "0"),
+	}
+
+	got := Total(rows, d(2), d(4))
+
+	want := []string{"6826.55", "0", "2793"}
+	if len(got) != len(want) {
+		t.Fatalf("got %d points, want %d: %+v", len(got), len(want), got)
+	}
+	for i, w := range want {
+		if !got[i].Date.Equal(d(2+i)) || !got[i].Value.Equal(decimal.RequireFromString(w)) {
+			t.Errorf("point %d: %s %s, want %s %s",
+				i, got[i].Date.Format(time.DateOnly), got[i].Value, d(2+i).Format(time.DateOnly), w)
+		}
+	}
+}
