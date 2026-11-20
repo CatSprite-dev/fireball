@@ -37,6 +37,7 @@ certs
 
 fireball-v2-plan-2.md
 how-we-work.md
+v2/CLAUDE.md
 
 !v2/data/splits/splits_moex.json
 !v2/data/splits/splits_yahoo.json
