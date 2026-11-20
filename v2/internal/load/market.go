@@ -25,6 +25,7 @@ type Market struct {
 
 // Market — цены в базовой валюте и номиналы с НКД облигаций с from по to на все позиции портфеля.
 func (l *Loader) Market(ctx context.Context, p *Portfolio, from, to time.Time) (*Market, error) {
+	start := time.Now()
 	positions := ledger.ByInstrument(p.Events, p.Currencies.ByAsset)
 	uidsByKey := uidsByKey(p.Events, p.Currencies.ByAsset)
 	tradePrices := ledger.TradePrices(p.Events, p.Currencies.ByAsset)
@@ -37,6 +38,7 @@ func (l *Loader) Market(ctx context.Context, p *Portfolio, from, to time.Time) (
 	if err != nil {
 		return nil, err
 	}
+	l.logger.Info("market loaded", "positions", len(positions), "bonds", len(bonds), "duration", time.Since(start))
 	return &Market{Prices: prices, Bonds: bonds}, nil
 }
 

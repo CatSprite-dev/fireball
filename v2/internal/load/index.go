@@ -14,6 +14,7 @@ import (
 
 // Index — значения индекса ticker по торговым дням с from по to.
 func (l *Loader) Index(ctx context.Context, ticker string, from, to time.Time) (series.Series, error) {
+	start := time.Now()
 	indicatives, err := l.client.GetIndicatives(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("indicatives: %w", err)
@@ -36,5 +37,6 @@ func (l *Loader) Index(ctx context.Context, ticker string, from, to time.Time) (
 	if err != nil {
 		return nil, fmt.Errorf("%s points: %w", ticker, err)
 	}
+	l.logger.Info("index loaded", "points", len(index), "duration", time.Since(start))
 	return index, nil
 }

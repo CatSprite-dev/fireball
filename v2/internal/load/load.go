@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -24,11 +25,12 @@ var excludedAccountTypes = map[string]bool{
 type Loader struct {
 	client *tinvest.Client
 	base   string
+	logger *slog.Logger
 }
 
-// New — загрузчик с клиентом брокера и базовой валютой base.
-func New(client *tinvest.Client, base string) *Loader {
-	return &Loader{client: client, base: base}
+// New — загрузчик с клиентом брокера, базовой валютой base и логгером.
+func New(client *tinvest.Client, base string, logger *slog.Logger) *Loader {
+	return &Loader{client: client, base: base, logger: logger}
 }
 
 // Account — счёт с операциями и портфелем; у закрытого счёта портфеля нет.
@@ -48,6 +50,7 @@ type Portfolio struct {
 
 // Portfolio — счета, операции, валюты и курсы; события книги уже в базовой валюте.
 func (l *Loader) Portfolio(ctx context.Context) (*Portfolio, error) {
+	start := time.Now()
 	accounts, err := l.client.GetAccounts(ctx, tinvest.AccountStatusAll)
 	if err != nil {
 		return nil, fmt.Errorf("get accounts: %w", err)
@@ -87,6 +90,7 @@ func (l *Loader) Portfolio(ctx context.Context) (*Portfolio, error) {
 	ledger.InheritInstruments(events)
 	events = ledger.AddCurrencyLegs(events, cur.ByAsset)
 
+	l.logger.Info("loaded", "accounts", len(data), "events", len(events), "duration", time.Since(start))
 	return &Portfolio{Accounts: data, Events: events, Currencies: cur, Rates: rates}, nil
 }
 

@@ -25,7 +25,7 @@ import (
 const baseCurrency = "RUB"
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	if err := run(logger); err != nil {
 		logger.Error("fatal", "error", err)
@@ -50,14 +50,12 @@ func run(logger *slog.Logger) error {
 
 	client := tinvest.New(token, logger)
 
-	loader := load.New(client, baseCurrency)
+	loader := load.New(client, baseCurrency, logger)
 
-	start := time.Now()
 	p, err := loader.Portfolio(ctx)
 	if err != nil {
 		return err
 	}
-	logger.Info("loaded", "accounts", len(p.Accounts), "events", len(p.Events), "duration", time.Since(start))
 
 	to := series.Day(time.Now())
 	from := to.AddDate(-1, 0, 0)
