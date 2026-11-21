@@ -19,8 +19,13 @@ import (
 
 // Overview — сводка портфеля для окна. Деньги — строкой, чтобы не терять копейки во float.
 type Overview struct {
-	Value string `json:"value"` // стоимость портфеля в базовой валюте, decimal строкой "1044651.48"
-	AsOf  string `json:"asOf"`  // день оценки, "2006-01-02"
+	Value    string `json:"value"`    // стоимость портфеля в базовой валюте, decimal строкой "1044651.48"
+	AsOf     string `json:"asOf"`     // день оценки, "2006-01-02"
+	Invested string `json:"invested"` // пополнения минус выводы за всё время
+	Profit   string `json:"profit"`   // стоимость минус вложено
+	Realized string `json:"realized"` // зафиксированная прибыль по сделкам с комиссиями
+	Paper    string `json:"paper"`    // бумажная прибыль: стоимость позиций минус их стоимость остатка
+	Income   string `json:"income"`   // выплаты за вычетом налогов на них
 }
 
 // Account — счёт для окна.
@@ -54,11 +59,21 @@ func (s *PortfolioService) Overview(ctx context.Context, accountIDs []string) (O
 	if err != nil {
 		return Overview{}, err
 	}
-	value, err := portfolioValue(p, m, s.base, today, accountIDs)
+	sum, err := summarize(p, m, s.base, today, accountIDs)
 	if err != nil {
 		return Overview{}, err
 	}
-	return Overview{Value: value.StringFixed(2), AsOf: today.Format(time.DateOnly)}, nil
+
+	profit := sum.Value.Sub(sum.Invested)
+	return Overview{
+		Value:    sum.Value.StringFixed(2),
+		AsOf:     today.Format(time.DateOnly),
+		Invested: sum.Invested.StringFixed(2),
+		Profit:   profit.StringFixed(2),
+		Realized: sum.Realized.StringFixed(2),
+		Paper:    sum.Paper.StringFixed(2),
+		Income:   sum.Income.StringFixed(2),
+	}, nil
 }
 
 // Accounts — счета портфеля в порядке, как у брокера.
@@ -104,16 +119,83 @@ func toAccounts(accounts []load.Account) []Account {
 	return result
 }
 
-// portfolioValue — стоимость позиций и денег счетов accountIDs на день day. Если у позиции нет цены — ошибка:
-// без неё сумма молча вышла бы меньше настоящей.
-func portfolioValue(p *load.Portfolio, m *load.Market, base string, day time.Time, accountIDs []string) (decimal.Decimal, error) {
-	events := ledger.Filter(p.Events, accountIDs)
+// summary — стоимость счетов на день и из чего складывается прибыль за всё время.
+// Тождество: Realized + Paper + Income + Clearing + Account = Value − Invested.
+type summary struct {
+	Value    decimal.Decimal // стоимость позиций и денег
+	Invested decimal.Decimal // пополнения минус выводы
+	Realized decimal.Decimal // зафиксированная прибыль по сделкам с комиссиями
+	Paper    decimal.Decimal // стоимость позиций минус их стоимость остатка
+	Income   decimal.Decimal // выплаты за вычетом налогов на них
+	Clearing decimal.Decimal // вариационная маржа и экспирация
+	Account  decimal.Decimal // комиссии и налоги без бумаги
+}
+
+// summarize — сводка по счетам accountIDs на день day: каждый счёт считается отдельно, потом
+// всё складывается. Так средняя цена у каждого счёта своя, как у брокера и налоговой:
+// если одна бумага лежит на двух счетах, продажа на одном не списывается по общей средней.
+func summarize(p *load.Portfolio, m *load.Market, base string, day time.Time, accountIDs []string) (summary, error) {
+	var total summary
+	for _, id := range accountIDs {
+		sum, err := summarizeAccount(p, m, base, day, id)
+		if err != nil {
+			return summary{}, err
+		}
+		total = total.add(sum)
+	}
+	return total, nil
+}
+
+// summarizeAccount — сводка по одному счёту. Если у позиции нет цены — ошибка:
+// без неё стоимость молча вышла бы меньше настоящей. Если части прибыли не сходятся
+// с прибылью — тоже ошибка: значит, какой-то поток денег не попал ни в одну часть.
+func summarizeAccount(p *load.Portfolio, m *load.Market, base string, day time.Time, accountID string) (summary, error) {
+	events := ledger.Filter(p.Events, []string{accountID})
 	positions := ledger.ByInstrument(events, p.Currencies.ByAsset)
 	cash := ledger.CashHistory(events, base)
 	rows, gaps := snapshot.Build(positions, m.Prices, m.Bonds, cash, base, day, day)
 	if len(gaps) > 0 {
-		return decimal.Zero, fmt.Errorf("value on %s: no price for %d positions, first %s", day.Format(time.DateOnly), len(gaps), gaps[0].Key)
+		return summary{}, fmt.Errorf("account %s: value on %s: no price for %d positions, first %s", accountID, day.Format(time.DateOnly), len(gaps), gaps[0].Key)
 	}
-	total := snapshot.Total(rows, day, day)
-	return total[0].Value, nil
+
+	var sum summary
+	valueByKey := make(map[string]decimal.Decimal)
+	for _, r := range rows {
+		sum.Value = sum.Value.Add(r.Value)
+		valueByKey[r.Key] = valueByKey[r.Key].Add(r.Value)
+	}
+	for key, f := range positions {
+		sum.Realized = sum.Realized.Add(f.Realized).Add(f.Fees)
+		sum.Paper = sum.Paper.Add(valueByKey[key]).Sub(f.Cost)
+		sum.Income = sum.Income.Add(f.Income).Add(f.Taxes)
+		sum.Clearing = sum.Clearing.Add(f.Clearing)
+	}
+	for _, e := range events {
+		switch e.OperationKind {
+		case ledger.KindDeposit, ledger.KindWithdrawal, ledger.KindTransferIn, ledger.KindTransferOut:
+			sum.Invested = sum.Invested.Add(e.BaseAmount.Amount)
+		case ledger.KindFee, ledger.KindTax:
+			if e.InstrumentUID == "" && e.AssetUID == "" {
+				sum.Account = sum.Account.Add(e.BaseAmount.Amount)
+			}
+		}
+	}
+
+	parts := sum.Realized.Add(sum.Paper).Add(sum.Income).Add(sum.Clearing).Add(sum.Account)
+	if profit := sum.Value.Sub(sum.Invested); !parts.Equal(profit) {
+		return summary{}, fmt.Errorf("account %s: summary on %s: profit parts %s, profit %s", accountID, day.Format(time.DateOnly), parts.StringFixed(2), profit.StringFixed(2))
+	}
+	return sum, nil
+}
+
+func (s summary) add(o summary) summary {
+	return summary{
+		Value:    s.Value.Add(o.Value),
+		Invested: s.Invested.Add(o.Invested),
+		Realized: s.Realized.Add(o.Realized),
+		Paper:    s.Paper.Add(o.Paper),
+		Income:   s.Income.Add(o.Income),
+		Clearing: s.Clearing.Add(o.Clearing),
+		Account:  s.Account.Add(o.Account),
+	}
 }

@@ -12,6 +12,11 @@ const error = ref('')
 // Деньги приходят строкой; в число — только для показа, считать с ним нельзя.
 const rub = new Intl.NumberFormat('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})
 
+// Пока нет данных или строка пустая — прочерк.
+function money(s: string | undefined): string {
+  return s ? `${rub.format(Number(s))} ₽` : '— ₽'
+}
+
 // Ответы могут прийти не по порядку, если галочки щёлкают быстро: показываем только последний запрос.
 let request = 0
 
@@ -36,21 +41,24 @@ watch(() => props.accountIDs, async ids => {
       <p v-if="error">{{ error }}</p>
       <p v-else-if="!overview">Загружаю…</p>
       <template v-else>
-        <p class="value">{{ rub.format(Number(overview.value)) }} ₽</p>
+        <p class="value">{{ money(overview.value) }}</p>
         <p>на {{ overview.asOf }}</p>
       </template>
     </section>
 
     <section class="card">
       <h3>Вложено <HelpMark /></h3>
-      <p class="value">— ₽</p>
+      <p class="value">{{ money(overview?.invested) }}</p>
     </section>
 
     <section class="card">
       <h3>Прибыль <HelpMark /></h3>
-      <p class="value">— ₽ · —%</p>
-      <p>сделки: зафикс. — <HelpMark /> / бумажная — <HelpMark /></p>
-      <p>выплаты: — <HelpMark /></p>
+      <p class="value">{{ money(overview?.profit) }}</p>
+      <p>
+        сделки: зафикс. {{ money(overview?.realized) }} <HelpMark /> /
+        бумажная {{ money(overview?.paper) }} <HelpMark />
+      </p>
+      <p>выплаты: {{ money(overview?.income) }} <HelpMark /></p>
     </section>
   </div>
 </template>
