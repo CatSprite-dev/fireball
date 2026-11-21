@@ -85,10 +85,12 @@ func ByInstrument(events []Event, currencyByAsset map[string]string) map[string]
 				f.Sold = f.Sold.Sub(nkd)
 				f.Income = f.Income.Add(nkd)
 			}
-		case KindDividend, KindCoupon, KindAmortization:
+		case KindDividend, KindCoupon:
 			f.Income = f.Income.Add(amount)
+		case KindAmortization:
+			f.Sold = f.Sold.Add(amount)
 		case KindRedemption:
-			f.Income = f.Income.Add(amount)
+			f.Sold = f.Sold.Add(amount)
 			f.Quantity = decimal.Zero
 			f.record(e.Date)
 		case KindFee:

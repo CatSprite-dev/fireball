@@ -164,9 +164,36 @@ func TestByInstrumentRedemptionAndExpirationCloseQuantity(t *testing.T) {
 		want string
 	}{
 		{"bond quantity", got["bond"].Quantity, "0"},
-		{"bond income", got["bond"].Income, "1035.10"},
+		{"bond sold", got["bond"].Sold, "1035.10"},
 		{"option quantity", got["opt"].Quantity, "0"},
 		{"amortization keeps quantity", got["amort"].Quantity, "10"},
+	}
+	for _, c := range checks {
+		if !c.got.Equal(decimal.RequireFromString(c.want)) {
+			t.Errorf("%s = %s, want %s", c.name, c.got, c.want)
+		}
+	}
+}
+
+func TestByInstrumentBondNominalReturnIsSold(t *testing.T) {
+	events := []Event{
+		ev("buy", "", KindBuy, "bond", "-10000", "10"),
+		ev("coupon", "", KindCoupon, "bond", "1500", ""),
+		ev("amort", "", KindAmortization, "bond", "3000", ""),
+		ev("redeem", "", KindRedemption, "bond", "7000", ""),
+	}
+
+	got := ByInstrument(events, nil)["bond"]
+
+	checks := []struct {
+		name string
+		got  decimal.Decimal
+		want string
+	}{
+		{"bought", got.Bought, "-10000"},
+		{"sold", got.Sold, "10000"},
+		{"income", got.Income, "1500"},
+		{"quantity", got.Quantity, "0"},
 	}
 	for _, c := range checks {
 		if !c.got.Equal(decimal.RequireFromString(c.want)) {
