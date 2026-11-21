@@ -10,8 +10,15 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
- * Overview — стоимость портфеля на сегодня.
+ * Accounts — счета портфеля в порядке, как у брокера.
  */
-export function Overview(): $CancellablePromise<$models.Overview> {
-    return $Call.ByID(2289550873);
+export function Accounts(): $CancellablePromise<$models.Account[] | null> {
+    return $Call.ByID(3358022002);
+}
+
+/**
+ * Overview — стоимость выбранных счетов на сегодня. Пустой список — стоимость 0.
+ */
+export function Overview(accountIDs: string[] | null): $CancellablePromise<$models.Overview> {
+    return $Call.ByID(2289550873, accountIDs);
 }

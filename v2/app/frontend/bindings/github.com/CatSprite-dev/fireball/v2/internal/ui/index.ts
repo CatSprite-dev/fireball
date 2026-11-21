@@ -7,5 +7,6 @@ export {
 };
 
 export type {
+    Account,
     Overview
 } from "./models.js";
