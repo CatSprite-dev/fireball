@@ -28,9 +28,10 @@ const periods = [
 
 <style scoped>
 .periods button {
-  height: 34px;
-  min-width: 40px;
-  padding: 0 9px;
+  height: 36px;
+  min-width: 42px;
+  padding: 0 10px;
+  font-size: 14px;
   font-family: var(--cond);
   font-weight: 600;
 }

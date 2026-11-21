@@ -102,7 +102,7 @@ const grouped = computed(() => {
 
 const unexplainedHelp =
   'Брокер не отдаёт через API некоторые операции (например, налог при закрытии ИИС). ' +
-  'Мы видим разницу в деньгах на счёте и вычитаем её, чтобы цифры сходились с брокером'
+  'Разница в деньгах на счёте вычитается, чтобы цифры сходились с брокером'
 
 const quantity = new Intl.NumberFormat('ru-RU', {maximumFractionDigits: 6})
 function count(s: string): string {
@@ -205,9 +205,14 @@ function shareWidth(s: string): string {
             <td class="num" :class="tone(table.totalProfit)">{{ signedRub(table.totalProfit) }}</td>
             <td colspan="2"></td>
           </tr>
+          <!-- Закрытые позиции скрыты, но их прибыль уже в итогах групп и таблицы: говорим, сколько. -->
+          <tr v-if="!showClosed && table.closedProfit" class="footnote">
+            <td :colspan="columns.length">В итог входит {{ signedRub(table.closedProfit) }} ₽ по закрытым позициям. Включите «Закрытые позиции», чтобы увидеть их.</td>
+          </tr>
         </tfoot>
       </table>
     </div>
+
   </section>
 </template>
 
@@ -220,8 +225,8 @@ function shareWidth(s: string): string {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 18px;
-  padding: 8px 12px;
+  gap: 8px 20px;
+  padding: 10px 18px;
   border-bottom: 1px solid var(--line);
 }
 .head h2 {
@@ -231,14 +236,13 @@ function shareWidth(s: string): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
   cursor: pointer;
 }
 .check input {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   margin: 0;
-  accent-color: var(--acc);
+  accent-color: var(--fg);
 }
 .message {
   margin: 0;
@@ -252,11 +256,11 @@ function shareWidth(s: string): string {
 }
 table {
   width: 100%;
-  min-width: 900px;
+  min-width: 1000px;
   border-collapse: collapse;
 }
 th, td {
-  padding: 7px 12px;
+  padding: 10px 14px;
   text-align: left;
   font-weight: inherit;
   white-space: nowrap;
@@ -266,7 +270,7 @@ td.num, th.num {
 }
 td {
   font-family: var(--cond);
-  font-size: 14px;
+  font-size: 15px;
   border-bottom: 1px solid var(--dim);
 }
 thead th {
@@ -276,14 +280,14 @@ thead th {
 }
 .sort {
   width: 100%;
-  height: 34px;
+  height: 40px;
   padding: 0;
   border: 0;
   background: transparent;
   text-align: inherit;
   color: var(--muted);
   font-family: var(--cond);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -296,11 +300,11 @@ thead th {
   margin-left: 4px;
 }
 .group > * {
-  padding: 6px 12px;
+  padding: 10px 14px;
   background: var(--sub);
   border-bottom: 1px solid var(--line);
   font-family: var(--cond);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
 }
 .toggle {
@@ -323,7 +327,7 @@ thead th {
 }
 .name {
   font-family: var(--sans);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
 }
 .strong {
@@ -339,7 +343,7 @@ thead th {
 }
 .share-bar {
   display: inline-block;
-  width: 40px;
+  width: 60px;
   height: 4px;
   background: var(--dim);
 }
@@ -355,7 +359,7 @@ thead th {
 }
 .dashed td.num {
   font-family: var(--cond);
-  font-size: 14px;
+  font-size: 15px;
 }
 .badge {
   margin-left: 8px;
@@ -369,10 +373,19 @@ thead th {
   text-transform: uppercase;
 }
 tfoot th, tfoot td {
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-bottom: 0;
   font-family: var(--cond);
   font-size: 16px;
   font-weight: 700;
+}
+/* Строка про закрытые позиции — сразу под «Итого», мелко. */
+tfoot .footnote td {
+  padding-top: 0;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: normal;
 }
 </style>

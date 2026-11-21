@@ -24,6 +24,7 @@ type Point struct {
 type Shadow struct {
 	Actual []Point `json:"actual"`
 	Shadow []Point `json:"shadow"`
+	Diff   string  `json:"diff"` // реальная минус тень на последнюю дату, ₽
 }
 
 // Charts — ряды для графиков «Обзора» по дням.
@@ -84,9 +85,20 @@ func charts(p *load.Portfolio, m *load.Market, index series.Series, base string,
 		TWR:            percentPoints(metrics.TWR(values, in, out, cmpFrom, today)),
 		Index:          percentPoints(metrics.TWR(index, nil, nil, cmpFrom, today)),
 		Value:          moneyPoints(values, from),
-		ShadowTrades:   Shadow{Actual: moneyPoints(securities, cmpFrom), Shadow: moneyPoints(shadowTrades, cmpFrom)},
-		ShadowDeposits: Shadow{Actual: moneyPoints(values, cmpFrom), Shadow: moneyPoints(shadowDeposits, cmpFrom)},
+		ShadowTrades:   toShadow(securities, shadowTrades, cmpFrom),
+		ShadowDeposits: toShadow(values, shadowDeposits, cmpFrom),
 	}, nil
+}
+
+// toShadow — линия и тень с дня from и разница между ними на последнюю дату.
+// Разница — из значений, округлённых до копеек, как в последних точках: равна разнице их подписей ровно.
+func toShadow(actual, shadow series.Series, from time.Time) Shadow {
+	result := Shadow{Actual: moneyPoints(actual, from), Shadow: moneyPoints(shadow, from)}
+	if len(actual) > 0 && len(shadow) > 0 {
+		a, s := actual[len(actual)-1].Value.Round(2), shadow[len(shadow)-1].Value.Round(2)
+		result.Diff = a.Sub(s).StringFixed(2)
+	}
+	return result
 }
 
 // percentPoints — ряд роста в процентах: 1.155 → "15.50".

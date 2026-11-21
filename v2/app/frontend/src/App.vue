@@ -5,7 +5,7 @@ import AccountsFilter from './components/overview/AccountsFilter.vue'
 import PeriodSwitch from './components/overview/PeriodSwitch.vue'
 import {day} from './format'
 
-const tabs = ['Обзор', 'Пропорции', 'Как мы считаем'] as const
+const tabs = ['Обзор', 'Пропорции', 'Как считается'] as const
 const tab = ref<(typeof tabs)[number]>('Обзор')
 
 // Счета и период выбираются в шапке и действуют на весь «Обзор».
@@ -20,9 +20,9 @@ const asOf = ref('')
   <!-- Шапка — полоса под кнопками окна macOS: окно тянется за её фон, кнопки и списки таскать нельзя. -->
   <header class="header">
     <div class="cell brand">
-      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="15" cy="12" r="6.5" fill="var(--fire)" />
-        <path d="M1.5 9h6M3.5 12h4M1.5 15h6" stroke="var(--fire)" stroke-width="2" stroke-linecap="square" />
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="15" cy="12" r="6.5" fill="var(--me)" />
+        <path d="M1.5 9h6M3.5 12h4M1.5 15h6" stroke="var(--me)" stroke-width="2.2" stroke-linecap="square" />
       </svg>
       <span class="name">FIREBALL OUTCOME</span>
     </div>
@@ -47,7 +47,7 @@ const asOf = ref('')
         <span class="date">{{ day(asOf) }}</span>
       </span>
       <!-- Обновление данных появится вместе с базой. -->
-      <button type="button" class="icon" aria-label="Обновить данные" title="Обновить данные — пока не работает">
+      <button type="button" class="icon" aria-label="Обновить данные" title="Обновить данные: пока не работает">
         <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
           <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3" fill="none" stroke="var(--fg)" stroke-width="1.6" stroke-linecap="square" />
         </svg>
@@ -75,7 +75,7 @@ const asOf = ref('')
 .cell {
   display: flex;
   align-items: center;
-  min-height: 50px;
+  min-height: 52px;
   background: var(--panel);
 }
 .cell button, .control {
@@ -83,23 +83,24 @@ const asOf = ref('')
 }
 /* Слева место под кнопки окна macOS. */
 .brand {
-  gap: 8px;
-  padding: 0 16px 0 84px;
+  gap: 10px;
+  padding: 0 18px 0 84px;
 }
 .name {
   font-family: var(--cond);
   font-weight: 700;
-  font-size: 17px;
-  letter-spacing: .06em;
+  font-size: 19px;
+  letter-spacing: .08em;
   white-space: nowrap;
 }
 .tabs button {
   height: 100%;
-  padding: 0 14px;
+  padding: 0 16px;
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--muted);
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -111,8 +112,8 @@ const asOf = ref('')
   flex: 1 1 0;
 }
 .control {
-  gap: 10px;
-  padding: 6px 12px;
+  gap: 12px;
+  padding: 8px 14px;
 }
 .as-of {
   display: flex;
@@ -121,12 +122,12 @@ const asOf = ref('')
 }
 .date {
   font-family: var(--cond);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
 }
 .icon {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -136,7 +137,7 @@ const asOf = ref('')
 }
 .main {
   --wails-draggable: no-drag;
-  padding: 12px;
+  padding: 14px;
 }
 .empty {
   border: 1px dashed var(--line);

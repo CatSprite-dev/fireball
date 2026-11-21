@@ -110,6 +110,55 @@ func TestPositionTable(t *testing.T) {
 	}
 }
 
+func TestPositionTableClosedProfit(t *testing.T) {
+	msk := time.FixedZone("MSK", 3*60*60)
+	date := func(d int) time.Time { return time.Date(2026, time.March, d, 0, 0, 0, 0, time.UTC) }
+	at := func(kind ledger.OperationKind, asset, amount, qty string, day time.Time) ledger.Event {
+		e := ledger.Event{
+			AccountID:     "acc",
+			Date:          time.Date(day.Year(), day.Month(), day.Day(), 12, 0, 0, 0, msk),
+			OperationKind: kind,
+			Amount:        money.Money{Amount: decimal.RequireFromString(amount), Currency: "RUB"},
+			BaseAmount:    money.Money{Amount: decimal.RequireFromString(amount), Currency: "RUB"},
+		}
+		if asset != "" {
+			e.AssetUID, e.InstrumentUID, e.InstrumentKind = asset, asset+"-uid", ledger.InstrumentShare
+			e.Quantity = decimal.RequireFromString(qty)
+		}
+		return e
+	}
+	from, today := date(1), date(10)
+	m := &load.Market{Prices: map[string]series.Series{
+		"a": {{Date: date(2), Value: decimal.RequireFromString("100")}},
+		"b": {{Date: date(2), Value: decimal.RequireFromString("100")}},
+	}}
+
+	// «b» купили по 100 и продали по 130 — закрыта с прибылью 30. «a» купили и держим — не закрыта.
+	p := &load.Portfolio{Events: []ledger.Event{
+		at(ledger.KindDeposit, "", "1000", "", date(2)),
+		at(ledger.KindBuy, "a", "-100", "1", date(2)),
+		at(ledger.KindBuy, "b", "-100", "1", date(3)),
+		at(ledger.KindSell, "b", "130", "1", date(4)),
+	}}
+	got, err := positionTable(p, m, "RUB", from, today, []string{"acc"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ClosedProfit != "30.00" {
+		t.Errorf("closed profit = %q, want 30.00", got.ClosedProfit)
+	}
+
+	// без закрытых позиций — пусто.
+	p.Events = p.Events[:2]
+	got, err = positionTable(p, m, "RUB", from, today, []string{"acc"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ClosedProfit != "" {
+		t.Errorf("closed profit = %q, want empty", got.ClosedProfit)
+	}
+}
+
 func TestUnexplainedCash(t *testing.T) {
 	today := time.Date(2026, time.March, 10, 0, 0, 0, 0, time.UTC)
 	deposit := func(account, amount string) ledger.Event {

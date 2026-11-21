@@ -39,8 +39,10 @@ type PositionTable struct {
 	Unexplained  string       `json:"unexplained"`  // рубли у брокера минус наши — в стоимости, в любом периоде
 	// UnexplainedProfit — то же расхождение в прибыли: только за всё время, иначе пусто.
 	UnexplainedProfit string `json:"unexplainedProfit"`
-	TotalValue        string `json:"totalValue"`  // стоимость всех строк с расхождением; совпадает с карточкой «Стоимость»
-	TotalProfit       string `json:"totalProfit"` // прибыль всех строк и уровня счёта; совпадает с карточкой «Прибыль»
+	// ClosedProfit — прибыль за период по закрытым позициям, она входит в итоги групп и таблицы; пусто, если 0.
+	ClosedProfit string `json:"closedProfit"`
+	TotalValue   string `json:"totalValue"`  // стоимость всех строк с расхождением; совпадает с карточкой «Стоимость»
+	TotalProfit  string `json:"totalProfit"` // прибыль всех строк и уровня счёта; совпадает с карточкой «Прибыль»
 }
 
 // GroupTotal — итог группы таблицы.
@@ -170,7 +172,11 @@ func positionTable(p *load.Portfolio, m *load.Market, base string, from, today t
 
 	groups := make(map[string]*position)
 	names := instrumentNames(p)
+	closedProfit := decimal.Zero
 	for key, pos := range byKey {
+		if pos.quantity.IsZero() {
+			closedProfit = closedProfit.Add(pos.profit)
+		}
 		row := Position{
 			Key:       key,
 			Ticker:    key,
@@ -206,6 +212,9 @@ func positionTable(p *load.Portfolio, m *load.Market, base string, from, today t
 	}
 	for kind, g := range groups {
 		result.Groups = append(result.Groups, GroupTotal{Kind: kind, Value: g.value.StringFixed(2), Profit: g.profit.StringFixed(2)})
+	}
+	if !closedProfit.IsZero() {
+		result.ClosedProfit = closedProfit.StringFixed(2)
 	}
 	return result, nil
 }

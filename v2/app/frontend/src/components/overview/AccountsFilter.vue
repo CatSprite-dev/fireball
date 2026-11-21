@@ -96,11 +96,11 @@ const summary = computed(() => {
   position: relative;
 }
 .toggle {
-  height: 34px;
+  height: 36px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid var(--line);
   background: transparent;
   cursor: pointer;
@@ -154,7 +154,7 @@ const summary = computed(() => {
   width: 15px;
   height: 15px;
   margin: 0;
-  accent-color: var(--acc);
+  accent-color: var(--fg);
 }
 .section {
   padding: 8px 12px 4px;

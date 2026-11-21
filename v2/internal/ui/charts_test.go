@@ -115,6 +115,11 @@ func TestCharts(t *testing.T) {
 		}
 	}
 
+	// разница теней — реальная минус тень на последнюю дату: 605 − 550 и 1210 − 1155.
+	if got.ShadowTrades.Diff != "55.00" || got.ShadowDeposits.Diff != "55.00" {
+		t.Errorf("разница теней: по бумагам %s, по пополнениям %s, want 55.00", got.ShadowTrades.Diff, got.ShadowDeposits.Diff)
+	}
+
 	// поправка не уводит стоимость в минус.
 	for _, p := range got.Value {
 		if decimal.RequireFromString(p.Value).IsNegative() {

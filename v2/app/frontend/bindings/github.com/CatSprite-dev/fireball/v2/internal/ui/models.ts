@@ -229,6 +229,11 @@ export interface PositionTable {
     "unexplainedProfit": string;
 
     /**
+     * ClosedProfit — прибыль за период по закрытым позициям, она входит в итоги групп и таблицы; пусто, если 0.
+     */
+    "closedProfit": string;
+
+    /**
      * стоимость всех строк с расхождением; совпадает с карточкой «Стоимость»
      */
     "totalValue": string;
@@ -245,4 +250,9 @@ export interface PositionTable {
 export interface Shadow {
     "actual": Point[] | null;
     "shadow": Point[] | null;
+
+    /**
+     * реальная минус тень на последнюю дату, ₽
+     */
+    "diff": string;
 }
