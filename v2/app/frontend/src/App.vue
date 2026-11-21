@@ -1,56 +1,147 @@
 <script setup lang="ts">
 import {ref} from 'vue'
 import OverviewPage from './components/overview/OverviewPage.vue'
+import AccountsFilter from './components/overview/AccountsFilter.vue'
+import PeriodSwitch from './components/overview/PeriodSwitch.vue'
+import {day} from './format'
 
 const tabs = ['Обзор', 'Пропорции', 'Как мы считаем'] as const
 const tab = ref<(typeof tabs)[number]>('Обзор')
+
+// Счета и период выбираются в шапке и действуют на весь «Обзор».
+// null — счета ещё не загружены, выбора пока нет.
+const accountIDs = ref<string[] | null>(null)
+const period = ref('12m')
+// День, на который загружены данные: приходит с карточками «Обзора».
+const asOf = ref('')
 </script>
 
 <template>
-  <div class="drag" aria-hidden="true"></div>
-  <div class="app">
-    <nav class="tabs">
-      <button
-        v-for="t in tabs"
-        :key="t"
-        :aria-pressed="t === tab"
-        :class="{selected: t === tab}"
-        @click="tab = t"
-      >
-        {{ t }}
-      </button>
+  <!-- Шапка — полоса под кнопками окна macOS: окно тянется за её фон, кнопки и списки таскать нельзя. -->
+  <header class="header">
+    <div class="cell brand">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="15" cy="12" r="6.5" fill="var(--fire)" />
+        <path d="M1.5 9h6M3.5 12h4M1.5 15h6" stroke="var(--fire)" stroke-width="2" stroke-linecap="square" />
+      </svg>
+      <span class="name">FIREBALL OUTCOME</span>
+    </div>
+
+    <nav class="cell tabs" aria-label="Разделы">
+      <button v-for="t in tabs" :key="t" type="button" :aria-pressed="t === tab" @click="tab = t">{{ t }}</button>
     </nav>
 
-    <OverviewPage v-if="tab === 'Обзор'" />
-    <section v-else-if="tab === 'Пропорции'">
-      <h1>Пропорции</h1>
-    </section>
-    <section v-else>
-      <h1>Как мы считаем</h1>
-    </section>
-  </div>
+    <div class="cell spacer"></div>
+
+    <div class="cell control">
+      <AccountsFilter @change="ids => (accountIDs = ids)" />
+    </div>
+
+    <div class="cell control">
+      <PeriodSwitch v-model="period" />
+    </div>
+
+    <div class="cell control">
+      <span class="as-of">
+        <span class="label">Данные на</span>
+        <span class="date">{{ day(asOf) }}</span>
+      </span>
+      <!-- Обновление данных появится вместе с базой. -->
+      <button type="button" class="icon" aria-label="Обновить данные" title="Обновить данные — пока не работает">
+        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3" fill="none" stroke="var(--fg)" stroke-width="1.6" stroke-linecap="square" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="main">
+    <OverviewPage v-if="tab === 'Обзор'" :accountIDs="accountIDs" :period="period" @as-of="d => (asOf = d)" />
+    <div v-else class="empty">Раздел «{{ tab }}» пока не готов.</div>
+  </main>
 </template>
 
 <style scoped>
-/* Полоса сверху под кнопками окна macOS: высота как InvisibleTitleBarHeight в app/main.go.
-   Окно тянется за неё; остальное — кнопки и галочки, их таскать нельзя. */
-.drag {
-  height: 50px;
+/* Ячейки шапки разделены линией в 1px: фон шапки — цвет линии, у ячеек — фон блока. */
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 1px;
+  background: var(--line);
+  border-bottom: 1px solid var(--line);
   --wails-draggable: drag;
 }
-.app {
+.cell {
+  display: flex;
+  align-items: center;
+  min-height: 50px;
+  background: var(--panel);
+}
+.cell button, .control {
   --wails-draggable: no-drag;
+}
+/* Слева место под кнопки окна macOS. */
+.brand {
+  gap: 8px;
+  padding: 0 16px 0 84px;
+}
+.name {
+  font-family: var(--cond);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+.tabs button {
+  height: 100%;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+.tabs button[aria-pressed="true"] {
+  border-bottom-color: var(--fg);
+  color: var(--fg);
+}
+.spacer {
+  flex: 1 1 0;
+}
+.control {
+  gap: 10px;
+  padding: 6px 12px;
+}
+.as-of {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 0 1.25rem 1.25rem;
+  line-height: 1.15;
 }
-.tabs {
+.date {
+  font-family: var(--cond);
+  font-size: 14px;
+  font-weight: 600;
+}
+.icon {
+  width: 34px;
+  height: 34px;
   display: flex;
-  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  background: transparent;
+  cursor: pointer;
 }
-.selected {
-  font-weight: bold;
-  text-decoration: underline;
+.main {
+  --wails-draggable: no-drag;
+  padding: 12px;
+}
+.empty {
+  border: 1px dashed var(--line);
+  padding: 40px;
+  text-align: center;
+  color: var(--muted);
 }
 </style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Выбранный период живёт на странице: v-model с кодом периода для сервиса.
+// Выбранный период живёт в шапке: v-model с кодом периода для сервиса.
 const selected = defineModel<string>({required: true})
 
 const periods = [
@@ -13,13 +13,12 @@ const periods = [
 </script>
 
 <template>
-  <div class="row">
-    <span>Период:</span>
+  <div class="seg periods" role="group" aria-label="Период">
     <button
       v-for="p in periods"
       :key="p.code"
+      type="button"
       :aria-pressed="p.code === selected"
-      :class="{selected: p.code === selected}"
       @click="selected = p.code"
     >
       {{ p.label }}
@@ -28,14 +27,11 @@ const periods = [
 </template>
 
 <style scoped>
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-.selected {
-  font-weight: bold;
-  text-decoration: underline;
+.periods button {
+  height: 34px;
+  min-width: 40px;
+  padding: 0 9px;
+  font-family: var(--cond);
+  font-weight: 600;
 }
 </style>
