@@ -17,8 +17,24 @@ export function Accounts(): $CancellablePromise<$models.Account[] | null> {
 }
 
 /**
- * Overview — стоимость выбранных счетов на сегодня. Пустой список — стоимость 0.
+ * Overview — стоимость выбранных счетов на сегодня и прибыль за период: period — как в Performance.
+ * Пустой список счетов — нули.
  */
-export function Overview(accountIDs: string[] | null): $CancellablePromise<$models.Overview> {
-    return $Call.ByID(2289550873, accountIDs);
+export function Overview(accountIDs: string[] | null, period: string): $CancellablePromise<$models.Overview> {
+    return $Call.ByID(2289550873, accountIDs, period);
+}
+
+/**
+ * Performance — TWR, MWR и сравнение с индексом по счетам accountIDs.
+ * period: "1m", "3m", "6m", "12m", "5y" или "all" — с первой операции выбранных счетов.
+ */
+export function Performance(accountIDs: string[] | null, period: string, index: string): $CancellablePromise<$models.Performance> {
+    return $Call.ByID(2973029372, accountIDs, period, index);
+}
+
+/**
+ * Positions — таблица бумаг по счетам accountIDs за период period (как в Overview).
+ */
+export function Positions(accountIDs: string[] | null, period: string): $CancellablePromise<$models.PositionTable> {
+    return $Call.ByID(1545985698, accountIDs, period);
 }

@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import {ref, watch} from 'vue'
+import {computed, ref, watch} from 'vue'
 import {PortfolioService} from '../../../bindings/github.com/CatSprite-dev/fireball/v2/internal/ui'
 import type {Overview} from '../../../bindings/github.com/CatSprite-dev/fireball/v2/internal/ui'
 import HelpMark from '../HelpMark.vue'
 
-const props = defineProps<{accountIDs: string[] | null}>()
+const props = defineProps<{accountIDs: string[] | null; period: string}>()
+
+// «Вложено» и «Прибыль» — за выбранный период.
+const during = computed(() => (props.period === 'all' ? 'за всё время' : 'за период'))
 
 const overview = ref<Overview | null>(null)
 const error = ref('')
@@ -20,13 +23,13 @@ function money(s: string | undefined): string {
 // Ответы могут прийти не по порядку, если галочки щёлкают быстро: показываем только последний запрос.
 let request = 0
 
-watch(() => props.accountIDs, async ids => {
+watch([() => props.accountIDs, () => props.period], async ([ids, period]) => {
   if (ids === null) return
   const current = ++request
   overview.value = null
   error.value = ''
   try {
-    const result = await PortfolioService.Overview(ids)
+    const result = await PortfolioService.Overview(ids, period)
     if (current === request) overview.value = result
   } catch (e) {
     if (current === request) error.value = e instanceof Error ? e.message : String(e)
@@ -47,12 +50,12 @@ watch(() => props.accountIDs, async ids => {
     </section>
 
     <section class="card">
-      <h3>Вложено <HelpMark /></h3>
+      <h3>Вложено {{ during }} <HelpMark /></h3>
       <p class="value">{{ money(overview?.invested) }}</p>
     </section>
 
     <section class="card">
-      <h3>Прибыль <HelpMark /></h3>
+      <h3>Прибыль {{ during }} <HelpMark /></h3>
       <p class="value">{{ money(overview?.profit) }}</p>
       <p>
         сделки: зафикс. {{ money(overview?.realized) }} <HelpMark /> /

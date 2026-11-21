@@ -1,8 +1,15 @@
 <script setup lang="ts">
-import {ref} from 'vue'
+// Выбранный период живёт на странице: v-model с кодом периода для сервиса.
+const selected = defineModel<string>({required: true})
 
-const periods = ['1М', '3М', '6М', '12М', '5 лет', 'Всё время']
-const selected = ref('12М')
+const periods = [
+  {code: '1m', label: '1М'},
+  {code: '3m', label: '3М'},
+  {code: '6m', label: '6М'},
+  {code: '12m', label: '12М'},
+  {code: '5y', label: '5 лет'},
+  {code: 'all', label: 'Всё время'},
+]
 </script>
 
 <template>
@@ -10,12 +17,12 @@ const selected = ref('12М')
     <span>Период:</span>
     <button
       v-for="p in periods"
-      :key="p"
-      :aria-pressed="p === selected"
-      :class="{selected: p === selected}"
-      @click="selected = p"
+      :key="p.code"
+      :aria-pressed="p.code === selected"
+      :class="{selected: p.code === selected}"
+      @click="selected = p.code"
     >
-      {{ p }}
+      {{ p.label }}
     </button>
   </div>
 </template>

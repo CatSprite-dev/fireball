@@ -8,5 +8,9 @@ export {
 
 export type {
     Account,
-    Overview
+    GroupTotal,
+    Overview,
+    Performance,
+    Position,
+    PositionTable
 } from "./models.js";

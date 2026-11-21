@@ -15,6 +15,9 @@ import (
 	"github.com/CatSprite-dev/fireball/v2/internal/tinvest"
 )
 
+// allTime — начало периода в нулевой день: все события внутри периода, сводка на начало — нули.
+var allTime time.Time
+
 func TestSummarizeValue(t *testing.T) {
 	msk := time.FixedZone("MSK", 3*60*60)
 	rub := func(amount string) money.Money {
@@ -51,7 +54,7 @@ func TestSummarizeValue(t *testing.T) {
 		Bonds:  map[string]snapshot.Bond{},
 	}
 
-	sum, err := summarize(p, m, "RUB", day, []string{"acc-1"})
+	_, sum, err := summarize(p, m, "RUB", allTime, day, []string{"acc-1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +78,7 @@ func TestSummarizeValue(t *testing.T) {
 		m := &load.Market{Prices: map[string]series.Series{"a": price("110"), "b": price("190"), "c": price("250")}}
 
 		// только первый счёт: те же 100050, позиция «c» и деньги второго счёта не входят.
-		sum, err := summarize(both, m, "RUB", day, []string{"acc-1"})
+		_, sum, err := summarize(both, m, "RUB", allTime, day, []string{"acc-1"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -84,7 +87,7 @@ func TestSummarizeValue(t *testing.T) {
 		}
 
 		// только второй счёт: 20 × 250 + рубли 50000 − 4000 = 51000.
-		sum, err = summarize(both, m, "RUB", day, []string{"acc-2"})
+		_, sum, err = summarize(both, m, "RUB", allTime, day, []string{"acc-2"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -94,7 +97,7 @@ func TestSummarizeValue(t *testing.T) {
 	})
 
 	t.Run("пустой выбор — 0", func(t *testing.T) {
-		sum, err := summarize(p, m, "RUB", day, nil)
+		_, sum, err := summarize(p, m, "RUB", allTime, day, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -105,7 +108,7 @@ func TestSummarizeValue(t *testing.T) {
 
 	t.Run("нет цены — ошибка", func(t *testing.T) {
 		m := &load.Market{Prices: map[string]series.Series{"a": price("110")}}
-		if _, err := summarize(p, m, "RUB", day, []string{"acc-1"}); err == nil {
+		if _, _, err := summarize(p, m, "RUB", allTime, day, []string{"acc-1"}); err == nil {
 			t.Error("want error")
 		}
 	})
@@ -162,7 +165,7 @@ func TestSummarizeProfitParts(t *testing.T) {
 		"a": {{Date: day, Value: decimal.RequireFromString("120")}},
 	}}
 
-	sum, err := summarize(p, m, "RUB", day, []string{"acc"})
+	_, sum, err := summarize(p, m, "RUB", allTime, day, []string{"acc"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +229,7 @@ func TestSummarizeAveragePerAccount(t *testing.T) {
 		"a": {{Date: day, Value: decimal.RequireFromString("150")}},
 	}}
 
-	sum, err := summarize(p, m, "RUB", day, []string{"acc-1", "acc-2"})
+	_, sum, err := summarize(p, m, "RUB", allTime, day, []string{"acc-1", "acc-2"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,5 +252,79 @@ func TestSummarizeAveragePerAccount(t *testing.T) {
 		if !c.got.Equal(decimal.RequireFromString(c.want)) {
 			t.Errorf("%s = %s, want %s", c.name, c.got, c.want)
 		}
+	}
+}
+
+func TestSummarizePeriod(t *testing.T) {
+	msk := time.FixedZone("MSK", 3*60*60)
+	date := func(m time.Month, d int) time.Time { return time.Date(2026, m, d, 0, 0, 0, 0, time.UTC) }
+	at := func(kind ledger.OperationKind, asset, amount, qty string, day time.Time) ledger.Event {
+		e := ledger.Event{
+			AccountID:     "acc",
+			Date:          time.Date(day.Year(), day.Month(), day.Day(), 12, 0, 0, 0, msk),
+			OperationKind: kind,
+			Amount:        money.Money{Amount: decimal.RequireFromString(amount), Currency: "RUB"},
+			BaseAmount:    money.Money{Amount: decimal.RequireFromString(amount), Currency: "RUB"},
+		}
+		if asset != "" {
+			e.AssetUID, e.InstrumentUID, e.InstrumentKind = asset, asset+"-uid", ledger.InstrumentShare
+		}
+		if qty != "" {
+			e.Quantity = decimal.RequireFromString(qty)
+		}
+		return e
+	}
+	from, today := date(time.March, 1), date(time.March, 10)
+
+	p := &load.Portfolio{Events: []ledger.Event{
+		// до периода: внесли 10000, купили 10 шт. по 100.
+		at(ledger.KindDeposit, "", "10000", "", date(time.January, 10)),
+		at(ledger.KindBuy, "a", "-1000", "10", date(time.January, 10)),
+		// в периоде: внесли 5000, продали 5 шт. по 130 — зафиксировано 650 − 5 × 100 = 150.
+		at(ledger.KindDeposit, "", "5000", "", date(time.March, 5)),
+		at(ledger.KindSell, "a", "650", "5", date(time.March, 5)),
+		// в периоде: дивиденд 40, налог с него 5.
+		at(ledger.KindDividend, "a", "40", "", date(time.March, 6)),
+		at(ledger.KindTax, "a", "-5", "", date(time.March, 6)),
+	}}
+	m := &load.Market{Prices: map[string]series.Series{
+		// накануне периода цена 120, сегодня 140.
+		"a": {
+			{Date: date(time.January, 10), Value: decimal.RequireFromString("100")},
+			{Date: date(time.February, 28), Value: decimal.RequireFromString("120")},
+			{Date: today, Value: decimal.RequireFromString("140")},
+		},
+	}}
+
+	end, change, err := summarize(p, m, "RUB", from, today, []string{"acc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// накануне: деньги 9000 + 10 × 120 = 10200, вложено 10000, бумажная 1200 − 1000 = 200.
+	// сегодня: деньги 9000 + 5000 + 650 + 40 − 5 = 14685, бумаги 5 × 140 = 700 — всего 15385;
+	// вложено 15000, зафиксировано 150, бумажная 700 − 500 = 200, выплаты 35.
+	checks := []struct {
+		name string
+		got  decimal.Decimal
+		want string
+	}{
+		{"стоимость сегодня", end.Value, "15385"},
+		{"вложено за период", change.Invested, "5000"},
+		// 15385 − 10200 − 5000.
+		{"прибыль за период", change.Value.Sub(change.Invested), "185"},
+		{"зафиксировано за период", change.Realized, "150"},
+		// бумажная была 200 на 10 шт., стала 200 на 5 шт.: половину прежней бумажной зафиксировали.
+		{"бумажная за период", change.Paper, "0"},
+		{"выплаты за период", change.Income, "35"},
+	}
+	for _, c := range checks {
+		if !c.got.Equal(decimal.RequireFromString(c.want)) {
+			t.Errorf("%s = %s, want %s", c.name, c.got, c.want)
+		}
+	}
+	// 150 + 0 + 35 = 185.
+	if parts, profit := change.parts(), change.Value.Sub(change.Invested); !parts.Equal(profit) {
+		t.Errorf("части прибыли %s, прибыль %s", parts, profit)
 	}
 }

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-// Значок подсказки у цифры. Текст подсказок появится позже.
+// Значок подсказки у цифры; текст показывается при наведении. У большинства цифр текста пока нет.
+defineProps<{text?: string}>()
 </script>
 
 <template>
-  <span class="help" aria-label="подсказка">?</span>
+  <span class="help" aria-label="подсказка" :title="text">?</span>
 </template>
 
 <style scoped>
