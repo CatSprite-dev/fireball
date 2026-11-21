@@ -8,9 +8,12 @@ export {
 
 export type {
     Account,
+    Charts,
     GroupTotal,
     Overview,
     Performance,
+    Point,
     Position,
-    PositionTable
+    PositionTable,
+    Shadow
 } from "./models.js";

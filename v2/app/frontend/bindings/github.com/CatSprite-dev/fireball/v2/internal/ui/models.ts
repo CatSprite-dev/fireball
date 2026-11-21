@@ -11,6 +11,36 @@ export interface Account {
 }
 
 /**
+ * Charts — ряды для графиков «Обзора» по дням.
+ */
+export interface Charts {
+    /**
+     * рост портфеля, % с CompareFrom из Performance; разница последних точек с Index — карточка «Против индекса»
+     */
+    "twr": Point[] | null;
+
+    /**
+     * рост индекса, % с CompareFrom; последняя точка — карточка «Индекс»
+     */
+    "index": Point[] | null;
+
+    /**
+     * стоимость с поправкой на необъяснённое расхождение; последняя точка — карточка «Стоимость»
+     */
+    "value": Point[] | null;
+
+    /**
+     * акции, облигации, фонды и их тень по сделкам, с CompareFrom
+     */
+    "shadowTrades": Shadow;
+
+    /**
+     * стоимость (как Value) и тень по пополнениям, с CompareFrom
+     */
+    "shadowDeposits": Shadow;
+}
+
+/**
  * GroupTotal — итог группы таблицы.
  */
 export interface GroupTotal {
@@ -93,6 +123,17 @@ export interface Performance {
      * день, с которого идёт сравнение, если индекс начинается позже From; иначе пусто
      */
     "compareFrom": string;
+}
+
+/**
+ * Point — точка графика. Значение — строкой с двумя знаками: рубли или проценты.
+ */
+export interface Point {
+    /**
+     * "2006-01-02"
+     */
+    "date": string;
+    "value": string;
 }
 
 /**
@@ -196,4 +237,12 @@ export interface PositionTable {
      * прибыль всех строк и уровня счёта; совпадает с карточкой «Прибыль»
      */
     "totalProfit": string;
+}
+
+/**
+ * Shadow — реальная линия и её тень в индексе.
+ */
+export interface Shadow {
+    "actual": Point[] | null;
+    "shadow": Point[] | null;
 }

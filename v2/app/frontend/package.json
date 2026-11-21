@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@wailsio/runtime": "3.0.0",
-    "vue": "^3.2.45"
+    "echarts": "6.1.0",
+    "vue": "^3.2.45",
+    "vue-echarts": "8.3.2"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",

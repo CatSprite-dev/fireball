@@ -17,6 +17,13 @@ export function Accounts(): $CancellablePromise<$models.Account[] | null> {
 }
 
 /**
+ * Charts — графики по счетам accountIDs за период period (как в Performance) против индекса index.
+ */
+export function Charts(accountIDs: string[] | null, period: string, index: string): $CancellablePromise<$models.Charts> {
+    return $Call.ByID(1792040567, accountIDs, period, index);
+}
+
+/**
  * Overview — стоимость выбранных счетов на сегодня и прибыль за период: period — как в Performance.
  * Пустой список счетов — нули.
  */

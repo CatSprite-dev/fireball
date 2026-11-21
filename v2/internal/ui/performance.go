@@ -46,14 +46,10 @@ func performance(p *load.Portfolio, m *load.Market, index series.Series, base st
 		return Performance{}, err
 	}
 
-	positions := ledger.ByInstrument(events, p.Currencies.ByAsset)
-	cash := ledger.CashHistory(events, base)
-	rows, gaps := snapshot.Build(positions, m.Prices, m.Bonds, cash, base, from, today)
-	if len(gaps) > 0 {
-		return Performance{}, fmt.Errorf("performance from %s: no price for %d positions, first %s on %s",
-			from.Format(time.DateOnly), len(gaps), gaps[0].Key, gaps[0].From.Format(time.DateOnly))
+	_, values, err := dailyValues(p, m, base, accountIDs, from, today)
+	if err != nil {
+		return Performance{}, err
 	}
-	values := snapshot.Total(rows, from, today)
 	in, out := ledger.DepositsAndWithdrawals(events)
 
 	result := Performance{
@@ -64,10 +60,8 @@ func performance(p *load.Portfolio, m *load.Market, index series.Series, base st
 		result.MWR = decimal.NewFromFloat(r * 100).StringFixed(2)
 	}
 
-	// Индекс может начинаться позже периода: тогда и TWR для сравнения считается с его первого дня.
-	cmpFrom := from
-	if len(index) > 0 && index[0].Date.After(from) {
-		cmpFrom = index[0].Date
+	cmpFrom := compareStart(index, from)
+	if cmpFrom.After(from) {
 		result.CompareFrom = cmpFrom.Format(time.DateOnly)
 	}
 	indexGrowth := growthPercent(metrics.TWR(index, nil, nil, cmpFrom, today))
@@ -75,6 +69,75 @@ func performance(p *load.Portfolio, m *load.Market, index series.Series, base st
 	result.Index = indexGrowth.StringFixed(2)
 	result.VsIndex = twrCmp.Sub(indexGrowth).StringFixed(2)
 	return result, nil
+}
+
+// dailyValues — строки позиций и стоимость счетов accountIDs на каждый день с from по today.
+// К стоимости прибавлено необъяснённое расхождение каждого счёта с дня его последней операции:
+// раньше брокер не мог списать то, чего мы не видим. От этого ряда считаются TWR, MWR и тени,
+// поэтому несуществующие деньги не вкладываются в индекс и не дают доходности.
+// Строки — без поправки: она про деньги счёта, а не про позиции.
+// Если у позиции нет цены — ошибка, как в summarizeAt.
+func dailyValues(p *load.Portfolio, m *load.Market, base string, accountIDs []string, from, today time.Time) ([]snapshot.Row, series.Series, error) {
+	events := ledger.Filter(p.Events, accountIDs)
+	positions := ledger.ByInstrument(events, p.Currencies.ByAsset)
+	cash := ledger.CashHistory(events, base)
+	rows, gaps := snapshot.Build(positions, m.Prices, m.Bonds, cash, base, from, today)
+	if len(gaps) > 0 {
+		return nil, nil, fmt.Errorf("values from %s: no price for %d positions, first %s on %s",
+			from.Format(time.DateOnly), len(gaps), gaps[0].Key, gaps[0].From.Format(time.DateOnly))
+	}
+	fixes, err := corrections(p, base, today, accountIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	values := snapshot.Total(rows, from, today)
+	for i, pt := range values {
+		for _, f := range fixes {
+			if !pt.Date.Before(f.since) {
+				values[i].Value = values[i].Value.Add(f.amount)
+			}
+		}
+	}
+	return rows, values, nil
+}
+
+// correction — необъяснённое расхождение одного счёта и день, с которого оно входит в стоимость.
+type correction struct {
+	since  time.Time
+	amount decimal.Decimal
+}
+
+// corrections — поправки счетов accountIDs: расхождение счёта с дня его последней операции
+// (у закрытого счёта — день закрытия). Счета без расхождения не попадают.
+func corrections(p *load.Portfolio, base string, today time.Time, accountIDs []string) ([]correction, error) {
+	var result []correction
+	for _, id := range accountIDs {
+		gap, err := unexplainedCash(p, base, today, []string{id})
+		if err != nil {
+			return nil, err
+		}
+		if gap.IsZero() {
+			continue
+		}
+		since := time.Time{}
+		for _, e := range ledger.Filter(p.Events, []string{id}) {
+			if day := series.Day(e.Date); day.After(since) {
+				since = day
+			}
+		}
+		result = append(result, correction{since: since, amount: gap})
+	}
+	return result, nil
+}
+
+// compareStart — день, с которого портфель сравнивается с индексом: начало периода,
+// а если индекс начинается позже — его первый день.
+func compareStart(index series.Series, from time.Time) time.Time {
+	if len(index) > 0 && index[0].Date.After(from) {
+		return index[0].Date
+	}
+	return from
 }
 
 // periodStart — первый день периода. Для "all" — день первой операции; нет операций — сегодня.

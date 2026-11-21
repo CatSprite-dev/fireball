@@ -6,6 +6,7 @@ import AccountsFilter from './AccountsFilter.vue'
 import PeriodSwitch from './PeriodSwitch.vue'
 import SummaryCards from './SummaryCards.vue'
 import PerformanceCards from './PerformanceCards.vue'
+import PortfolioCharts from './PortfolioCharts.vue'
 import PositionsTable from './PositionsTable.vue'
 
 // null — счета ещё не загружены, выбора пока нет.
@@ -39,6 +40,7 @@ watch([accountIDs, period, index], async ([ids, p, i]) => {
     <PeriodSwitch v-model="period" />
     <SummaryCards :accountIDs="accountIDs" :period="period" />
     <PerformanceCards v-model:index="index" :performance="performance" :error="performanceError" />
+    <PortfolioCharts :accountIDs="accountIDs" :period="period" :index="index" />
     <PositionsTable :accountIDs="accountIDs" :period="period" />
   </div>
 </template>
