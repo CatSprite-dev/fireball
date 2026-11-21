@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -78,14 +79,15 @@ func run(logger *slog.Logger) error {
 	if err := checkTWR(p, m, index, nil, from, to); err != nil {
 		return err
 	}
+	checkAverages(p)
 	return checkAccounts(p)
 }
 
 func checkAccounts(p *load.Portfolio) error {
 	events, cur := p.Events, p.Currencies
-	var sumTrade, sumPayout, sumClearing, sumAccount, sumBroker decimal.Decimal
-	fmt.Printf("%-28s %12s %12s %10s %10s %12s %12s %8s\n",
-		"счёт", "сделки", "выплаты", "клиринг", "счёт", "итого", "брокер", "разница")
+	var sumRealized, sumPaper, sumPayout, sumClearing, sumAccount, sumBroker decimal.Decimal
+	fmt.Printf("%-28s %12s %12s %12s %10s %10s %12s %12s %8s\n",
+		"счёт", "зафикс.", "бумажная", "выплаты", "клиринг", "счёт", "итого", "брокер", "разница")
 
 	for _, d := range p.Accounts {
 		evs := ledger.Filter(events, []string{d.Account.ID})
@@ -115,9 +117,11 @@ func checkAccounts(p *load.Portfolio) error {
 			}
 		}
 
-		var trade, payout, clearing, account decimal.Decimal
+		var trade, realized, paper, payout, clearing, account decimal.Decimal
 		for key, f := range book {
 			trade = trade.Add(value[key]).Add(f.Bought).Add(f.Sold).Add(f.Fees)
+			realized = realized.Add(f.Realized).Add(f.Fees)
+			paper = paper.Add(value[key]).Sub(f.Cost)
 			payout = payout.Add(f.Income).Add(f.Taxes)
 			clearing = clearing.Add(f.Clearing)
 			if !f.Quantity.Equal(qty[key]) {
@@ -150,19 +154,22 @@ func checkAccounts(p *load.Portfolio) error {
 		}
 		broker := brokerValue.Sub(netIn)
 
-		sumTrade, sumPayout = sumTrade.Add(trade), sumPayout.Add(payout)
+		if !realized.Add(paper).Equal(trade) {
+			fmt.Printf("  зафикс. + бумажная = %s, а сделки = %s\n", realized.Add(paper), trade)
+		}
+		sumRealized, sumPaper, sumPayout = sumRealized.Add(realized), sumPaper.Add(paper), sumPayout.Add(payout)
 		sumClearing, sumAccount = sumClearing.Add(clearing), sumAccount.Add(account)
 		sumBroker = sumBroker.Add(broker)
-		printSplit(d.Account.Name, trade, payout, clearing, account, broker)
+		printSplit(d.Account.Name, realized, paper, payout, clearing, account, broker)
 	}
-	printSplit("ИТОГО", sumTrade, sumPayout, sumClearing, sumAccount, sumBroker)
+	printSplit("ИТОГО", sumRealized, sumPaper, sumPayout, sumClearing, sumAccount, sumBroker)
 	return nil
 }
 
-func printSplit(name string, trade, payout, clearing, account, broker decimal.Decimal) {
-	total := trade.Add(payout).Add(clearing).Add(account)
-	fmt.Printf("%-28s %12s %12s %10s %10s %12s %12s %8s\n", name,
-		trade.StringFixed(2), payout.StringFixed(2), clearing.StringFixed(2), account.StringFixed(2),
+func printSplit(name string, realized, paper, payout, clearing, account, broker decimal.Decimal) {
+	total := realized.Add(paper).Add(payout).Add(clearing).Add(account)
+	fmt.Printf("%-28s %12s %12s %12s %10s %10s %12s %12s %8s\n", name,
+		realized.StringFixed(2), paper.StringFixed(2), payout.StringFixed(2), clearing.StringFixed(2), account.StringFixed(2),
 		total.StringFixed(2), broker.StringFixed(2), total.Sub(broker).StringFixed(2))
 }
 
@@ -373,5 +380,41 @@ func dumpEvents(events []ledger.Event, from, to time.Time) {
 		fmt.Printf("%s  %-8s %-16s %-10s qty=%-6s %12s %s\n",
 			e.Date.Format("2006-01-02 15:04"), e.AccountID[:8], e.OperationKind, e.InstrumentKind,
 			e.Quantity.String(), e.Amount.Amount.StringFixed(2), e.Amount.Currency)
+	}
+}
+
+// checkAverages — временная сверка: наша средняя цена (Cost / Quantity, в рублях) против средней брокера.
+func checkAverages(p *load.Portfolio) {
+	fmt.Println("средняя цена: наша (руб.) / брокер (в валюте бумаги)")
+	for _, d := range p.Accounts {
+		if d.Portfolio == nil {
+			continue
+		}
+		evs := ledger.Filter(p.Events, []string{d.Account.ID})
+		book := ledger.ByInstrument(evs, p.Currencies.ByAsset)
+		keys := ledger.PageKeys(evs, p.Currencies.ByAsset)
+		for _, pos := range d.Portfolio.Positions {
+			key, ok := keys[pos.InstrumentUID]
+			if code, isCur := p.Currencies.ByUID[pos.InstrumentUID]; isCur {
+				if code == baseCurrency {
+					continue
+				}
+				key, ok = code, true
+			}
+			f := book[key]
+			if !ok || f == nil || f.Quantity.IsZero() {
+				fmt.Printf("  %-22s %-8s нет в книге\n", d.Account.Name, pos.Ticker)
+				continue
+			}
+			ours := f.Cost.Div(f.Quantity)
+			avg := pos.AveragePositionPrice
+			broker := decimal.RequireFromString(avg.Units).Add(decimal.New(int64(avg.Nano), -9))
+			diff := ""
+			if strings.EqualFold(avg.Currency, baseCurrency) {
+				diff = ours.Sub(broker).StringFixed(2)
+			}
+			fmt.Printf("  %-22s %-8s %-9s qty=%-10s наша=%12s  брокер=%12s %s  разница=%s\n",
+				d.Account.Name, pos.Ticker, f.Kind, f.Quantity, ours.StringFixed(2), broker.StringFixed(2), avg.Currency, diff)
+		}
 	}
 }

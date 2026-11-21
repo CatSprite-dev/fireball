@@ -43,6 +43,8 @@ type Flows struct {
 	Taxes    decimal.Decimal
 	Quantity decimal.Decimal
 	Clearing decimal.Decimal
+	Cost     decimal.Decimal // стоимость остатка по средней цене; у шорта — отрицательная
+	Realized decimal.Decimal // зафиксированная прибыль по сделкам, по средней цене
 	History  History
 }
 
@@ -70,27 +72,32 @@ func ByInstrument(events []Event, currencyByAsset map[string]string) map[string]
 		amount := e.BaseAmount.Amount
 		switch e.OperationKind {
 		case KindBuy:
-			f.Bought = f.Bought.Add(amount)
-			f.Quantity = f.Quantity.Add(adjustForSplits(uid, e.Date, e.Quantity))
+			nkd := e.AccruedInterest.Amount
+			price := amount.Add(nkd)
+			f.Bought = f.Bought.Add(price)
+			f.Income = f.Income.Sub(nkd)
+			quantity := adjustForSplits(uid, e.Date, e.Quantity)
+			f.trade(quantity, price)
+			f.Quantity = f.Quantity.Add(quantity)
 			f.record(e.Date)
-			if nkd := e.AccruedInterest.Amount; !nkd.IsZero() {
-				f.Bought = f.Bought.Add(nkd)
-				f.Income = f.Income.Sub(nkd)
-			}
 		case KindSell:
-			f.Sold = f.Sold.Add(amount)
-			f.Quantity = f.Quantity.Sub(adjustForSplits(uid, e.Date, e.Quantity))
+			nkd := e.AccruedInterest.Amount
+			price := amount.Sub(nkd)
+			f.Sold = f.Sold.Add(price)
+			f.Income = f.Income.Add(nkd)
+			quantity := adjustForSplits(uid, e.Date, e.Quantity)
+			f.trade(quantity.Neg(), price)
+			f.Quantity = f.Quantity.Sub(quantity)
 			f.record(e.Date)
-			if nkd := e.AccruedInterest.Amount; !nkd.IsZero() {
-				f.Sold = f.Sold.Sub(nkd)
-				f.Income = f.Income.Add(nkd)
-			}
 		case KindDividend, KindCoupon:
 			f.Income = f.Income.Add(amount)
 		case KindAmortization:
 			f.Sold = f.Sold.Add(amount)
+			f.Cost = f.Cost.Sub(amount)
 		case KindRedemption:
 			f.Sold = f.Sold.Add(amount)
+			f.Realized = f.Realized.Add(amount).Sub(f.Cost)
+			f.Cost = decimal.Zero
 			f.Quantity = decimal.Zero
 			f.record(e.Date)
 		case KindFee:
@@ -101,6 +108,8 @@ func ByInstrument(events []Event, currencyByAsset map[string]string) map[string]
 			f.Clearing = f.Clearing.Add(amount)
 		case KindExpiration:
 			f.Clearing = f.Clearing.Add(amount)
+			f.Realized = f.Realized.Sub(f.Cost)
+			f.Cost = decimal.Zero
 			f.Quantity = decimal.Zero
 			f.record(e.Date)
 		}
@@ -146,6 +155,7 @@ func addCurrencyMirror(pages map[string]*Flows, e Event) {
 	} else {
 		f.Sold = f.Sold.Add(mirror)
 	}
+	f.trade(e.Amount.Amount, mirror)
 	f.Quantity = f.Quantity.Add(e.Amount.Amount)
 	f.record(e.Date)
 }
@@ -158,6 +168,35 @@ func PageKeys(events []Event, currencyCodeByAssetUID map[string]string) (pageKey
 		}
 	}
 	return pageKeyByInstrumentUID
+}
+
+// trade — сделка по средней цене: quantity со знаком (покупка +, продажа −), amount — деньги
+// сделки со знаком (покупка −, продажа +). Вызывать до изменения Quantity.
+// Сначала сделка закрывает остаток противоположного знака по средней цене, остальное открывает
+// новый остаток: так шорт, перешедший через ноль, делится на закрытие и открытие.
+// У фьючерсов цены в сделке нет, их результат — в Clearing.
+func (f *Flows) trade(quantity, amount decimal.Decimal) {
+	if f.Kind == InstrumentFutures {
+		return
+	}
+	if !f.Quantity.IsZero() && f.Quantity.Sign() != quantity.Sign() {
+		held, traded := f.Quantity.Abs(), quantity.Abs()
+		closed := decimal.Min(held, traded)
+
+		cost := f.Cost
+		if !closed.Equal(held) {
+			cost = f.Cost.Mul(closed).Div(held)
+		}
+		proceeds := amount
+		if !closed.Equal(traded) {
+			proceeds = amount.Mul(closed).Div(traded)
+		}
+
+		f.Realized = f.Realized.Add(proceeds).Sub(cost)
+		f.Cost = f.Cost.Sub(cost)
+		amount = amount.Sub(proceeds)
+	}
+	f.Cost = f.Cost.Sub(amount)
 }
 
 func (f *Flows) record(date time.Time) {
